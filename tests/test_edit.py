@@ -18,7 +18,7 @@ def _create_editor_script(path: Path, contents: str) -> Path:
         f"#!/usr/bin/env bash\ncat > \"$1\" <<'EDOFSNIPPET'\n{contents}\nEDOFSNIPPET\n",
         encoding="utf-8",
     )
-    os.chmod(writer, 0o755)
+    os.chmod(writer, 0o700)
     return writer
 
 
@@ -117,7 +117,7 @@ class TestEditCommand:
         self._setup(tmp_path, monkeypatch)
         fail_editor = tmp_path / "fail_editor.sh"
         fail_editor.write_text("#!/usr/bin/env bash\nexit 1\n")
-        os.chmod(fail_editor, 0o755)
+        os.chmod(fail_editor, 0o700)
         monkeypatch.setenv("EDITOR", str(fail_editor))
         result = runner.invoke(app, ["edit", "gs"])
         assert result.exit_code == 1

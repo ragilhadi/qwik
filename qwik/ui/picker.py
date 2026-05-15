@@ -46,7 +46,6 @@ def run_picker(store: "AliasStore") -> str | None:
     selected_index = 0
     results: list[tuple[str, object, float]] = []
     selected_name: str | None = None
-    cancelled = False
 
     def refresh(query: str) -> None:
         nonlocal results, selected_index
@@ -122,8 +121,6 @@ def run_picker(store: "AliasStore") -> str | None:
     @kb.add("c-c")
     @kb.add("escape")
     def _cancel(event) -> None:  # type: ignore[no-untyped-def]
-        nonlocal cancelled
-        cancelled = True
         event.app.exit()
 
     @kb.add("c-e")
@@ -183,6 +180,4 @@ def run_picker(store: "AliasStore") -> str | None:
     refresh("")
     app.run()
 
-    if cancelled:
-        return None
     return selected_name
