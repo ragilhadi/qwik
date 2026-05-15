@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qwik"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Friendly CLI Alias Manager"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -49,11 +49,12 @@ packages = ["qwik"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "--cov=qwik --cov-report=term-missing --cov-fail-under=85"
+addopts = "--cov=qwik --cov-report=term-missing --cov-report=xml --cov-fail-under=85"
 
 [tool.coverage.run]
 source = ["qwik"]
 omit = ["*/tests/*"]
+relative_files = true
 
 [tool.mypy]
 python_version = "3.12"

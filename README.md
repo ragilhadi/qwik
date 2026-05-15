@@ -1,5 +1,9 @@
 # qwik — A Friendly CLI Alias Manager
 
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=ragilhadi_qwik&metric=coverage)](https://sonarcloud.io/summary/new_code?id=ragilhadi_qwik)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=ragilhadi_qwik&metric=bugs)](https://sonarcloud.io/summary/new_code?id=ragilhadi_qwik)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ragilhadi_qwik&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ragilhadi_qwik)
+
 Create, manage, and run shell aliases from a single interface. Works cross-platform with bash, zsh, fish, PowerShell, and cmd.
 
 **Two ways to run any alias:**
