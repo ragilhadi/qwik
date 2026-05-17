@@ -336,7 +336,7 @@ class TestShellRenderersCoverage:
 
         r = BashRenderer()
         out = r.render_alias("gco", Alias(command="git checkout {1}"))
-        assert "qwik -r" in out
+        assert "qwik run" in out
 
     def test_zsh_append_quotes(self) -> None:
         from qwik.shells.zsh import ZshRenderer
@@ -352,7 +352,7 @@ class TestShellRenderersCoverage:
 
         r = FishRenderer()
         out = r.render_alias("gco", Alias(command="git checkout {1}"))
-        assert "qwik -r" in out
+        assert "qwik run" in out
 
     def test_fish_append_quotes(self) -> None:
         from qwik.shells.fish import FishRenderer
@@ -368,7 +368,7 @@ class TestShellRenderersCoverage:
 
         r = PwshRenderer()
         out = r.render_alias("gco", Alias(command="git checkout {1}"))
-        assert "qwik -r" in out
+        assert "qwik run" in out
 
     def test_pwsh_append(self) -> None:
         from qwik.shells.pwsh import PwshRenderer

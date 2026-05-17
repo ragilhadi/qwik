@@ -64,6 +64,53 @@ def validate_placeholders(command: str, args: Sequence[str]) -> None:
         # {@} and {*} are always valid regardless of args
 
 
+def _parse_positional(match: re.Match[str], args: Sequence[str]) -> str:
+    """Handle {N} and {N:-default} placeholders."""
+    # {N} — group 1
+    if match.group(1) is not None:
+        idx = int(match.group(1))
+        if idx < 1:
+            raise ValueError(
+                f"Invalid placeholder {{{idx}}} in alias. "
+                f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
+            )
+        return args[idx - 1] if idx <= len(args) else ""
+    # {N:-default} — groups 4 and 5
+    if match.group(4) is not None:
+        idx = int(match.group(4))
+        if idx < 1:
+            raise ValueError(
+                f"Invalid placeholder {{{idx}}} in alias. "
+                f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
+            )
+        return args[idx - 1] if idx <= len(args) else match.group(5)
+    return match.group(0)
+
+
+def _replacer(match: re.Match[str], args: Sequence[str]) -> str:
+    if match.group(1) is not None or match.group(4) is not None:
+        return _parse_positional(match, args)
+    if match.group(2) is not None:
+        return " ".join(args)
+    if match.group(3) is not None:
+        return shlex.quote(" ".join(args))
+    return match.group(0)
+
+
+def _extract_surplus(command: str, args: Sequence[str]) -> Sequence[str]:
+    """Return any args that are not consumed by positional placeholders."""
+    max_ref = 0
+    for m in _PLACEHOLDER_RE.finditer(command):
+        if m.group(1) is not None:
+            max_ref = max(max_ref, int(m.group(1)))
+        elif m.group(4) is not None:
+            max_ref = max(max_ref, int(m.group(4)))
+        else:
+            # {@} or {*} consume everything
+            return []
+    return args[max_ref:]
+
+
 def expand(command: str, args: Sequence[str]) -> str:
     """Expand *command* using the provided positional *args*.
 
@@ -85,7 +132,7 @@ def expand(command: str, args: Sequence[str]) -> str:
     +------------------+------------------------------------------+
     | ``{*}``          | All arguments as a single quoted string. |
     +------------------+------------------------------------------+
-    | ``{1:-val}``     | N-th arg, falling back to *val* if missing.|
+    | ``{1:-val}``     | N-th arg, falling back to *val* if missing|
     +------------------+------------------------------------------+
 
     Args:
@@ -106,51 +153,9 @@ def expand(command: str, args: Sequence[str]) -> str:
 
     validate_placeholders(command, args)
 
-    def _replacer(match: re.Match[str]) -> str:
-        # {N}
-        if match.group(1) is not None:
-            idx = int(match.group(1))
-            if idx < 1:
-                raise ValueError(
-                    f"Invalid placeholder {{{idx}}} in alias. "
-                    f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
-                )
-            return args[idx - 1] if idx <= len(args) else ""
-        # {@}
-        if match.group(2) is not None:
-            return " ".join(args)
-        # {*}
-        if match.group(3) is not None:
-            return shlex.quote(" ".join(args))
-        # {N:-default}
-        if match.group(4) is not None:
-            idx = int(match.group(4))
-            if idx < 1:
-                raise ValueError(
-                    f"Invalid placeholder {{{idx}}} in alias. "
-                    f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
-                )
-            default = match.group(5)
-            return args[idx - 1] if idx <= len(args) else default
-        return match.group(0)
+    expanded = _PLACEHOLDER_RE.sub(lambda m: _replacer(m, args), command)
 
-    expanded = _PLACEHOLDER_RE.sub(_replacer, command)
-
-    # Append any surplus arguments after template substitution.
-    max_ref = 0
-    has_all_placeholder = False
-    for m in _PLACEHOLDER_RE.finditer(command):
-        if m.group(1) is not None:
-            max_ref = max(max_ref, int(m.group(1)))
-        elif m.group(4) is not None:
-            max_ref = max(max_ref, int(m.group(4)))
-        elif m.group(2) is not None or m.group(3) is not None:
-            has_all_placeholder = True
-
-    if has_all_placeholder:
-        surplus: list[str] = []
-    else:
-        surplus = args[max_ref:]
+    surplus = _extract_surplus(command, args)
     if surplus:
         quoted = " ".join(shlex.quote(a) for a in surplus)
         expanded = f"{expanded} {quoted}"

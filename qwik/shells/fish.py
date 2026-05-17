@@ -25,7 +25,7 @@ class FishRenderer(ShellRenderer):
 
         Append-mode aliases become ``alias name 'command'``.
         Template-mode aliases become a wrapper function that calls
-        ``qwik -r`` so argument substitution is delegated back to the
+        ``qwik run`` so argument substitution is delegated back to the
         Python engine.
 
         Args:
@@ -38,6 +38,6 @@ class FishRenderer(ShellRenderer):
         from qwik.core.substitute import has_placeholders
 
         if has_placeholders(alias.command):
-            return f"function {name}\n" f'    qwik -r "{name}" $argv\n' f"end"
+            return f'function {name}\n    qwik run "{name}" $argv\nend'
         escaped = alias.command.replace("'", "\\'")
-        return f"function {name}\n" f"    {escaped} $argv\n" f"end"
+        return f"function {name}\n    {escaped} $argv\nend"

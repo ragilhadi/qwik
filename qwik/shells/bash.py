@@ -25,7 +25,7 @@ class BashRenderer(ShellRenderer):
 
         Append-mode aliases become ``alias name='command'``.
         Template-mode aliases (containing placeholders) become a
-        wrapper function that delegates to ``qwik -r`` so that the
+        wrapper function that delegates to ``qwik run`` so that the
         substitution engine is reused exactly.
 
         Args:
@@ -39,6 +39,6 @@ class BashRenderer(ShellRenderer):
 
         if has_placeholders(alias.command):
             # Function wrapper so complex quoting is handled by qwik itself.
-            return f"{name}() {{\n" f'    qwik -r "{name}" "$@"\n' f"}}"
+            return f"{name}() {{\n" f'    qwik run "{name}" "$@"\n' f"}}"
         escaped = alias.command.replace("'", "'\"'\"'")
         return f"alias {name}='{escaped}'"

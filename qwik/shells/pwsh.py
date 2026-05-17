@@ -25,7 +25,7 @@ class PwshRenderer(ShellRenderer):
 
         All aliases are rendered as functions because PowerShell does not
         support passing arbitrary arguments to native ``alias``.
-        Template mode uses ``qwik -r``; append mode forwards ``$args``
+        Template mode uses ``qwik run``; append mode forwards ``$args``
         directly.
 
         Args:
@@ -38,5 +38,5 @@ class PwshRenderer(ShellRenderer):
         from qwik.core.substitute import has_placeholders
 
         if has_placeholders(alias.command):
-            return f"function {name} {{\n" f'    qwik -r "{name}" @args\n' f"}}"
-        return f"function {name} {{\n" f"    {alias.command} @args\n" f"}}"
+            return f'function {name} {{\n    qwik run "{name}" @args\n}}'
+        return f"function {name} {{\n    {alias.command} @args\n}}"

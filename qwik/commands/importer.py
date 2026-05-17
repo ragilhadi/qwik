@@ -16,9 +16,6 @@ __all__ = ["import_command"]
 
 def import_command(
     path: Path = typer.Argument(..., help="Source file path."),
-    merge: bool = typer.Option(
-        True, "--merge", "-m", help="Merge with existing aliases."
-    ),
     overwrite: bool = typer.Option(
         False, "--overwrite", "-o", help="Replace entire store."
     ),
