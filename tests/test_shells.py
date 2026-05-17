@@ -25,7 +25,7 @@ class TestRenderers:
     def test_bash_template_function(self) -> None:
         renderer = get_renderer("bash")
         out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
-        assert 'qwik -r "gco" "$@"' in out
+        assert 'qwik run "gco" "$@"' in out
 
     def test_zsh_append_alias_with_quotes(self) -> None:
         renderer = get_renderer("zsh")

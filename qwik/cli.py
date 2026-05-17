@@ -42,6 +42,7 @@ app = typer.Typer(
 # Register subcommands
 app.command("add")(add_command)
 app.command("list")(list_command)
+app.command("ls")(list_command)
 app.command("show")(show_command)
 app.command("edit")(edit_command)
 app.command("rename")(rename_command)

@@ -85,13 +85,8 @@ def doctor_command() -> None:
         raise typer.Exit(1)
 
 
-def _detect_shell() -> str | None:
-    """Attempt to detect the current user's shell.
-
-    Returns:
-        A lowercase shell name (e.g. ``bash``, ``zsh``), or ``None``.
-    """
-    # Prefer the $SHELL environment variable.
+def _shell_name_from_env() -> str | None:
+    """Return shell name from ``$SHELL`` if present."""
     shell_env = os.environ.get("SHELL", "").lower()
     if "bash" in shell_env:
         return "bash"
@@ -101,8 +96,11 @@ def _detect_shell() -> str | None:
         return "fish"
     if "pwsh" in shell_env or "powershell" in shell_env:
         return "pwsh"
+    return None
 
-    # Fallback: inspect parent process via /proc on Linux.
+
+def _shell_name_from_proc() -> str | None:
+    """Return shell name by inspecting parent process on Linux."""
     try:
         with Path("/proc/self/status").open(encoding="utf-8") as f:
             for line in f:
@@ -122,6 +120,15 @@ def _detect_shell() -> str | None:
     except Exception:
         pass
     return None
+
+
+def _detect_shell() -> str | None:
+    """Attempt to detect the current user's shell.
+
+    Returns:
+        A lowercase shell name (e.g. ``bash``, ``zsh``), or ``None``.
+    """
+    return _shell_name_from_env() or _shell_name_from_proc()
 
 
 def _hook_installed(shell: str | None) -> bool:

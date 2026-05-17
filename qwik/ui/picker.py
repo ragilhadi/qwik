@@ -25,6 +25,89 @@ if TYPE_CHECKING:
 __all__ = ["run_picker"]
 
 
+def _get_result_lines(results, selected_index):
+    lines = []
+    for idx, (name, alias, _score) in enumerate(results):
+        prefix = "▶ " if idx == selected_index else "  "
+        style = "bold" if idx == selected_index else ""
+        cmd = alias.command[:40]
+        lines.append((f"{style}" if style else "", f"{prefix}{name:<12} {cmd}\n"))
+    if not results:
+        lines.append(("dim", "  (no matches)\n"))
+    return lines
+
+
+def _get_preview_lines(results, selected_index):
+    if not results or selected_index >= len(results):
+        return [("dim", "  (no selection)\n")]
+    name, alias, _ = results[selected_index]
+    return [
+        ("bold", f"  Name: {name}\n"),
+        ("", f"  Cmd:  {alias.command}\n"),
+        ("", f"  Tag:  {', '.join(alias.tag) or '—'}\n"),
+        ("", f"  Used: {alias.run_count} times\n"),
+    ]
+
+
+class _PickerState:
+    def __init__(self) -> None:
+        self.selected_index: int = 0
+        self.results: list[tuple[str, object, float]] = []
+        self.selected_name: str | None = None
+
+
+def _bind_keys(
+    kb: KeyBindings,
+    state: _PickerState,
+    result_window: Window,
+    preview_window: Window,
+) -> None:
+    @kb.add("up")
+    def _up(event) -> None:  # type: ignore[no-untyped-def]
+        if state.results:
+            state.selected_index = max(0, state.selected_index - 1)
+            result_window.content = FormattedTextControl(
+                lambda: _get_result_lines(state.results, state.selected_index)
+            )
+            preview_window.content = FormattedTextControl(
+                lambda: _get_preview_lines(state.results, state.selected_index)
+            )
+
+    @kb.add("down")
+    def _down(event) -> None:  # type: ignore[no-untyped-def]
+        if state.results:
+            state.selected_index = min(len(state.results) - 1, state.selected_index + 1)
+            result_window.content = FormattedTextControl(
+                lambda: _get_result_lines(state.results, state.selected_index)
+            )
+            preview_window.content = FormattedTextControl(
+                lambda: _get_preview_lines(state.results, state.selected_index)
+            )
+
+    @kb.add("enter")
+    def _enter(event) -> None:  # type: ignore[no-untyped-def]
+        if state.results and state.selected_index < len(state.results):
+            state.selected_name = state.results[state.selected_index][0]
+            event.app.exit()
+
+    @kb.add("c-c")
+    @kb.add("escape")
+    def _cancel(event) -> None:  # type: ignore[no-untyped-def]
+        event.app.exit()
+
+    @kb.add("c-e")
+    def _edit(event) -> None:  # type: ignore[no-untyped-def]
+        if state.results and state.selected_index < len(state.results):
+            state.selected_name = f"__edit__:{state.results[state.selected_index][0]}"
+            event.app.exit()
+
+    @kb.add("c-d")
+    def _delete(event) -> None:  # type: ignore[no-untyped-def]
+        if state.results and state.selected_index < len(state.results):
+            state.selected_name = f"__delete__:{state.results[state.selected_index][0]}"
+            event.app.exit()
+
+
 def run_picker(store: "AliasStore") -> str | None:
     """Run the interactive fuzzy picker and return the selected alias name.
 
@@ -41,101 +124,31 @@ def run_picker(store: "AliasStore") -> str | None:
         return None
 
     kb = KeyBindings()
+    state = _PickerState()
 
-    # State
-    selected_index = 0
-    results: list[tuple[str, object, float]] = []
-    selected_name: str | None = None
-
-    def refresh(query: str) -> None:
-        nonlocal results, selected_index
-        results = search_aliases(store, query, limit=50)
-        selected_index = 0
-        result_window.content = FormattedTextControl(get_result_text)
-        preview_window.content = FormattedTextControl(get_preview_text)
-
-    def get_result_text() -> list:
-        lines: list = []
-        for idx, (name, alias, score) in enumerate(results):
-            prefix = "▶ " if idx == selected_index else "  "
-            style = "bold" if idx == selected_index else ""
-            cmd = alias.command[:40]
-            lines.append((f"{style}" if style else "", f"{prefix}{name:<12} {cmd}\n"))
-        if not results:
-            lines.append(("dim", "  (no matches)\n"))
-        return lines
-
-    def get_preview_text() -> list:
-        if not results or selected_index >= len(results):
-            return [("dim", "  (no selection)\n")]
-        name, alias, _ = results[selected_index]
-        lines = [
-            ("bold", f"  Name: {name}\n"),
-            ("", f"  Cmd:  {alias.command}\n"),
-            ("", f"  Tag:  {', '.join(alias.tag) or '—'}\n"),
-            ("", f"  Used: {alias.run_count} times\n"),
-        ]
-        return lines
-
-    # Buffers
-    input_buffer = Buffer(
-        on_text_changed=lambda buf: refresh(buf.text),
-        multiline=False,
-    )
-
-    # Windows
     result_window = Window(
-        content=FormattedTextControl(get_result_text),
+        content=FormattedTextControl(
+            lambda: _get_result_lines(state.results, state.selected_index)
+        ),
         height=Dimension(max=10),
         wrap_lines=False,
     )
     preview_window = Window(
-        content=FormattedTextControl(get_preview_text),
+        content=FormattedTextControl(
+            lambda: _get_preview_lines(state.results, state.selected_index)
+        ),
         height=Dimension(min=4, max=8),
         wrap_lines=False,
     )
 
-    @kb.add("up")
-    def _up(event) -> None:  # type: ignore[no-untyped-def]
-        nonlocal selected_index
-        if results:
-            selected_index = max(0, selected_index - 1)
-            result_window.content = FormattedTextControl(get_result_text)
-            preview_window.content = FormattedTextControl(get_preview_text)
+    _bind_keys(kb, state, result_window, preview_window)
 
-    @kb.add("down")
-    def _down(event) -> None:  # type: ignore[no-untyped-def]
-        nonlocal selected_index
-        if results:
-            selected_index = min(len(results) - 1, selected_index + 1)
-            result_window.content = FormattedTextControl(get_result_text)
-            preview_window.content = FormattedTextControl(get_preview_text)
-
-    @kb.add("enter")
-    def _enter(event) -> None:  # type: ignore[no-untyped-def]
-        nonlocal selected_name
-        if results and selected_index < len(results):
-            selected_name = results[selected_index][0]
-            event.app.exit()
-
-    @kb.add("c-c")
-    @kb.add("escape")
-    def _cancel(event) -> None:  # type: ignore[no-untyped-def]
-        event.app.exit()
-
-    @kb.add("c-e")
-    def _edit(event) -> None:  # type: ignore[no-untyped-def]
-        nonlocal selected_name
-        if results and selected_index < len(results):
-            selected_name = f"__edit__:{results[selected_index][0]}"
-            event.app.exit()
-
-    @kb.add("c-d")
-    def _delete(event) -> None:  # type: ignore[no-untyped-def]
-        nonlocal selected_name
-        if results and selected_index < len(results):
-            selected_name = f"__delete__:{results[selected_index][0]}"
-            event.app.exit()
+    input_buffer = Buffer(
+        on_text_changed=lambda buf: _refresh(
+            store, state, result_window, preview_window, buf.text
+        ),
+        multiline=False,
+    )
 
     layout = Layout(
         HSplit(
@@ -177,7 +190,18 @@ def run_picker(store: "AliasStore") -> str | None:
     )
 
     app = Application(layout=layout, key_bindings=kb, style=style, full_screen=False)
-    refresh("")
+    _refresh(store, state, result_window, preview_window, "")
     app.run()
 
-    return selected_name
+    return state.selected_name
+
+
+def _refresh(store, state, result_window, preview_window, query):
+    state.results = search_aliases(store, query, limit=50)
+    state.selected_index = 0
+    result_window.content = FormattedTextControl(
+        lambda: _get_result_lines(state.results, state.selected_index)
+    )
+    preview_window.content = FormattedTextControl(
+        lambda: _get_preview_lines(state.results, state.selected_index)
+    )
