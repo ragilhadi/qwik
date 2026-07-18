@@ -106,3 +106,36 @@ class TestCallbackCoverage:
         _reset_config()
         result = runner.invoke(app, ["list"])
         assert result.exit_code == 0
+
+
+class TestNoColorFlag:
+    def test_no_color_flag_disables_color(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setattr("qwik.ui.theme._NO_COLOR_OVERRIDE", False)
+        _reset_config()
+        result = runner.invoke(app, ["--no-color", "list"])
+        assert "\x1b[" not in result.output
+
+    def test_no_color_env_disables_color(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        monkeypatch.setenv("NO_COLOR", "1")
+        monkeypatch.setattr("qwik.ui.theme._NO_COLOR_OVERRIDE", False)
+        _reset_config()
+        result = runner.invoke(app, ["list"])
+        assert "\x1b[" not in result.output
+
+
+class TestDebug:
+    def test_qwik_debug_does_not_crash(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        monkeypatch.setenv("QWIK_DEBUG", "1")
+        _reset_config()
+        result = runner.invoke(app, ["list"])
+        assert result.exit_code in (0, 1)

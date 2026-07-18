@@ -21,14 +21,13 @@ class TestTheme:
         assert s is not None
 
     def test_no_color_env(self, monkeypatch) -> None:
-        """Cover NO_COLOR branch."""
+        """Cover NO_COLOR branch (lazy env read)."""
         monkeypatch.setenv("NO_COLOR", "1")
-        # Need to reimport/respect env
-        import importlib
         import qwik.ui.theme as theme_mod
 
-        importlib.reload(theme_mod)
-        assert theme_mod._FORCE_COLOR is False
+        assert theme_mod._no_color_active() is True
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        assert theme_mod._no_color_active() is False
 
 
 class TestTables:

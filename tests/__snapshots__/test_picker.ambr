@@ -1,0 +1,26 @@
+# serializer version: 1
+# name: test_picker_result_lines_snapshot
+  list([
+    tuple(
+      'bold',
+      '''
+        ▶ gco          git checkout {1}
+  
+      ''',
+    ),
+    tuple(
+      '',
+      '''
+          gp           git push
+  
+      ''',
+    ),
+    tuple(
+      '',
+      '''
+          gs           git status
+  
+      ''',
+    ),
+  ])
+# ---

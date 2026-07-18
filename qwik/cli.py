@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+import os
+
 import typer
-from rich.console import Console
 
 from qwik import __version__
 from qwik.commands.add import add_command
@@ -21,6 +23,8 @@ from qwik.commands.run import run_command
 from qwik.commands.search import search_command
 from qwik.commands.show import show_command
 from qwik.commands.tag import tag_command, untag_command
+import qwik.ui.theme as _theme
+from qwik.ui.theme import get_console
 
 __all__ = ["app"]
 
@@ -28,7 +32,7 @@ __all__ = ["app"]
 def _version_callback(value: bool) -> None:
     """Print version and exit."""
     if value:
-        Console().print(f"qwik {__version__}")
+        get_console().print(f"qwik {__version__}")
         raise typer.Exit()
 
 
@@ -91,17 +95,28 @@ def main(
         help="Show this message and exit.",
         is_eager=True,
     ),
+    no_color: bool = typer.Option(
+        False,
+        "--no-color",
+        help="Disable colored output.",
+    ),
 ) -> None:
     """Top-level callback implementing shortcut flags and bare invocation.
 
     When invoked with no subcommand and no flags, the fuzzy picker opens.
     """
+    if os.environ.get("QWIK_DEBUG"):
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(levelname)s %(name)s: %(message)s",
+        )
+    _theme._NO_COLOR_OVERRIDE = no_color
     # If a subcommand is already being handled, do nothing.
     if ctx.invoked_subcommand is not None:
         return
 
     if help_flag:
-        Console().print(ctx.get_help())
+        get_console().print(ctx.get_help())
         raise typer.Exit()
 
     if list_flag:
@@ -126,13 +141,13 @@ def main(
                 idx = i
                 break
         if idx is None:
-            Console().print(
+            get_console().print(
                 "[qwik.error]Could not locate -r in arguments.[/qwik.error]"
             )
             raise typer.Exit(1)
         remainder = sys.argv[idx + 1 :]
         if not remainder:
-            Console().print("[qwik.error]Usage: qwik -r <name> [args...][/qwik.error]")
+            get_console().print("[qwik.error]Usage: qwik -r <name> [args...][/qwik.error]")
             raise typer.Exit(1)
         name = remainder[0]
         args = remainder[1:]

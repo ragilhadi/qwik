@@ -29,14 +29,16 @@ Create, manage, and run shell aliases from a single interface. Works cross-platf
 
 ## Installation
 
+Not yet published to PyPI; install from source.
+
 ```bash
-pipx install qwik
+pipx install git+https://github.com/ragilhadi/qwik.git
 ```
 
 Or with `uv`:
 
 ```bash
-uv tool install qwik
+uv tool install git+https://github.com/ragilhadi/qwik.git
 ```
 
 ## Quick Start
@@ -205,6 +207,7 @@ qwik --version
 qwik -v
 qwik --help
 qwik -h
+qwik --no-color           # disable colored output for this invocation
 ```
 
 ---
@@ -241,6 +244,8 @@ Use `{…}` markers to substitute arguments into the command.
 qwik add gco "git checkout {1}"
 gco main                # → git checkout main
 ```
+
+> **Note:** `{1}`, `{@}`, and `{N:-default}` interpolations are `shlex.quote`d at runtime, so args containing shell metacharacters are passed safely. `{*}` is shell-quoted as a single string. For example, `qwik run gco '; rm -rf /'` expands to `git checkout '; rm -rf /'` — the `;` is quoted and treated as a literal argument, not a command separator.
 
 **Multiple positionals:**
 
@@ -297,7 +302,7 @@ co                      # → git checkout main (default)
 
 ### Validation
 
-- `{0}` is rejected at add-time — placeholders are 1-based
+- `{0}` is rejected at add-time and at run-time — placeholders are 1-based
 - Missing required args produce a clear error at runtime instead of silently expanding to empty strings
 
 ---
@@ -417,6 +422,7 @@ run_count = 42
 |---|---|
 | `EDITOR` | Editor for `qwik edit` (default: `vi`) |
 | `QWIK_CONFIG_DIR` | Override default config directory |
+| `XDG_CONFIG_HOME` | Base config dir (used by fish rc resolution) |
 | `QWIK_DEBUG=1` | Enable debug logs to stderr |
 | `NO_COLOR` | Disable colored output (also `--no-color`) |
 

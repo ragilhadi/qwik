@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
 from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.input import Input
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import (
     HSplit,
@@ -14,19 +15,30 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.layout.dimension import Dimension
+from prompt_toolkit.output import Output
 from prompt_toolkit.styles import Style as PTStyle
 
 from qwik.core.search import search_aliases
 from qwik.ui.theme import get_console
 
 if TYPE_CHECKING:
-    from qwik.core.models import AliasStore
+    from qwik.core.models import Alias, AliasStore
 
 __all__ = ["run_picker"]
 
 
-def _get_result_lines(results, selected_index):
-    lines = []
+def _build_style() -> PTStyle:
+    from qwik.ui.theme import _no_color_active
+
+    if _no_color_active():
+        return PTStyle.from_dict({"": "", "bold": "bold", "dim": ""})
+    return PTStyle.from_dict({"": "#ffffff", "bold": "bold #ffffff", "dim": "#666666"})
+
+
+def _get_result_lines(
+    results: list[tuple[str, Alias, float]], selected_index: int
+) -> list[tuple[str, str]]:
+    lines: list[tuple[str, str]] = []
     for idx, (name, alias, _score) in enumerate(results):
         prefix = "▶ " if idx == selected_index else "  "
         style = "bold" if idx == selected_index else ""
@@ -37,7 +49,9 @@ def _get_result_lines(results, selected_index):
     return lines
 
 
-def _get_preview_lines(results, selected_index):
+def _get_preview_lines(
+    results: list[tuple[str, Alias, float]], selected_index: int
+) -> list[tuple[str, str]]:
     if not results or selected_index >= len(results):
         return [("dim", "  (no selection)\n")]
     name, alias, _ = results[selected_index]
@@ -52,7 +66,7 @@ def _get_preview_lines(results, selected_index):
 class _PickerState:
     def __init__(self) -> None:
         self.selected_index: int = 0
-        self.results: list[tuple[str, object, float]] = []
+        self.results: list[tuple[str, Alias, float]] = []
         self.selected_name: str | None = None
 
 
@@ -108,7 +122,12 @@ def _bind_keys(
             event.app.exit()
 
 
-def run_picker(store: "AliasStore") -> str | None:
+def run_picker(
+    store: "AliasStore",
+    *,
+    input_: Input | None = None,
+    output: Output | None = None,
+) -> str | None:
     """Run the interactive fuzzy picker and return the selected alias name.
 
     Args:
@@ -181,22 +200,29 @@ def run_picker(store: "AliasStore") -> str | None:
         )
     )
 
-    style = PTStyle.from_dict(
-        {
-            "": "#ffffff",
-            "bold": "bold #ffffff",
-            "dim": "#666666",
-        }
-    )
+    style = _build_style()
 
-    app = Application(layout=layout, key_bindings=kb, style=style, full_screen=False)
+    app: Application[None] = Application(
+        layout=layout,
+        key_bindings=kb,
+        style=style,
+        full_screen=False,
+        input=input_,
+        output=output,
+    )
     _refresh(store, state, result_window, preview_window, "")
     app.run()
 
     return state.selected_name
 
 
-def _refresh(store, state, result_window, preview_window, query):
+def _refresh(
+    store: "AliasStore",
+    state: _PickerState,
+    result_window: Window,
+    preview_window: Window,
+    query: str,
+) -> None:
     state.results = search_aliases(store, query, limit=50)
     state.selected_index = 0
     result_window.content = FormattedTextControl(

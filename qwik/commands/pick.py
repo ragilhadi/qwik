@@ -5,12 +5,12 @@ from __future__ import annotations
 import subprocess
 
 import typer
-from rich.console import Console
 
 from qwik.core.store import get_store
 from qwik.core.substitute import expand
 from qwik.ui.picker import run_picker
 from qwik.ui.prompts import print_error, print_success
+from qwik.ui.theme import get_console
 
 __all__ = ["pick_command"]
 
@@ -19,7 +19,7 @@ def pick_command() -> None:
     """Open the interactive fuzzy picker; selecting an alias runs it."""
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     selected = run_picker(data)
     if selected is None:
@@ -64,13 +64,16 @@ def pick_command() -> None:
     print_success(f'Running "{name}" → {expanded!r}', console=console)
     returncode = 1
     try:
-        result = subprocess.run(expanded, shell=True)
-        returncode = result.returncode
+        completed = subprocess.run(expanded, shell=True)
+        returncode = completed.returncode
     except KeyboardInterrupt:
         # Child received SIGINT (e.g. user hit Ctrl+C on a long-running command).
         returncode = 130
     finally:
-        alias.bump_usage()
-        store.save_with_backup(data)
+        try:
+            store.bump_usage(name)
+        except OSError:
+            # best-effort usage tracking; never mask the command's exit code
+            pass
 
     raise typer.Exit(returncode)

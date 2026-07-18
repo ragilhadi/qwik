@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import shutil
 import os
 from datetime import datetime, timezone
@@ -10,6 +11,7 @@ from typing import Any
 
 import tomlkit
 from tomlkit import TOMLDocument
+from tomlkit.exceptions import ParseError as TOMLDecodeError
 
 from qwik.config import Config, get_config
 from qwik.core.models import AliasStore
@@ -23,13 +25,21 @@ __all__ = [
 _MAX_BACKUPS: int = 20
 
 
-def _now_stamp() -> str:
-    """Return an ISO-like timestamp suitable for filenames.
+# Monotonic counter appended to backup timestamps to guarantee filename
+# uniqueness even when ``datetime.now()`` returns the same value twice in
+# a tight loop (Windows clock resolution is ~15 ms, so microsecond stamps
+# can still collide).
+_backup_counter: itertools.count[int] = itertools.count()
 
-    Returns:
-        A string in the form ``YYYYMMDD-HHMMSS``.
+
+def _now_stamp() -> str:
+    """Return an ISO-like timestamp with microseconds and a per-process counter.
+
+    The counter suffix guarantees filename uniqueness across rapid writes
+    on platforms where ``datetime.now()`` resolution is coarser than the
+    call interval.
     """
-    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    return f"{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')}-{next(_backup_counter):04d}"
 
 
 class Store:
@@ -69,10 +79,17 @@ class Store:
         """
         if not self._path.exists():
             return AliasStore()
-        raw = self._path.read_text(encoding="utf-8")
-        doc = tomlkit.parse(raw)
-        data: dict[str, Any] = doc.unwrap()
-        return AliasStore.model_validate(data)
+        try:
+            raw = self._path.read_text(encoding="utf-8")
+            doc = tomlkit.parse(raw)
+            data: dict[str, Any] = doc.unwrap()
+            return AliasStore.model_validate(data)
+        except (TOMLDecodeError, ValueError) as exc:
+            raise RuntimeError(
+                f"Could not read alias store at {self._path}: {exc}. "
+                f"Run `qwik doctor` to diagnose or restore from "
+                f"{self._backup_dir}."
+            ) from exc
 
     def save(self, store: AliasStore) -> None:
         """Persist *store* atomically to disk.
@@ -86,6 +103,23 @@ class Store:
         temp.write_text(tomlkit.dumps(doc), encoding="utf-8")
         temp.replace(self._path)
 
+    def bump_usage(self, name: str) -> None:
+        """Increment ``run_count`` / update ``last_used`` for *name* only.
+
+        Performs a read-modify-write under :class:`FileLock`. Does NOT
+        create a backup (reserves backups for mutating operations).
+        """
+        from qwik.core.locking import FileLock
+
+        lock = FileLock(self._path.with_suffix(".toml.lock"))
+        with lock:
+            data = self.load()
+            alias = data.get(name)
+            if alias is None:
+                return
+            alias.bump_usage()
+            self.save(data)
+
     def save_with_backup(self, store: AliasStore) -> None:
         """Persist *store* after creating a backup of the existing file.
 
@@ -94,9 +128,9 @@ class Store:
         """
         self._config.ensure_dirs()
         if self._path.exists():
-            self._rotate_backups()
             backup_name = f"aliases-{_now_stamp()}.toml"
             shutil.copy2(self._path, self._backup_dir / backup_name)
+            self._rotate_backups()
         self.save(store)
 
     def _rotate_backups(self) -> None:
@@ -104,9 +138,8 @@ class Store:
         if not self._backup_dir.exists():
             return
         backups = sorted(self._backup_dir.glob("aliases-*.toml"))
-        if len(backups) > _MAX_BACKUPS:
-            for old in backups[: len(backups) - _MAX_BACKUPS]:
-                old.unlink()
+        for old in backups[: len(backups) - _MAX_BACKUPS]:
+            old.unlink(missing_ok=True)
 
     @staticmethod
     def _store_to_document(store: AliasStore) -> TOMLDocument:

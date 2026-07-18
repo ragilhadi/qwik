@@ -7,18 +7,19 @@ import shutil
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
+from qwik.commands.init_shell import _fish_config_dir
 from qwik.core.store import get_store
 from qwik.shells.base import SUPPORTED_SHELLS
 from qwik.ui.prompts import print_error, print_success, print_warning
+from qwik.ui.theme import get_console
 
 __all__ = ["doctor_command"]
 
 
 def doctor_command() -> None:
     """Diagnose shell, hook status, store readability, and conflicts."""
-    console = Console()
+    console = get_console()
     store = get_store()
 
     checks_ok = 0
@@ -145,7 +146,7 @@ def _hook_installed(shell: str | None) -> bool:
     rc_map = {
         "bash": Path.home() / ".bashrc",
         "zsh": Path.home() / ".zshrc",
-        "fish": Path.home() / ".config" / "fish" / "config.fish",
+        "fish": _fish_config_dir() / "config.fish",
         "pwsh": Path.home()
         / ".config"
         / "powershell"

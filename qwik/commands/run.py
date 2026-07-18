@@ -1,33 +1,23 @@
-"""``qwik run`` / ``qwik -r`` — execute an alias via subprocess."""
+"""``qwik run`` / ``qwik -r`` — execute an alias via subprocess.
+
+All aliases are executed under ``shell=True`` because alias commands are
+shell snippets that may legitimately use pipes, redirects, and compound
+operators. Runtime arguments are pre-quoted by :mod:`qwik.core.substitute`
+to prevent injection.
+"""
 
 from __future__ import annotations
 
 import subprocess
 
 import typer
-from rich.console import Console
 
 from qwik.core.store import get_store
 from qwik.core.substitute import expand
 from qwik.ui.prompts import print_error, print_success
+from qwik.ui.theme import get_console
 
 __all__ = ["run_command"]
-
-
-def _has_shell_metacharacters(cmd: str) -> bool:
-    """Detect characters that require ``shell=True``.
-
-    Args:
-        cmd: The expanded command string.
-
-    Returns:
-        ``True`` if *cmd* contains characters like ``|``, ``>``, ``<``,
-        ``;``, ``&``, ``$``, backticks, ``~``, ``*``, ``(``, ``)``,
-        or compound operators ``&&`` / ``||``.
-    """
-    if "&&" in cmd or "||" in cmd:
-        return True
-    return any(c in cmd for c in r"|<>&$`~*()")
 
 
 def run_command(
@@ -37,7 +27,7 @@ def run_command(
     """Execute an alias via subprocess (works without shell hooks)."""
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     alias = data.get(name)
     if alias is None:
@@ -63,7 +53,10 @@ def run_command(
         # Child received SIGINT (e.g. user hit Ctrl+C on docker stats).
         returncode = 130
     finally:
-        alias.bump_usage()
-        store.save_with_backup(data)
+        try:
+            store.bump_usage(name)
+        except OSError:
+            # best-effort usage tracking; never mask the command's exit code
+            pass
 
     raise typer.Exit(returncode)

@@ -4,16 +4,17 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
 from qwik.core.models import Alias
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success
+from qwik.ui.theme import get_console
 
 __all__ = ["edit_command"]
 
@@ -55,14 +56,19 @@ def edit_command(
     """Open the alias entry in ``$EDITOR`` as an editable TOML snippet."""
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     alias = data.get(name)
     if alias is None:
         print_error(f'Alias "{name}" does not exist.', console=console)
         raise typer.Exit(1)
 
-    editor = os.environ.get("EDITOR", "vi")
+    default_editor = "notepad" if sys.platform == "win32" else "vi"
+    editor = (
+        os.environ.get("EDITOR")
+        or os.environ.get("VISUAL")
+        or default_editor
+    )
 
     snippet = (
         f'# Edit the fields below and save/quit to apply changes to "{name}"\n'
@@ -96,9 +102,9 @@ def edit_command(
 
         data.aliases[name] = Alias(
             command=str(new_fields.get("command", alias.command)),
-            tag=new_fields.get("tag", alias.tag) or [],
+            tag=list(new_fields.get("tag", alias.tag)) or [],  # type: ignore[call-overload]
             description=str(new_fields.get("description", alias.description)),
-            enabled=new_fields.get("enabled", alias.enabled),
+            enabled=bool(new_fields.get("enabled", alias.enabled)),
             created_at=alias.created_at,
             updated_at=datetime.now(timezone.utc),
             last_used=alias.last_used,
@@ -108,6 +114,16 @@ def edit_command(
         print_success(f'Updated "{name}".', console=console)
     except subprocess.CalledProcessError as exc:
         print_error(f"Editor exited with code {exc.returncode}.", console=console)
+        raise typer.Exit(1)
+    except FileNotFoundError:
+        print_error(
+            f"Editor {editor!r} not found.",
+            suggestion="Set $EDITOR or $VISUAL to an installed editor.",
+            console=console,
+        )
+        raise typer.Exit(1)
+    except OSError as exc:
+        print_error(f"Could not launch editor {editor!r}: {exc}", console=console)
         raise typer.Exit(1)
     finally:
         tmp_path.unlink(missing_ok=True)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -17,6 +18,17 @@ from qwik.ui.prompts import print_error, print_info, print_success
 __all__ = ["init_shell_command"]
 
 
+def _fish_config_dir() -> Path:
+    """Resolve the fish config directory honoring env overrides."""
+    env_val = os.environ.get("__fish_config_dir")
+    if env_val:
+        return Path(env_val)
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg:
+        return Path(xdg) / "fish"
+    return Path.home() / ".config" / "fish"
+
+
 def _rc_path(shell: str) -> Path | None:
     """Guess the standard rc file for *shell*.
 
@@ -30,8 +42,6 @@ def _rc_path(shell: str) -> Path | None:
     if shell == "pwsh":
         pwsh_dir = home / ".config" / "powershell"
         if sys.platform == "win32":
-            import os
-
             # Use %USERPROFILE%\Documents instead of hardcoded "Documents"
             # to support non-English Windows and relocated folders.
             docs = Path.home()
@@ -55,7 +65,7 @@ def _rc_path(shell: str) -> Path | None:
     mapping: dict[str, Path] = {
         "bash": home / ".bashrc",
         "zsh": home / ".zshrc",
-        "fish": home / ".config" / "fish" / "config.fish",
+        "fish": _fish_config_dir() / "config.fish",
     }
     return mapping.get(shell)
 

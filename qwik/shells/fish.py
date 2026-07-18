@@ -39,5 +39,5 @@ class FishRenderer(ShellRenderer):
 
         if has_placeholders(alias.command):
             return f'function {name}\n    qwik run "{name}" $argv\nend'
-        escaped = alias.command.replace("'", "\\'")
-        return f"function {name}\n    {escaped} $argv\nend"
+        escaped = alias.command.replace("\\", "\\\\").replace("'", "\\'")
+        return f"function {name}\n    '{escaped}' $argv\nend"

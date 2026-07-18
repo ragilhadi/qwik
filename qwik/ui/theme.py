@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Literal
 
 from rich.console import Console
 from rich.style import Style
@@ -15,8 +15,15 @@ __all__ = [
     "style",
 ]
 
-# Respect NO_COLOR environment variable per PRD §7.
-_FORCE_COLOR: bool | None = None if os.environ.get("NO_COLOR") is None else False
+_NO_COLOR_OVERRIDE: bool = False
+
+
+def _no_color_active() -> bool:
+    """True if color output is disabled via flag, env, or platform."""
+    if _NO_COLOR_OVERRIDE:
+        return True
+    return os.environ.get("NO_COLOR") is not None
+
 
 THEME = Theme(
     {
@@ -42,7 +49,9 @@ def get_console(*, no_color: bool = False, **kwargs: Any) -> Console:
     Returns:
         A configured Rich console.
     """
-    color_system = None if (_FORCE_COLOR is False or no_color) else "auto"
+    color_system: Literal["auto", "standard", "256", "truecolor", "windows"] | None = (
+        None if (no_color or _no_color_active()) else "auto"
+    )
     return Console(theme=THEME, color_system=color_system, **kwargs)
 
 

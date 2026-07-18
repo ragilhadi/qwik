@@ -196,3 +196,34 @@ class TestInitShellRcPath:
             assert "Cannot determine rc file" in result.output
         finally:
             is_mod._rc_path = original
+
+    def test_fish_rc_path_respects_xdg(self, tmp_path, monkeypatch) -> None:
+        from qwik.commands.init_shell import _rc_path
+
+        xdg = tmp_path / "xdg"
+        xdg.mkdir()
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+        monkeypatch.delenv("__fish_config_dir", raising=False)
+        assert _rc_path("fish") == xdg / "fish" / "config.fish"
+
+    def test_fish_rc_path_respects_fish_env(self, tmp_path, monkeypatch) -> None:
+        from qwik.commands.init_shell import _rc_path
+
+        fdir = tmp_path / "fishcustom"
+        fdir.mkdir()
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.setenv("__fish_config_dir", str(fdir))
+        assert _rc_path("fish") == fdir / "config.fish"
+
+    def test_fish_rc_path_default(self, tmp_path, monkeypatch) -> None:
+        import sys
+
+        from qwik.commands.init_shell import _rc_path
+
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.delenv("__fish_config_dir", raising=False)
+        if sys.platform == "win32":
+            monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        else:
+            monkeypatch.setenv("HOME", str(tmp_path))
+        assert _rc_path("fish") == tmp_path / ".config" / "fish" / "config.fish"

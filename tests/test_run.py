@@ -1,11 +1,10 @@
-"""Tests for the run command and shell metacharacter handling."""
+"""Tests for the run command."""
 
 from __future__ import annotations
 
 from typer.testing import CliRunner
 
 from qwik.cli import app
-from qwik.commands.run import _has_shell_metacharacters
 
 runner = CliRunner()
 
@@ -98,28 +97,26 @@ class TestRunTemplates:
         assert "Missing argument" in result.output
 
 
-class TestRunMetacharacters:
-    def test_tilde_requires_shell(self) -> None:
-        assert _has_shell_metacharacters("cat ~/file") is True
-
-    def test_andand_requires_shell(self) -> None:
-        assert _has_shell_metacharacters("cmd1 && cmd2") is True
-        assert _has_shell_metacharacters("cmd1 || cmd2") is True
-
-    def test_glob_star_requires_shell(self) -> None:
-        assert _has_shell_metacharacters("cat *.log") is True
-
-    def test_parens_requires_shell(self) -> None:
-        assert _has_shell_metacharacters("(cmd1; cmd2)") is True
-
-    def test_simple_no_shell(self) -> None:
-        assert _has_shell_metacharacters("echo hello") is False
-
-    def test_run_with_tilde(self, tmp_path, monkeypatch) -> None:
+class TestRunBackupChurn:
+    def test_run_does_not_create_backup(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
-
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
-        runner.invoke(app, ["add", "lsh", "ls", "~"])
-        result = runner.invoke(app, ["run", "lsh"])
-        assert result.exit_code in (0, 1)
+        runner.invoke(app, ["add", "hi", "echo", "hello"])
+        backup_dir = tmp_path / "backups"
+        runner.invoke(app, ["run", "hi"])
+        runner.invoke(app, ["run", "hi"])
+        runner.invoke(app, ["run", "hi"])
+        assert backup_dir.exists()
+        assert list(backup_dir.glob("aliases-*.toml")) == []
+
+    def test_run_count_increments(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "hi", "echo", "hello"])
+        runner.invoke(app, ["run", "hi"])
+        runner.invoke(app, ["run", "hi"])
+        from qwik.core.store import get_store
+        alias = get_store().load().get("hi")
+        assert alias.run_count == 2

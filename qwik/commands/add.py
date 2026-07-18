@@ -19,6 +19,7 @@ from qwik.ui.prompts import (
     prompt_confirm,
     prompt_text,
 )
+from qwik.ui.theme import get_console
 
 __all__ = ["add_command"]
 
@@ -36,7 +37,7 @@ def add_command(
         False, "--force", "-f", help="Overwrite if alias already exists."
     ),
     global_install: bool = typer.Option(
-        False, "--global", "-g", help="(Reserved) install for all users."
+        False, "--global", "-g", help="(Reserved) install for all users.", hidden=True,
     ),
 ) -> None:
     """Create a new alias.
@@ -46,7 +47,7 @@ def add_command(
     del global_install  # reserved for future use
     store = get_store()
     store_data = store.load()
-    console = Console()
+    console = get_console()
 
     # Interactive mode if name missing
     if name is None:
@@ -56,6 +57,14 @@ def add_command(
         command = [cmd_input]
 
     full_command = " ".join(command)
+
+    from qwik.core.substitute import validate_placeholders_static
+
+    try:
+        validate_placeholders_static(full_command)
+    except ValueError as exc:
+        print_error(str(exc), console=console)
+        raise typer.Exit(1)
 
     # Conflict checks
     checker = ConflictChecker(store_data)
@@ -83,7 +92,7 @@ def add_command(
         )
         raise typer.Exit(1)
 
-    if result.needs_warning:
+    if result.needs_warning and not force:
         print_warning(
             f'"{name}" shadows {result.path_location}.',
             console=console,
@@ -93,7 +102,7 @@ def add_command(
 
     alias = Alias(
         command=full_command,
-        tag=tag or "",
+        tag=tag or [],  # type: ignore[arg-type]
         description=description or "",
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
