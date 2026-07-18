@@ -13,9 +13,10 @@ __all__ = [
     "validate_placeholders_static",
 ]
 
-# Regex matching supported placeholders:
-#   {1}, {2}, ..., {@}, {*}, {1:-default}
-_PLACEHOLDER_RE: re.Pattern[str] = re.compile(r"\{(?:(\d+)|(@)|(\*)|(\d+):-([^}]*))\}")
+_NAMED_RE = r"[A-Za-z_][A-Za-z0-9_-]*"
+_PLACEHOLDER_RE: re.Pattern[str] = re.compile(
+    r"\{(?:(\d+)|(@)|(\*)|(\d+):-([^}]*)|(" + _NAMED_RE + r")|(" + _NAMED_RE + r"):-([^}]*))\}"
+)
 
 
 def has_placeholders(command: str) -> bool:
@@ -28,6 +29,34 @@ def has_placeholders(command: str) -> bool:
         Boolean indicating template mode vs append mode.
     """
     return _PLACEHOLDER_RE.search(command) is not None
+
+
+def _named_placeholder_index_map(command: str) -> dict[str, int]:
+    """Return a mapping of named-placeholder names to 1-based positional indices.
+
+    Names are assigned indices by the order of their first appearance in
+    *command*, left-to-right. Numeric placeholders (``{N}``, ``{N:-default}``)
+    consume index slots too, so a name appearing after ``{1}`` gets index 2.
+
+    Args:
+        command: The alias command string.
+
+    Returns:
+        A dict mapping each named-placeholder name to its 1-based index.
+        Empty if *command* has no named placeholders.
+    """
+    name_to_index: dict[str, int] = {}
+    next_index = 1
+    for match in _PLACEHOLDER_RE.finditer(command):
+        name = match.group(6) or match.group(7)
+        if name is not None:
+            if name not in name_to_index:
+                name_to_index[name] = next_index
+                next_index += 1
+        else:
+            if match.group(1) is not None or match.group(4) is not None:
+                next_index += 1
+    return name_to_index
 
 
 def validate_placeholders_static(command: str) -> None:
@@ -51,6 +80,14 @@ def validate_placeholders_static(command: str) -> None:
                     )
 
 
+def _raise_invalid_index(idx: int, command: str) -> None:
+    """Raise ValueError for a 0/negative positional placeholder."""
+    raise ValueError(
+        f'Invalid placeholder {{{idx}}} in alias: "{command}". '
+        f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
+    )
+
+
 def validate_placeholders(command: str, args: Sequence[str]) -> None:
     """Raise :class:`ValueError` if a referenced positional arg is missing.
 
@@ -62,15 +99,12 @@ def validate_placeholders(command: str, args: Sequence[str]) -> None:
         ValueError: If the command references ``{N}`` where *N* is greater
             than the number of supplied *args*.
     """
+    name_map = _named_placeholder_index_map(command)
     for match in _PLACEHOLDER_RE.finditer(command):
-        # match groups: (digit) | (@) | (*) | (digit, default)
         if match.group(1) is not None:
             idx = int(match.group(1))
             if idx < 1:
-                raise ValueError(
-                    f'Invalid placeholder {{{idx}}} in alias: "{command}". '
-                    f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
-                )
+                _raise_invalid_index(idx, command)
             if idx > len(args):
                 raise ValueError(
                     f'Missing argument {idx} for alias: "{command}" '
@@ -79,55 +113,69 @@ def validate_placeholders(command: str, args: Sequence[str]) -> None:
         elif match.group(4) is not None:
             idx = int(match.group(4))
             if idx < 1:
+                _raise_invalid_index(idx, command)
+        elif match.group(6) is not None:
+            name = match.group(6)
+            idx = name_map[name]
+            if idx > len(args):
                 raise ValueError(
-                    f'Invalid placeholder {{{idx}}} in alias: "{command}". '
-                    f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
+                    f'Missing argument for placeholder {{{name}}} '
+                    f'(position {idx}) in alias: "{command}" '
+                    f"(received {len(args)} argument(s))"
                 )
-        # {@} and {*} are always valid regardless of args
+        elif match.group(7) is not None:
+            pass
 
 
-def _parse_positional(match: re.Match[str], args: Sequence[str]) -> str:
+def _parse_positional(match: re.Match[str], args: Sequence[str], command: str) -> str:
     """Handle {N} and {N:-default} placeholders."""
     if match.group(1) is not None:
         idx = int(match.group(1))
         if idx < 1:
-            raise ValueError(
-                f"Invalid placeholder {{{idx}}} in alias. "
-                f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
-            )
+            _raise_invalid_index(idx, command)
         return shlex.quote(args[idx - 1]) if idx <= len(args) else ""
     if match.group(4) is not None:
         idx = int(match.group(4))
         if idx < 1:
-            raise ValueError(
-                f"Invalid placeholder {{{idx}}} in alias. "
-                f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
-            )
+            _raise_invalid_index(idx, command)
         value = args[idx - 1] if idx <= len(args) else match.group(5)
         return shlex.quote(value)
     return match.group(0)
 
 
-def _replacer(match: re.Match[str], args: Sequence[str]) -> str:
+def _replacer(match: re.Match[str], args: Sequence[str], command: str, name_map: dict[str, int]) -> str:
     if match.group(1) is not None or match.group(4) is not None:
-        return _parse_positional(match, args)
+        return _parse_positional(match, args, command)
     if match.group(2) is not None:  # {@}
         return " ".join(shlex.quote(a) for a in args)
     if match.group(3) is not None:  # {*}
         return shlex.quote(" ".join(args))
+    if match.group(6) is not None:  # {name}
+        name = match.group(6)
+        idx = name_map[name]
+        return shlex.quote(args[idx - 1]) if idx <= len(args) else ""
+    if match.group(7) is not None:  # {name:-default}
+        name = match.group(7)
+        idx = name_map[name]
+        value = args[idx - 1] if idx <= len(args) else match.group(8)
+        return shlex.quote(value)
     return match.group(0)
 
 
 def _extract_surplus(command: str, args: Sequence[str]) -> Sequence[str]:
     """Return any args that are not consumed by positional placeholders."""
     max_ref = 0
+    name_map = _named_placeholder_index_map(command)
     for m in _PLACEHOLDER_RE.finditer(command):
         if m.group(1) is not None:
             max_ref = max(max_ref, int(m.group(1)))
         elif m.group(4) is not None:
             max_ref = max(max_ref, int(m.group(4)))
+        elif m.group(6) is not None:
+            max_ref = max(max_ref, name_map[m.group(6)])
+        elif m.group(7) is not None:
+            max_ref = max(max_ref, name_map[m.group(7)])
         else:
-            # {@} or {*} consume everything
             return []
     return args[max_ref:]
 
@@ -155,6 +203,12 @@ def expand(command: str, args: Sequence[str]) -> str:
     +------------------+------------------------------------------+
     | ``{1:-val}``     | N-th arg, falling back to *val* if missing|
     +------------------+------------------------------------------+
+    | ``{name}``       | Named slot, mapped to an index by order  |
+    |                  | of first appearance (same as ``{N}``).   |
+    +------------------+------------------------------------------+
+    | ``{name:-val}`` | Named slot with default (same as         |
+    |                  | ``{N:-val}``).                           |
+    +------------------+------------------------------------------+
 
     Args:
         command: The raw alias command.
@@ -173,8 +227,11 @@ def expand(command: str, args: Sequence[str]) -> str:
         return f"{command} {quoted}"
 
     validate_placeholders(command, args)
+    name_map = _named_placeholder_index_map(command)
 
-    expanded = _PLACEHOLDER_RE.sub(lambda m: _replacer(m, args), command)
+    expanded = _PLACEHOLDER_RE.sub(
+        lambda m: _replacer(m, args, command, name_map), command
+    )
 
     surplus = _extract_surplus(command, args)
     if surplus:

@@ -23,7 +23,6 @@ from qwik.commands.run import run_command
 from qwik.commands.search import search_command
 from qwik.commands.show import show_command
 from qwik.commands.tag import tag_command, untag_command
-import qwik.ui.theme as _theme
 from qwik.ui.theme import get_console
 
 __all__ = ["app"]
@@ -110,6 +109,7 @@ def main(
             level=logging.DEBUG,
             format="%(levelname)s %(name)s: %(message)s",
         )
+    import qwik.ui.theme as _theme
     _theme._NO_COLOR_OVERRIDE = no_color
     # If a subcommand is already being handled, do nothing.
     if ctx.invoked_subcommand is not None:
