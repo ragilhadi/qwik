@@ -10,67 +10,57 @@ __all__ = [
     "ConflictResult",
     "ConflictChecker",
     "SHELL_BUILTINS",
+    "is_builtin",
 ]
 
-# Common shell builtins that should not be shadowed lightly.
-SHELL_BUILTINS: frozenset[str] = frozenset(
-    [
-        "cd",
-        "echo",
-        "alias",
-        "unalias",
-        "set",
-        "export",
-        "source",
-        "unset",
-        "type",
-        "read",
-        "eval",
-        "exec",
-        "test",
-        "true",
-        "false",
-        "printf",
-        "shift",
-        "exit",
-        "return",
-        "break",
-        "continue",
-        "local",
-        "declare",
-        "typeset",
-        "readonly",
-        "trap",
-        "wait",
-        "jobs",
-        "fg",
-        "bg",
-        "kill",
-        "ulimit",
-        "umask",
-        "hash",
-        "getopts",
-        "builtin",
-        "command",
-        "compgen",
-        "complete",
-        "shopt",
-        "enable",
-        "logout",
-        "mapfile",
-        "readarray",
-        "help",
-        "history",
-        "let",
-        "pushd",
-        "popd",
-        "dirs",
-        "suspend",
-        "disown",
-        "times",
-        "caller",
-    ]
-)
+SHELL_BUILTINS: dict[str, frozenset[str]] = {
+    "bash": frozenset([
+        "cd", "echo", "alias", "unalias", "set", "export", "source", "unset",
+        "type", "read", "eval", "exec", "test", "true", "false", "printf",
+        "shift", "exit", "return", "break", "continue", "local", "declare",
+        "typeset", "readonly", "trap", "wait", "jobs", "fg", "bg", "kill",
+        "ulimit", "umask", "hash", "getopts", "builtin", "command", "compgen",
+        "complete", "shopt", "enable", "logout", "mapfile", "readarray",
+        "help", "history", "let", "pushd", "popd", "dirs", "suspend",
+        "disown", "times", "caller",
+    ]),
+    "zsh": frozenset([
+        "setopt", "unsetopt", "autoload", "zle", "compdef", "zmodload",
+        "print", "bindkey", "alias", "unalias", "set", "unset", "source",
+        "echo", "printf", "test", "true", "false", "return", "break",
+        "continue", "exit", "shift", "cd", "typeset", "declare", "local",
+        "readonly", "trap", "wait", "jobs", "fg", "bg", "kill", "history",
+        "pushd", "popd", "dirs", "suspend", "disown", "times", "hash",
+        "getopts", "builtin", "command", "let",
+    ]),
+    "fish": frozenset([
+        "abbr", "builtin", "function", "set", "test", "echo", "printf",
+        "string", "contains", "switch", "begin", "end", "and", "or", "not",
+        "return", "break", "continue", "source", "alias", "cd", "type",
+        "command", "jobs", "fg", "bg", "kill", "bind", "complete", "pushd",
+        "popd", "dirs", "history", "count", "math", "random",
+    ]),
+    "pwsh": frozenset([
+        "Write-Output", "Write-Host", "Write-Error", "Write-Warning",
+        "Write-Verbose", "Write-Debug", "Get-ChildItem", "Set-Location",
+        "Invoke-Expression", "ForEach-Object", "Where-Object",
+        "Select-Object", "Measure-Object", "Sort-Object", "Group-Object",
+        "Compare-Object", "Test-Path", "Get-Content", "Set-Content",
+        "Add-Content", "Remove-Item", "New-Item", "Copy-Item", "Move-Item",
+    ]),
+    "cmd": frozenset([
+        "echo", "set", "cd", "dir", "cls", "exit", "if", "for", "rem",
+        "call", "goto", "shift", "title", "prompt", "ver", "vol", "path",
+        "date", "time", "type", "copy", "del", "ren", "md", "rd",
+    ]),
+}
+
+
+def is_builtin(name: str, shell: str | None = None) -> bool:
+    """Return True if *name* is a builtin of *shell* (defaults to bash)."""
+    if shell is None:
+        shell = "bash"
+    return name in SHELL_BUILTINS.get(shell, SHELL_BUILTINS["bash"])
 
 
 class ConflictResult:
@@ -166,7 +156,7 @@ class ConflictChecker:
             A :class:`ConflictResult` summarising all findings.
         """
         existing = name in self._store.aliases
-        builtin = name in SHELL_BUILTINS
+        builtin = is_builtin(name)
         path_bin = shutil.which(name)
         is_on_path = path_bin is not None
 
