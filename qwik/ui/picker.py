@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
 from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.input import Input
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import (
     HSplit,
@@ -14,6 +15,7 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.layout.dimension import Dimension
+from prompt_toolkit.output import Output
 from prompt_toolkit.styles import Style as PTStyle
 
 from qwik.core.search import search_aliases
@@ -120,7 +122,12 @@ def _bind_keys(
             event.app.exit()
 
 
-def run_picker(store: "AliasStore") -> str | None:
+def run_picker(
+    store: "AliasStore",
+    *,
+    input_: Input | None = None,
+    output: Output | None = None,
+) -> str | None:
     """Run the interactive fuzzy picker and return the selected alias name.
 
     Args:
@@ -196,7 +203,12 @@ def run_picker(store: "AliasStore") -> str | None:
     style = _build_style()
 
     app: Application[None] = Application(
-        layout=layout, key_bindings=kb, style=style, full_screen=False
+        layout=layout,
+        key_bindings=kb,
+        style=style,
+        full_screen=False,
+        input=input_,
+        output=output,
     )
     _refresh(store, state, result_window, preview_window, "")
     app.run()
