@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import os
+
 import typer
 
 from qwik import __version__
@@ -103,6 +106,11 @@ def main(
 
     When invoked with no subcommand and no flags, the fuzzy picker opens.
     """
+    if os.environ.get("QWIK_DEBUG"):
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(levelname)s %(name)s: %(message)s",
+        )
     _theme._NO_COLOR_OVERRIDE = no_color
     # If a subcommand is already being handled, do nothing.
     if ctx.invoked_subcommand is not None:

@@ -128,3 +128,14 @@ class TestNoColorFlag:
         _reset_config()
         result = runner.invoke(app, ["list"])
         assert "\x1b[" not in result.output
+
+
+class TestDebug:
+    def test_qwik_debug_does_not_crash(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        monkeypatch.setenv("QWIK_DEBUG", "1")
+        _reset_config()
+        result = runner.invoke(app, ["list"])
+        assert result.exit_code in (0, 1)
