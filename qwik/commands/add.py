@@ -36,7 +36,7 @@ def add_command(
         False, "--force", "-f", help="Overwrite if alias already exists."
     ),
     global_install: bool = typer.Option(
-        False, "--global", "-g", help="(Reserved) install for all users."
+        False, "--global", "-g", help="(Reserved) install for all users.", hidden=True,
     ),
 ) -> None:
     """Create a new alias.

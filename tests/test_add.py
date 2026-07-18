@@ -72,3 +72,13 @@ class TestPlaceholderValidation:
         _reset_config()
         result = runner.invoke(app, ["add", "gco", "git checkout {1}"])
         assert result.exit_code == 0
+
+
+class TestGlobalFlagHidden:
+    def test_global_flag_hidden(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "--help"])
+        assert "--global" not in result.output
+        assert "-g" not in result.output
