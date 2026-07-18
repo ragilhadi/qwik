@@ -25,6 +25,14 @@ if TYPE_CHECKING:
 __all__ = ["run_picker"]
 
 
+def _build_style() -> PTStyle:
+    from qwik.ui.theme import _no_color_active
+
+    if _no_color_active():
+        return PTStyle.from_dict({"": "", "bold": "bold", "dim": ""})
+    return PTStyle.from_dict({"": "#ffffff", "bold": "bold #ffffff", "dim": "#666666"})
+
+
 def _get_result_lines(results, selected_index):
     lines = []
     for idx, (name, alias, _score) in enumerate(results):
@@ -181,13 +189,7 @@ def run_picker(store: "AliasStore") -> str | None:
         )
     )
 
-    style = PTStyle.from_dict(
-        {
-            "": "#ffffff",
-            "bold": "bold #ffffff",
-            "dim": "#666666",
-        }
-    )
+    style = _build_style()
 
     app = Application(layout=layout, key_bindings=kb, style=style, full_screen=False)
     _refresh(store, state, result_window, preview_window, "")
