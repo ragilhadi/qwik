@@ -63,7 +63,10 @@ def run_command(
         # Child received SIGINT (e.g. user hit Ctrl+C on docker stats).
         returncode = 130
     finally:
-        alias.bump_usage()
-        store.save_with_backup(data)
+        try:
+            store.bump_usage(name)
+        except OSError:
+            # best-effort usage tracking; never mask the command's exit code
+            pass
 
     raise typer.Exit(returncode)

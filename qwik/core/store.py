@@ -86,6 +86,23 @@ class Store:
         temp.write_text(tomlkit.dumps(doc), encoding="utf-8")
         temp.replace(self._path)
 
+    def bump_usage(self, name: str) -> None:
+        """Increment ``run_count`` / update ``last_used`` for *name* only.
+
+        Performs a read-modify-write under :class:`FileLock`. Does NOT
+        create a backup (reserves backups for mutating operations).
+        """
+        from qwik.core.locking import FileLock
+
+        lock = FileLock(self._path.with_suffix(".toml.lock"))
+        with lock:
+            data = self.load()
+            alias = data.get(name)
+            if alias is None:
+                return
+            alias.bump_usage()
+            self.save(data)
+
     def save_with_backup(self, store: AliasStore) -> None:
         """Persist *store* after creating a backup of the existing file.
 
