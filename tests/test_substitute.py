@@ -93,3 +93,37 @@ class TestQuoting:
 
     def test_all_args_normal_stays_unquoted(self) -> None:
         assert expand("echo {@}", ["a", "b"]) == "echo a b"
+
+
+from qwik.core.substitute import _named_placeholder_index_map
+
+
+class TestNamedIndexMap:
+    def test_single_name(self) -> None:
+        assert _named_placeholder_index_map("git checkout {branch}") == {"branch": 1}
+
+    def test_two_names_order_of_appearance(self) -> None:
+        assert _named_placeholder_index_map('git commit -m "{type}: {scope}"') == {
+            "type": 1,
+            "scope": 2,
+        }
+
+    def test_repeated_name_reuses_index(self) -> None:
+        assert _named_placeholder_index_map("echo {a} {a}") == {"a": 1}
+
+    def test_mixed_named_and_numeric(self) -> None:
+        assert _named_placeholder_index_map("echo {1} {name}") == {"name": 2}
+
+    def test_named_with_default_uses_name(self) -> None:
+        assert _named_placeholder_index_map("git checkout {branch:-main}") == {"branch": 1}
+
+    def test_no_names_returns_empty(self) -> None:
+        assert _named_placeholder_index_map("git status") == {}
+
+    def test_only_numeric_returns_empty(self) -> None:
+        assert _named_placeholder_index_map("git checkout {1}") == {}
+
+    def test_invalid_braces_are_literals(self) -> None:
+        assert _named_placeholder_index_map("echo {123bad}") == {}
+        assert _named_placeholder_index_map("echo {bad name}") == {}
+        assert _named_placeholder_index_map("echo {$$$}") == {}

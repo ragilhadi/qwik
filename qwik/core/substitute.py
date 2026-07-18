@@ -13,9 +13,10 @@ __all__ = [
     "validate_placeholders_static",
 ]
 
-# Regex matching supported placeholders:
-#   {1}, {2}, ..., {@}, {*}, {1:-default}
-_PLACEHOLDER_RE: re.Pattern[str] = re.compile(r"\{(?:(\d+)|(@)|(\*)|(\d+):-([^}]*))\}")
+_NAMED_RE = r"[A-Za-z_][A-Za-z0-9_-]*"
+_PLACEHOLDER_RE: re.Pattern[str] = re.compile(
+    r"\{(?:(\d+)|(@)|(\*)|(\d+):-([^}]*)|(" + _NAMED_RE + r")|(" + _NAMED_RE + r"):-([^}]*))\}"
+)
 
 
 def has_placeholders(command: str) -> bool:
@@ -28,6 +29,34 @@ def has_placeholders(command: str) -> bool:
         Boolean indicating template mode vs append mode.
     """
     return _PLACEHOLDER_RE.search(command) is not None
+
+
+def _named_placeholder_index_map(command: str) -> dict[str, int]:
+    """Return a mapping of named-placeholder names to 1-based positional indices.
+
+    Names are assigned indices by the order of their first appearance in
+    *command*, left-to-right. Numeric placeholders (``{N}``, ``{N:-default}``)
+    consume index slots too, so a name appearing after ``{1}`` gets index 2.
+
+    Args:
+        command: The alias command string.
+
+    Returns:
+        A dict mapping each named-placeholder name to its 1-based index.
+        Empty if *command* has no named placeholders.
+    """
+    name_to_index: dict[str, int] = {}
+    next_index = 1
+    for match in _PLACEHOLDER_RE.finditer(command):
+        name = match.group(6) or match.group(7)
+        if name is not None:
+            if name not in name_to_index:
+                name_to_index[name] = next_index
+                next_index += 1
+        else:
+            if match.group(1) is not None or match.group(4) is not None:
+                next_index += 1
+    return name_to_index
 
 
 def validate_placeholders_static(command: str) -> None:
