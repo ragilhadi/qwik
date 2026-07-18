@@ -9,6 +9,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from qwik.commands.init_shell import _fish_config_dir
 from qwik.core.store import get_store
 from qwik.shells.base import SUPPORTED_SHELLS
 from qwik.ui.prompts import print_error, print_success, print_warning
@@ -146,7 +147,7 @@ def _hook_installed(shell: str | None) -> bool:
     rc_map = {
         "bash": Path.home() / ".bashrc",
         "zsh": Path.home() / ".zshrc",
-        "fish": Path.home() / ".config" / "fish" / "config.fish",
+        "fish": _fish_config_dir() / "config.fish",
         "pwsh": Path.home()
         / ".config"
         / "powershell"
