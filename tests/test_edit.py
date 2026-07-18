@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from qwik.cli import app
@@ -122,3 +124,29 @@ class TestEditCommand:
         result = runner.invoke(app, ["edit", "gs"])
         assert result.exit_code == 1
         assert "Editor exited" in result.output
+
+
+class TestEditorSelection:
+    def test_editor_missing_filenotfound(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        monkeypatch.setenv("EDITOR", "definitely-not-a-real-editor-xyz")
+        monkeypatch.delenv("VISUAL", raising=False)
+        _reset_config()
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        result = runner.invoke(app, ["edit", "gs"])
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower() or "Editor" in result.output
+
+    def test_visual_takes_precedence_over_default(self, tmp_path, monkeypatch):
+        if sys.platform == "win32":
+            pytest.skip("POSIX-only editor script test")
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        editor = _create_editor_script(tmp_path, 'command = "git log"\ntag = []\ndescription = ""\nenabled = True')
+        monkeypatch.setenv("EDITOR", "")
+        monkeypatch.setenv("VISUAL", str(editor))
+        result = runner.invoke(app, ["edit", "gs"])
+        assert result.exit_code == 0

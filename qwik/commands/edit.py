@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,7 +63,12 @@ def edit_command(
         print_error(f'Alias "{name}" does not exist.', console=console)
         raise typer.Exit(1)
 
-    editor = os.environ.get("EDITOR", "vi")
+    default_editor = "notepad" if sys.platform == "win32" else "vi"
+    editor = (
+        os.environ.get("EDITOR")
+        or os.environ.get("VISUAL")
+        or default_editor
+    )
 
     snippet = (
         f'# Edit the fields below and save/quit to apply changes to "{name}"\n'
@@ -108,6 +114,16 @@ def edit_command(
         print_success(f'Updated "{name}".', console=console)
     except subprocess.CalledProcessError as exc:
         print_error(f"Editor exited with code {exc.returncode}.", console=console)
+        raise typer.Exit(1)
+    except FileNotFoundError:
+        print_error(
+            f"Editor {editor!r} not found.",
+            suggestion="Set $EDITOR or $VISUAL to an installed editor.",
+            console=console,
+        )
+        raise typer.Exit(1)
+    except OSError as exc:
+        print_error(f"Could not launch editor {editor!r}: {exc}", console=console)
         raise typer.Exit(1)
     finally:
         tmp_path.unlink(missing_ok=True)
