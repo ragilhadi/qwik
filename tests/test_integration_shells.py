@@ -16,6 +16,16 @@ def _shell_available(name: str) -> bool:
     return shutil.which(name) is not None
 
 
+def _qwik_env() -> dict[str, str]:
+    """Environment for qwik subprocesses: force UTF-8 stdio on Windows."""
+    import os
+
+    env = dict(os.environ)
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    return env
+
+
 @pytest.fixture
 def qwik_store(tmp_path, monkeypatch):
     from qwik.config import _reset_config
@@ -31,11 +41,13 @@ def test_bash_hook_runs_alias(qwik_store, tmp_path):
     if not _shell_available("bash"):
         pytest.skip("bash not installed")
     rcfile = tmp_path / "bashrc"
-    hook = subprocess.run(["qwik", "init", "bash"], capture_output=True, text=True, check=True).stdout
+    hook = subprocess.run(
+        ["qwik", "init", "bash"], capture_output=True, text=True, check=True, env=_qwik_env()
+    ).stdout
     rcfile.write_text(f"{hook}\n", encoding="utf-8")
     result = subprocess.run(
         ["bash", "-c", f"source {rcfile}; qwik run gs"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=_qwik_env(),
     )
     assert result.returncode in (0, 1, 128)
 
@@ -44,10 +56,12 @@ def test_bash_hook_runs_alias(qwik_store, tmp_path):
 def test_zsh_hook_runs_alias(qwik_store, tmp_path):
     if not _shell_available("zsh"):
         pytest.skip("zsh not installed")
-    hook = subprocess.run(["qwik", "init", "zsh"], capture_output=True, text=True, check=True).stdout
+    hook = subprocess.run(
+        ["qwik", "init", "zsh"], capture_output=True, text=True, check=True, env=_qwik_env()
+    ).stdout
     result = subprocess.run(
         ["zsh", "-c", f"{hook}; gco main"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=_qwik_env(),
     )
     assert "git checkout main" in result.stdout or "git checkout" in result.stderr
 
@@ -56,10 +70,12 @@ def test_zsh_hook_runs_alias(qwik_store, tmp_path):
 def test_fish_hook_runs_alias(qwik_store, tmp_path):
     if not _shell_available("fish"):
         pytest.skip("fish not installed")
-    hook = subprocess.run(["qwik", "init", "fish"], capture_output=True, text=True, check=True).stdout
+    hook = subprocess.run(
+        ["qwik", "init", "fish"], capture_output=True, text=True, check=True, env=_qwik_env()
+    ).stdout
     result = subprocess.run(
         ["fish", "-c", f"{hook}; gco main"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=_qwik_env(),
     )
     assert "git checkout main" in result.stdout or "git checkout" in result.stderr
 
@@ -68,9 +84,11 @@ def test_fish_hook_runs_alias(qwik_store, tmp_path):
 def test_pwsh_hook_runs_alias(qwik_store, tmp_path):
     if not _shell_available("pwsh"):
         pytest.skip("pwsh not installed")
-    hook = subprocess.run(["qwik", "init", "pwsh"], capture_output=True, text=True, check=True).stdout
+    hook = subprocess.run(
+        ["qwik", "init", "pwsh"], capture_output=True, text=True, check=True, env=_qwik_env()
+    ).stdout
     result = subprocess.run(
         ["pwsh", "-NoProfile", "-Command", f"{hook}; gco main"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=_qwik_env(),
     )
     assert "git checkout main" in result.stdout or "git checkout" in result.stderr
