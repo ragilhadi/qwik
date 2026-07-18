@@ -92,7 +92,7 @@ def add_command(
         )
         raise typer.Exit(1)
 
-    if result.needs_warning:
+    if result.needs_warning and not force:
         print_warning(
             f'"{name}" shadows {result.path_location}.',
             console=console,
