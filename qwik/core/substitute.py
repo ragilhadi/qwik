@@ -99,8 +99,8 @@ def validate_placeholders(command: str, args: Sequence[str]) -> None:
         ValueError: If the command references ``{N}`` where *N* is greater
             than the number of supplied *args*.
     """
+    name_map = _named_placeholder_index_map(command)
     for match in _PLACEHOLDER_RE.finditer(command):
-        # match groups: (digit) | (@) | (*) | (digit, default)
         if match.group(1) is not None:
             idx = int(match.group(1))
             if idx < 1:
@@ -114,7 +114,17 @@ def validate_placeholders(command: str, args: Sequence[str]) -> None:
             idx = int(match.group(4))
             if idx < 1:
                 _raise_invalid_index(idx, command)
-        # {@} and {*} are always valid regardless of args
+        elif match.group(6) is not None:
+            name = match.group(6)
+            idx = name_map[name]
+            if idx > len(args):
+                raise ValueError(
+                    f'Missing argument for placeholder {{{name}}} '
+                    f'(position {idx}) in alias: "{command}" '
+                    f"(received {len(args)} argument(s))"
+                )
+        elif match.group(7) is not None:
+            pass
 
 
 def _parse_positional(match: re.Match[str], args: Sequence[str], command: str) -> str:
@@ -133,26 +143,39 @@ def _parse_positional(match: re.Match[str], args: Sequence[str], command: str) -
     return match.group(0)
 
 
-def _replacer(match: re.Match[str], args: Sequence[str], command: str) -> str:
+def _replacer(match: re.Match[str], args: Sequence[str], command: str, name_map: dict[str, int]) -> str:
     if match.group(1) is not None or match.group(4) is not None:
         return _parse_positional(match, args, command)
     if match.group(2) is not None:  # {@}
         return " ".join(shlex.quote(a) for a in args)
     if match.group(3) is not None:  # {*}
         return shlex.quote(" ".join(args))
+    if match.group(6) is not None:  # {name}
+        name = match.group(6)
+        idx = name_map[name]
+        return shlex.quote(args[idx - 1]) if idx <= len(args) else ""
+    if match.group(7) is not None:  # {name:-default}
+        name = match.group(7)
+        idx = name_map[name]
+        value = args[idx - 1] if idx <= len(args) else match.group(8)
+        return shlex.quote(value)
     return match.group(0)
 
 
 def _extract_surplus(command: str, args: Sequence[str]) -> Sequence[str]:
     """Return any args that are not consumed by positional placeholders."""
     max_ref = 0
+    name_map = _named_placeholder_index_map(command)
     for m in _PLACEHOLDER_RE.finditer(command):
         if m.group(1) is not None:
             max_ref = max(max_ref, int(m.group(1)))
         elif m.group(4) is not None:
             max_ref = max(max_ref, int(m.group(4)))
+        elif m.group(6) is not None:
+            max_ref = max(max_ref, name_map[m.group(6)])
+        elif m.group(7) is not None:
+            max_ref = max(max_ref, name_map[m.group(7)])
         else:
-            # {@} or {*} consume everything
             return []
     return args[max_ref:]
 
@@ -180,6 +203,12 @@ def expand(command: str, args: Sequence[str]) -> str:
     +------------------+------------------------------------------+
     | ``{1:-val}``     | N-th arg, falling back to *val* if missing|
     +------------------+------------------------------------------+
+    | ``{name}``       | Named slot, mapped to an index by order  |
+    |                  | of first appearance (same as ``{N}``).   |
+    +------------------+------------------------------------------+
+    | ``{name:-val}`` | Named slot with default (same as         |
+    |                  | ``{N:-val}``).                           |
+    +------------------+------------------------------------------+
 
     Args:
         command: The raw alias command.
@@ -198,8 +227,11 @@ def expand(command: str, args: Sequence[str]) -> str:
         return f"{command} {quoted}"
 
     validate_placeholders(command, args)
+    name_map = _named_placeholder_index_map(command)
 
-    expanded = _PLACEHOLDER_RE.sub(lambda m: _replacer(m, args, command), command)
+    expanded = _PLACEHOLDER_RE.sub(
+        lambda m: _replacer(m, args, command, name_map), command
+    )
 
     surplus = _extract_surplus(command, args)
     if surplus:
