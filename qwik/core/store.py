@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import shutil
 import os
 from datetime import datetime, timezone
@@ -24,9 +25,21 @@ __all__ = [
 _MAX_BACKUPS: int = 20
 
 
+# Monotonic counter appended to backup timestamps to guarantee filename
+# uniqueness even when ``datetime.now()`` returns the same value twice in
+# a tight loop (Windows clock resolution is ~15 ms, so microsecond stamps
+# can still collide).
+_backup_counter: itertools.count[int] = itertools.count()
+
+
 def _now_stamp() -> str:
-    """Return an ISO-like timestamp with microseconds for filename uniqueness."""
-    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+    """Return an ISO-like timestamp with microseconds and a per-process counter.
+
+    The counter suffix guarantees filename uniqueness across rapid writes
+    on platforms where ``datetime.now()`` resolution is coarser than the
+    call interval.
+    """
+    return f"{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')}-{next(_backup_counter):04d}"
 
 
 class Store:

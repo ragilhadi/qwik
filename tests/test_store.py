@@ -1,5 +1,6 @@
 """Unit tests for alias store persistence."""
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -90,3 +91,36 @@ class TestSubsecondBackups:
             temp_store.save_with_backup(loaded)
         backups = list(temp_store._backup_dir.glob("aliases-*.toml"))
         assert len(backups) == 5  # prime write has no prior file → no backup; 5 loop writes all unique
+
+
+class TestBackupRecovery:
+    def test_restore_from_latest_backup(self, temp_store):
+        data = AliasStore()
+        data.add("gs", Alias(command="git status"))
+        temp_store.save_with_backup(data)
+        data.add("gco", Alias(command="git checkout {1}"))
+        temp_store.save_with_backup(data)
+        # Corrupt the live store
+        temp_store.path.write_text("garbage", encoding="utf-8")
+        with pytest.raises(RuntimeError):
+            temp_store.load()
+        backups = sorted(temp_store._backup_dir.glob("aliases-*.toml"))
+        assert backups, "expected at least one backup"
+        # save_with_backup backs up the PREVIOUS state before writing the
+        # new one, so the latest backup contains the state from before the
+        # most recent write (here: the {gs} state). Restoring it yields a
+        # usable store, even if not the very latest.
+        latest = backups[-1]
+        shutil.copy2(latest, temp_store.path)
+        recovered = temp_store.load()
+        assert "gs" in recovered.aliases
+
+    def test_rm_creates_backup(self, temp_store):
+        data = AliasStore()
+        data.add("gs", Alias(command="git status"))
+        temp_store.save_with_backup(data)
+        # Simulate the rm flow: load, remove, save_with_backup
+        loaded = temp_store.load()
+        loaded.remove("gs")
+        temp_store.save_with_backup(loaded)
+        assert any(temp_store._backup_dir.glob("aliases-*.toml"))
