@@ -1,4 +1,10 @@
-"""``qwik run`` / ``qwik -r`` — execute an alias via subprocess."""
+"""``qwik run`` / ``qwik -r`` — execute an alias via subprocess.
+
+All aliases are executed under ``shell=True`` because alias commands are
+shell snippets that may legitimately use pipes, redirects, and compound
+operators. Runtime arguments are pre-quoted by :mod:`qwik.core.substitute`
+to prevent injection.
+"""
 
 from __future__ import annotations
 
@@ -13,22 +19,6 @@ from qwik.ui.prompts import print_error, print_success
 from qwik.ui.theme import get_console
 
 __all__ = ["run_command"]
-
-
-def _has_shell_metacharacters(cmd: str) -> bool:
-    """Detect characters that require ``shell=True``.
-
-    Args:
-        cmd: The expanded command string.
-
-    Returns:
-        ``True`` if *cmd* contains characters like ``|``, ``>``, ``<``,
-        ``;``, ``&``, ``$``, backticks, ``~``, ``*``, ``(``, ``)``,
-        or compound operators ``&&`` / ``||``.
-    """
-    if "&&" in cmd or "||" in cmd:
-        return True
-    return any(c in cmd for c in r"|<>&$`~*()")
 
 
 def run_command(

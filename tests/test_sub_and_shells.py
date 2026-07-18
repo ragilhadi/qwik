@@ -109,36 +109,6 @@ class TestShellsBase:
         assert "# footer" in result
 
 
-class TestRunMetacharacters:
-    """Cover run.py metacharacter detection."""
-
-    def test_tilde_requires_shell(self) -> None:
-        from qwik.commands.run import _has_shell_metacharacters
-
-        assert _has_shell_metacharacters("cat ~/file") is True
-
-    def test_andand_requires_shell(self) -> None:
-        from qwik.commands.run import _has_shell_metacharacters
-
-        assert _has_shell_metacharacters("cmd1 && cmd2") is True
-        assert _has_shell_metacharacters("cmd1 || cmd2") is True
-
-    def test_glob_star_requires_shell(self) -> None:
-        from qwik.commands.run import _has_shell_metacharacters
-
-        assert _has_shell_metacharacters("cat *.log") is True
-
-    def test_parens_requires_shell(self) -> None:
-        from qwik.commands.run import _has_shell_metacharacters
-
-        assert _has_shell_metacharacters("(cmd1; cmd2)") is True
-
-    def test_simple_no_shell(self) -> None:
-        from qwik.commands.run import _has_shell_metacharacters
-
-        assert _has_shell_metacharacters("echo hello") is False
-
-
 class TestInitShell:
     """Cover init_shell.py installation paths."""
 
