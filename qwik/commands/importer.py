@@ -34,19 +34,36 @@ def import_command(
     suffix = path.suffix.lstrip(".").lower()
     raw = path.read_text(encoding="utf-8")
 
-    if suffix == "toml":
-        import tomlkit
+    try:
+        if suffix == "toml":
+            import tomlkit
 
-        parsed = dict(tomlkit.parse(raw))
-    elif suffix == "json":
-        import json
+            parsed = dict(tomlkit.parse(raw).unwrap())
+        elif suffix == "json":
+            import json
 
-        parsed = json.loads(raw)
-    else:
-        print_error(f"Unknown format '{suffix}'. Use .toml or .json.", console=console)
+            parsed = json.loads(raw)
+        else:
+            print_error(f"Unknown format '{suffix}'. Use .toml or .json.", console=console)
+            raise typer.Exit(1)
+        incoming = AliasStore.model_validate(parsed)
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        print_error(f"Could not parse {path}: {exc}", console=console)
         raise typer.Exit(1)
 
-    incoming = AliasStore.model_validate(parsed)
+    # Command preview — incoming commands are arbitrary shell and will run under shell=True
+    if not yes:
+        console.print("[qwik.warning]Commands to be imported:[/qwik.warning]")
+        for name, alias in list(incoming.aliases.items())[:20]:
+            console.print(f"  [bold]{name}[/bold] → {alias.command}")
+        if len(incoming.aliases) > 20:
+            console.print(f"  ... and {len(incoming.aliases) - 20} more")
+        console.print(
+            "[qwik.warning]Importing aliases is a trust boundary — "
+            "stored commands will run under `shell=True`.[/qwik.warning]"
+        )
 
     # Diff display
     existing_names = set(data.aliases)
