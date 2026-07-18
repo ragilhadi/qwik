@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import typer
-from rich.console import Console
 
 from qwik.core.conflicts import ConflictChecker
 from qwik.core.models import Alias

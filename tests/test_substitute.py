@@ -1,5 +1,7 @@
 """Unit tests for the substitute engine."""
 
+import shlex
+
 import pytest
 
 from qwik.core.substitute import expand, has_placeholders
@@ -69,9 +71,6 @@ class TestExpand:
     def test_zero_default_placeholder_raises(self) -> None:
         with pytest.raises(ValueError):
             expand("echo {0:-default}", [])
-
-
-import shlex
 
 
 class TestQuoting:
