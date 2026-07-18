@@ -10,6 +10,7 @@ from rich.console import Console
 from qwik.core.models import AliasStore
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success, prompt_confirm
+from qwik.ui.theme import get_console
 
 __all__ = ["import_command"]
 
@@ -24,7 +25,7 @@ def import_command(
     """Import aliases from a TOML or JSON file."""
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     if not path.exists():
         print_error(f"File not found: {path}", console=console)

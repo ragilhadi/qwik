@@ -19,6 +19,7 @@ from qwik.ui.prompts import (
     prompt_confirm,
     prompt_text,
 )
+from qwik.ui.theme import get_console
 
 __all__ = ["add_command"]
 
@@ -46,7 +47,7 @@ def add_command(
     del global_install  # reserved for future use
     store = get_store()
     store_data = store.load()
-    console = Console()
+    console = get_console()
 
     # Interactive mode if name missing
     if name is None:

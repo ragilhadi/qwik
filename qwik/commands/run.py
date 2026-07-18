@@ -10,6 +10,7 @@ from rich.console import Console
 from qwik.core.store import get_store
 from qwik.core.substitute import expand
 from qwik.ui.prompts import print_error, print_success
+from qwik.ui.theme import get_console
 
 __all__ = ["run_command"]
 
@@ -37,7 +38,7 @@ def run_command(
     """Execute an alias via subprocess (works without shell hooks)."""
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     alias = data.get(name)
     if alias is None:

@@ -12,13 +12,14 @@ from rich.console import Console
 from qwik.core.store import get_store
 from qwik.shells.base import SUPPORTED_SHELLS
 from qwik.ui.prompts import print_error, print_success, print_warning
+from qwik.ui.theme import get_console
 
 __all__ = ["doctor_command"]
 
 
 def doctor_command() -> None:
     """Diagnose shell, hook status, store readability, and conflicts."""
-    console = Console()
+    console = get_console()
     store = get_store()
 
     checks_ok = 0

@@ -15,6 +15,7 @@ from rich.console import Console
 from qwik.core.models import Alias
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success
+from qwik.ui.theme import get_console
 
 __all__ = ["edit_command"]
 
@@ -56,7 +57,7 @@ def edit_command(
     """Open the alias entry in ``$EDITOR`` as an editable TOML snippet."""
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     alias = data.get(name)
     if alias is None:
