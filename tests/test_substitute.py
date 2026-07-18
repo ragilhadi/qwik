@@ -69,3 +69,28 @@ class TestExpand:
     def test_zero_default_placeholder_raises(self) -> None:
         with pytest.raises(ValueError):
             expand("echo {0:-default}", [])
+
+
+import shlex
+
+
+class TestQuoting:
+    def test_positional_metachar_is_quoted(self) -> None:
+        assert expand("git checkout {1}", ["; rm -rf /"]) == f"git checkout {shlex.quote('; rm -rf /')}"
+
+    def test_default_metachar_is_quoted(self) -> None:
+        assert expand("echo {1:-x}", []) == "echo x"
+        assert expand("echo {1:-; rm -rf /}", []) == f"echo {shlex.quote('; rm -rf /')}"
+
+    def test_all_args_metachar_is_quoted(self) -> None:
+        out = expand("echo {@}", ["a", "; rm", "b"])
+        assert out == f"echo {shlex.quote('a')} {shlex.quote('; rm')} {shlex.quote('b')}"
+
+    def test_positional_normal_stays_unquoted(self) -> None:
+        assert expand("git checkout {1}", ["main"]) == "git checkout main"
+
+    def test_default_normal_stays_unquoted(self) -> None:
+        assert expand("git push origin {1:-main}", ["feat/x"]) == "git push origin feat/x"
+
+    def test_all_args_normal_stays_unquoted(self) -> None:
+        assert expand("echo {@}", ["a", "b"]) == "echo a b"

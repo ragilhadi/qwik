@@ -66,7 +66,6 @@ def validate_placeholders(command: str, args: Sequence[str]) -> None:
 
 def _parse_positional(match: re.Match[str], args: Sequence[str]) -> str:
     """Handle {N} and {N:-default} placeholders."""
-    # {N} — group 1
     if match.group(1) is not None:
         idx = int(match.group(1))
         if idx < 1:
@@ -74,8 +73,7 @@ def _parse_positional(match: re.Match[str], args: Sequence[str]) -> str:
                 f"Invalid placeholder {{{idx}}} in alias. "
                 f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
             )
-        return args[idx - 1] if idx <= len(args) else ""
-    # {N:-default} — groups 4 and 5
+        return shlex.quote(args[idx - 1]) if idx <= len(args) else ""
     if match.group(4) is not None:
         idx = int(match.group(4))
         if idx < 1:
@@ -83,16 +81,17 @@ def _parse_positional(match: re.Match[str], args: Sequence[str]) -> str:
                 f"Invalid placeholder {{{idx}}} in alias. "
                 f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
             )
-        return args[idx - 1] if idx <= len(args) else match.group(5)
+        value = args[idx - 1] if idx <= len(args) else match.group(5)
+        return shlex.quote(value)
     return match.group(0)
 
 
 def _replacer(match: re.Match[str], args: Sequence[str]) -> str:
     if match.group(1) is not None or match.group(4) is not None:
         return _parse_positional(match, args)
-    if match.group(2) is not None:
-        return " ".join(args)
-    if match.group(3) is not None:
+    if match.group(2) is not None:  # {@}
+        return " ".join(shlex.quote(a) for a in args)
+    if match.group(3) is not None:  # {*}
         return shlex.quote(" ".join(args))
     return match.group(0)
 
