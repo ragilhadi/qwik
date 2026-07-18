@@ -55,3 +55,20 @@ class TestAddInteractive:
             assert "Added" in result.output
         finally:
             rp.Prompt.ask = orig_ask
+
+
+class TestPlaceholderValidation:
+    def test_add_rejects_zero_placeholder(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "bad", "echo {0}"])
+        assert result.exit_code == 1
+        assert "1-based" in result.output or "placeholder" in result.output.lower()
+
+    def test_add_accepts_valid_positional(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "gco", "git checkout {1}"])
+        assert result.exit_code == 0

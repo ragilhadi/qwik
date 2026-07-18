@@ -10,6 +10,7 @@ __all__ = [
     "expand",
     "has_placeholders",
     "validate_placeholders",
+    "validate_placeholders_static",
 ]
 
 # Regex matching supported placeholders:
@@ -27,6 +28,27 @@ def has_placeholders(command: str) -> bool:
         Boolean indicating template mode vs append mode.
     """
     return _PLACEHOLDER_RE.search(command) is not None
+
+
+def validate_placeholders_static(command: str) -> None:
+    """Reject {0} and other structurally-invalid placeholders without
+    requiring the runtime args.
+
+    Args:
+        command: The alias command to check.
+
+    Raises:
+        ValueError: If any placeholder uses a 0 (or negative) index.
+    """
+    for match in _PLACEHOLDER_RE.finditer(command):
+        for gidx in (1, 4):
+            if match.group(gidx) is not None:
+                idx = int(match.group(gidx))
+                if idx < 1:
+                    raise ValueError(
+                        f'Invalid placeholder {{{idx}}} in alias: "{command}". '
+                        f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
+                    )
 
 
 def validate_placeholders(command: str, args: Sequence[str]) -> None:

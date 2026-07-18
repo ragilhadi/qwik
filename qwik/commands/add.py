@@ -57,6 +57,14 @@ def add_command(
 
     full_command = " ".join(command)
 
+    from qwik.core.substitute import validate_placeholders_static
+
+    try:
+        validate_placeholders_static(full_command)
+    except ValueError as exc:
+        print_error(str(exc), console=console)
+        raise typer.Exit(1)
+
     # Conflict checks
     checker = ConflictChecker(store_data)
     result = checker.check(name)
