@@ -23,9 +23,8 @@ from qwik.commands.run import run_command
 from qwik.commands.search import search_command
 from qwik.commands.show import show_command
 from qwik.commands.tag import tag_command, untag_command
-from qwik.ui.theme import get_console
-
 import qwik.ui.theme as _theme
+from qwik.ui.theme import get_console
 
 __all__ = ["app"]
 

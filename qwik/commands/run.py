@@ -11,7 +11,6 @@ from __future__ import annotations
 import subprocess
 
 import typer
-from rich.console import Console
 
 from qwik.core.store import get_store
 from qwik.core.substitute import expand

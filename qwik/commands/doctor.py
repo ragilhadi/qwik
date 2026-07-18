@@ -7,7 +7,6 @@ import shutil
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
 from qwik.commands.init_shell import _fish_config_dir
 from qwik.core.store import get_store

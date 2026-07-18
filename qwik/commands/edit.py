@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
 from qwik.core.models import Alias
 from qwik.core.store import get_store

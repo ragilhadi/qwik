@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
 from qwik.core.models import AliasStore
 from qwik.core.store import get_store
