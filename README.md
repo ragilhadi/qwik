@@ -232,9 +232,11 @@ Use `{…}` markers to substitute arguments into the command.
 | Placeholder | Meaning |
 |---|---|
 | `{1}`, `{2}`, `{3}`… | Nth positional argument (1-based) |
+| `{name}` | Named slot — mapped to a positional index by order of first appearance (see below) |
 | `{@}` | All arguments joined with spaces |
 | `{*}` | All arguments as a single quoted string |
 | `{1:-default}` | Nth positional, falling back to `default` if missing |
+| `{name:-default}` | Named slot, falling back to `default` if the arg is missing |
 
 ---
 
@@ -254,6 +256,20 @@ qwik add gcm 'git commit -m "{1}: {2}"'
 gcm feat "add login"
 # → git commit -m "feat: add login"
 ```
+
+**Named placeholders (readable):**
+
+```bash
+qwik add gco "git checkout {branch}"
+gco main                # → git checkout main
+
+qwik add gcm 'git commit -m "{type}: {scope}"'
+gcm feat login          # → git commit -m "feat: login"
+```
+
+Named placeholders are mapped to positional arguments by **order of first appearance**: the first distinct name is `{1}`, the second is `{2}`, and so on. Repeating a name reuses its index (`echo {a} {a}` with arg `x` → `echo x x`). Named and numeric placeholders share the same index space — `echo {1} {name}` with args `a b` → `echo a b` (`{1}`=a, `{name}`=b at index 2).
+
+> **Note:** Named placeholder names must start with a letter or underscore and contain only letters, digits, underscores, and hyphens (`^[A-Za-z_][A-Za-z0-9_-]*$`). A `{…}` that doesn't match this pattern and isn't a numeric/`@`/`*` placeholder is left as a literal — so `{123bad}` and `{some text}` in a command are passed through untouched.
 
 **Default value:**
 
@@ -302,7 +318,9 @@ co                      # → git checkout main (default)
 
 ### Validation
 
-- `{0}` is rejected at add-time and at run-time — placeholders are 1-based
+- `{0}` is rejected at add-time and at run-time — positional placeholders are 1-based
+- Named placeholders (`{name}`) are 1-based by order of appearance, so there is no `{0name}` form; `{0name}` is a literal
+- Invalid brace content (e.g. `{123bad}`, `{some text}`) is left untouched as a literal, not an error
 - Missing required args produce a clear error at runtime instead of silently expanding to empty strings
 
 ---

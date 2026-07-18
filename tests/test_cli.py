@@ -69,6 +69,11 @@ class TestAddCommand:
         assert result.exit_code == 0
         assert "Added" in result.output
 
+    def test_add_named_placeholder_accepted(self, clean_store) -> None:
+        result = runner.invoke(app, ["add", "gco", "git", "checkout", "{branch}"])
+        assert result.exit_code == 0
+        assert "Added" in result.output
+
     def test_add_builtin_without_force(self, clean_store) -> None:
         result = runner.invoke(app, ["add", "cd", "echo", "hi"])
         assert result.exit_code == 1
