@@ -103,9 +103,9 @@ def edit_command(
 
         data.aliases[name] = Alias(
             command=str(new_fields.get("command", alias.command)),
-            tag=new_fields.get("tag", alias.tag) or [],
+            tag=list(new_fields.get("tag", alias.tag)) or [],  # type: ignore[call-overload]
             description=str(new_fields.get("description", alias.description)),
-            enabled=new_fields.get("enabled", alias.enabled),
+            enabled=bool(new_fields.get("enabled", alias.enabled)),
             created_at=alias.created_at,
             updated_at=datetime.now(timezone.utc),
             last_used=alias.last_used,

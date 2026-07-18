@@ -102,7 +102,7 @@ def add_command(
 
     alias = Alias(
         command=full_command,
-        tag=tag or "",
+        tag=tag or [],  # type: ignore[arg-type]
         description=description or "",
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),

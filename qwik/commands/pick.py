@@ -64,8 +64,8 @@ def pick_command() -> None:
     print_success(f'Running "{name}" → {expanded!r}', console=console)
     returncode = 1
     try:
-        result = subprocess.run(expanded, shell=True)
-        returncode = result.returncode
+        completed = subprocess.run(expanded, shell=True)
+        returncode = completed.returncode
     except KeyboardInterrupt:
         # Child received SIGINT (e.g. user hit Ctrl+C on a long-running command).
         returncode = 130

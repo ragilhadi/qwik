@@ -15,6 +15,19 @@ runner = CliRunner()
 
 
 def _create_editor_script(path: Path, contents: str) -> Path:
+    if sys.platform == "win32":
+        writer = path / "editor.bat"
+        # Batch can't easily write arbitrary multi-line text; delegate to Python.
+        payload = path / "payload.txt"
+        payload.write_text(contents, encoding="utf-8")
+        writer.write_text(
+            f'@echo off\r\n"{sys.executable}" -c "'
+            "import sys; "
+            f"open(sys.argv[1], 'w', encoding='utf-8').write(open(sys.argv[2], encoding='utf-8').read())"
+            f'" "%~1" "{payload}"\r\n',
+            encoding="utf-8",
+        )
+        return writer
     writer = path / "editor.sh"
     writer.write_text(
         f"#!/usr/bin/env bash\ncat > \"$1\" <<'EDOFSNIPPET'\n{contents}\nEDOFSNIPPET\n",
@@ -117,9 +130,13 @@ class TestEditCommand:
 
     def test_edit_editor_failed(self, tmp_path, monkeypatch) -> None:
         self._setup(tmp_path, monkeypatch)
-        fail_editor = tmp_path / "fail_editor.sh"
-        fail_editor.write_text("#!/usr/bin/env bash\nexit 1\n")
-        os.chmod(fail_editor, 0o700)
+        if sys.platform == "win32":
+            fail_editor = tmp_path / "fail_editor.bat"
+            fail_editor.write_text("@echo off\nexit /b 1\n", encoding="utf-8")
+        else:
+            fail_editor = tmp_path / "fail_editor.sh"
+            fail_editor.write_text("#!/usr/bin/env bash\nexit 1\n")
+            os.chmod(fail_editor, 0o700)
         monkeypatch.setenv("EDITOR", str(fail_editor))
         result = runner.invoke(app, ["edit", "gs"])
         assert result.exit_code == 1

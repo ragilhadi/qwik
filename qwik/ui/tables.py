@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rich.box import SIMPLE_HEAVY
+from rich.console import Console
 from rich.table import Table
 
 
@@ -22,7 +23,7 @@ def render_list_table(
     *,
     tag_filter: str | None = None,
     search_query: str | None = None,
-    console=None,
+    console: Console | None = None,
 ) -> Table:
     """Build a Rich :class:`~rich.table.Table` for ``qwik list``.
 

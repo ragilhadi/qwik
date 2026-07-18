@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Literal
 
 from rich.console import Console
 from rich.style import Style
@@ -49,7 +49,9 @@ def get_console(*, no_color: bool = False, **kwargs: Any) -> Console:
     Returns:
         A configured Rich console.
     """
-    color_system = None if (no_color or _no_color_active()) else "auto"
+    color_system: Literal["auto", "standard", "256", "truecolor", "windows"] | None = (
+        None if (no_color or _no_color_active()) else "auto"
+    )
     return Console(theme=THEME, color_system=color_system, **kwargs)
 
 
