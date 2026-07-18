@@ -10,6 +10,7 @@ from typing import Any
 
 import tomlkit
 from tomlkit import TOMLDocument
+from tomlkit.exceptions import ParseError as TOMLDecodeError
 
 from qwik.config import Config, get_config
 from qwik.core.models import AliasStore
@@ -24,12 +25,8 @@ _MAX_BACKUPS: int = 20
 
 
 def _now_stamp() -> str:
-    """Return an ISO-like timestamp suitable for filenames.
-
-    Returns:
-        A string in the form ``YYYYMMDD-HHMMSS``.
-    """
-    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    """Return an ISO-like timestamp with microseconds for filename uniqueness."""
+    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
 
 
 class Store:
@@ -69,10 +66,17 @@ class Store:
         """
         if not self._path.exists():
             return AliasStore()
-        raw = self._path.read_text(encoding="utf-8")
-        doc = tomlkit.parse(raw)
-        data: dict[str, Any] = doc.unwrap()
-        return AliasStore.model_validate(data)
+        try:
+            raw = self._path.read_text(encoding="utf-8")
+            doc = tomlkit.parse(raw)
+            data: dict[str, Any] = doc.unwrap()
+            return AliasStore.model_validate(data)
+        except (TOMLDecodeError, ValueError) as exc:
+            raise RuntimeError(
+                f"Could not read alias store at {self._path}: {exc}. "
+                f"Run `qwik doctor` to diagnose or restore from "
+                f"{self._backup_dir}."
+            ) from exc
 
     def save(self, store: AliasStore) -> None:
         """Persist *store* atomically to disk.
@@ -111,9 +115,9 @@ class Store:
         """
         self._config.ensure_dirs()
         if self._path.exists():
-            self._rotate_backups()
             backup_name = f"aliases-{_now_stamp()}.toml"
             shutil.copy2(self._path, self._backup_dir / backup_name)
+            self._rotate_backups()
         self.save(store)
 
     def _rotate_backups(self) -> None:
@@ -121,9 +125,8 @@ class Store:
         if not self._backup_dir.exists():
             return
         backups = sorted(self._backup_dir.glob("aliases-*.toml"))
-        if len(backups) > _MAX_BACKUPS:
-            for old in backups[: len(backups) - _MAX_BACKUPS]:
-                old.unlink()
+        for old in backups[: len(backups) - _MAX_BACKUPS]:
+            old.unlink(missing_ok=True)
 
     @staticmethod
     def _store_to_document(store: AliasStore) -> TOMLDocument:
