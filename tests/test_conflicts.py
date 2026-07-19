@@ -47,24 +47,57 @@ class TestBuiltinsSet:
         assert is_builtin("echo") is True
 
 
-def test_zsh_builtin_setopt_detected():
-    from qwik.core.conflicts import is_builtin
+class TestShellSpecificBuiltins:
+    def test_zsh_setopt(self) -> None:
+        from qwik.core.conflicts import is_builtin
 
-    assert is_builtin("setopt", "zsh") is True
-    assert is_builtin("setopt", "bash") is False
+        assert is_builtin("setopt", "zsh") is True
+
+    def test_zsh_setopt_not_bash(self) -> None:
+        from qwik.core.conflicts import is_builtin
+
+        assert is_builtin("setopt", "bash") is False
+
+    def test_fish_abbr(self) -> None:
+        from qwik.core.conflicts import is_builtin
+
+        assert is_builtin("abbr", "fish") is True
+
+    def test_fish_abbr_not_bash(self) -> None:
+        from qwik.core.conflicts import is_builtin
+
+        assert is_builtin("abbr", "bash") is False
+
+    def test_pwsh_write_output(self) -> None:
+        from qwik.core.conflicts import is_builtin
+
+        assert is_builtin("Write-Output", "pwsh") is True
+
+    def test_cmd_dir(self) -> None:
+        from qwik.core.conflicts import is_builtin
+
+        assert is_builtin("dir", "cmd") is True
+
+    def test_cmd_dir_not_bash(self) -> None:
+        from qwik.core.conflicts import is_builtin
+
+        assert is_builtin("dir", "bash") is False
 
 
-def test_fish_builtin_abbr_detected():
-    from qwik.core.conflicts import is_builtin
+class TestConflictCheckerShellParam:
+    def test_check_uses_shell_param(self) -> None:
+        store = AliasStore()
+        checker = ConflictChecker(store)
+        zsh_result = checker.check("setopt", shell="zsh")
+        bash_result = checker.check("setopt", shell="bash")
+        assert zsh_result.is_builtin is True
+        assert bash_result.is_builtin is False
 
-    assert is_builtin("abbr", "fish") is True
-    assert is_builtin("abbr", "bash") is False
-
-
-def test_pwsh_builtin_writeoutput_detected():
-    from qwik.core.conflicts import is_builtin
-
-    assert is_builtin("Write-Output", "pwsh") is True
+    def test_check_defaults_to_bash(self) -> None:
+        store = AliasStore()
+        checker = ConflictChecker(store)
+        result = checker.check("setopt")
+        assert result.is_builtin is False
 
 
 def test_is_builtin_defaults_to_bash():

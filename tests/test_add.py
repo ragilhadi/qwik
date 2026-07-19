@@ -134,3 +134,58 @@ class TestGroupFlag:
         assert result.exit_code == 1
         assert "Invalid group" in result.output
         assert "Traceback" not in result.output
+
+
+class TestAddBuiltinDetection:
+    def test_add_rejects_zsh_builtin_when_detected_zsh(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "zsh")
+        result = runner.invoke(app, ["add", "setopt", "echo", "hi"])
+        assert result.exit_code == 1
+        assert "shell builtin" in result.output
+
+    def test_add_rejects_fish_builtin_when_detected_fish(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "fish")
+        result = runner.invoke(app, ["add", "abbr", "echo", "hi"])
+        assert result.exit_code == 1
+        assert "shell builtin" in result.output
+
+    def test_add_allows_zsh_builtin_when_shell_override_bash(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "zsh")
+        result = runner.invoke(app, ["add", "setopt", "echo", "hi", "--shell", "bash"])
+        assert result.exit_code == 0
+        assert "Added" in result.output
+
+    def test_add_rejects_bash_builtin_with_shell_override_bash(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "fish")
+        result = runner.invoke(app, ["add", "compgen", "echo", "hi", "--shell", "bash"])
+        assert result.exit_code == 1
+        assert "shell builtin" in result.output
+
+    def test_add_allows_bash_builtin_with_shell_override_fish(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "bash")
+        result = runner.invoke(app, ["add", "compgen", "echo", "hi", "--shell", "fish"])
+        assert result.exit_code == 0
+        assert "Added" in result.output
+
+    def test_add_shell_flag_hidden_from_help(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "--help"])
+        out = _strip_ansi(result.output)
+        assert "--shell" not in out

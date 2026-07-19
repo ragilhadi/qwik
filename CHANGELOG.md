@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-19
+
+### Fixed
+- Builtin-conflict detection at `qwik add`/`rename` now uses the detected shell's builtin set, not bash's. Previously `setopt`/`abbr`/`Write-Output`/`dir` were allowed on their native shells.
+
 ## [0.3.1] - 2026-07-19
 
 ### Added

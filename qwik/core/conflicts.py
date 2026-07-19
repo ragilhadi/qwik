@@ -146,17 +146,19 @@ class ConflictChecker:
         """
         self._store = store
 
-    def check(self, name: str) -> ConflictResult:
+    def check(self, name: str, shell: str | None = None) -> ConflictResult:
         """Run the full conflict pipeline against *name*.
 
         Args:
             name: Candidate alias name.
+            shell: Shell name whose builtin set should be consulted.
+                Defaults to ``bash`` when ``None``.
 
         Returns:
             A :class:`ConflictResult` summarising all findings.
         """
         existing = name in self._store.aliases
-        builtin = is_builtin(name)
+        builtin = is_builtin(name, shell)
         path_bin = shutil.which(name)
         is_on_path = path_bin is not None
 

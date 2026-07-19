@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 
@@ -14,6 +13,11 @@ from qwik.commands.sync import _load_sync_config
 from qwik.config import get_config
 from qwik.core.git import behind_ahead, current_branch, git_available, is_dirty
 from qwik.core.models import AliasStore
+from qwik.core.shell_detect import (
+    detect_shell,
+    shell_name_from_env,
+    shell_name_from_proc,
+)
 from qwik.core.store import get_store
 from qwik.shells.base import SUPPORTED_SHELLS
 from qwik.ui.prompts import (
@@ -26,6 +30,10 @@ from qwik.ui.prompts import (
 from qwik.ui.theme import get_console
 
 __all__ = ["doctor_command"]
+
+_detect_shell = detect_shell
+_shell_name_from_env = shell_name_from_env
+_shell_name_from_proc = shell_name_from_proc
 
 
 def _latest_valid_backup(backup_dir: Path) -> Path | None:
@@ -200,52 +208,6 @@ def doctor_command() -> None:
     )
     if checks_err:
         raise typer.Exit(1)
-
-
-def _shell_name_from_env() -> str | None:
-    """Return shell name from ``$SHELL`` if present."""
-    shell_env = os.environ.get("SHELL", "").lower()
-    if "bash" in shell_env:
-        return "bash"
-    if "zsh" in shell_env:
-        return "zsh"
-    if "fish" in shell_env:
-        return "fish"
-    if "pwsh" in shell_env or "powershell" in shell_env:
-        return "pwsh"
-    return None
-
-
-def _shell_name_from_proc() -> str | None:
-    """Return shell name by inspecting parent process on Linux."""
-    try:
-        with Path("/proc/self/status").open(encoding="utf-8") as f:
-            for line in f:
-                if line.startswith("PPid:"):
-                    ppid = line.split()[1]
-                    exe_link = Path(f"/proc/{ppid}/exe")
-                    if exe_link.exists():
-                        name = exe_link.resolve().name.lower()
-                        if "bash" in name:
-                            return "bash"
-                        if "zsh" in name:
-                            return "zsh"
-                        if "fish" in name:
-                            return "fish"
-                        if "pwsh" in name or "powershell" in name:
-                            return "pwsh"
-    except Exception:
-        pass
-    return None
-
-
-def _detect_shell() -> str | None:
-    """Attempt to detect the current user's shell.
-
-    Returns:
-        A lowercase shell name (e.g. ``bash``, ``zsh``), or ``None``.
-    """
-    return _shell_name_from_env() or _shell_name_from_proc()
 
 
 def _hook_installed(shell: str | None) -> bool:

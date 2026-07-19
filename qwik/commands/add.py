@@ -9,6 +9,7 @@ import typer
 
 from qwik.core.conflicts import ConflictChecker
 from qwik.core.models import Alias, validate_alias_name
+from qwik.core.shell_detect import detect_shell as _detect_shell
 from qwik.core.store import get_store
 from qwik.ui.prompts import (
     print_error,
@@ -38,6 +39,9 @@ def add_command(
     group: Optional[str] = typer.Option(
         None, "--group", "-g", help="Primary group for the alias."
     ),
+    shell: Optional[str] = typer.Option(
+        None, "--shell", hidden=True, help="Override shell detection for conflict checks."
+    ),
 ) -> None:
     """Create a new alias.
 
@@ -66,7 +70,8 @@ def add_command(
 
     # Conflict checks
     checker = ConflictChecker(store_data)
-    result = checker.check(name)
+    active_shell = shell or _detect_shell()
+    result = checker.check(name, shell=active_shell)
 
     if not result.valid_syntax:
         print_error(
