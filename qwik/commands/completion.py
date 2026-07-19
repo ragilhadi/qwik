@@ -136,7 +136,7 @@ def _install_zsh(marker: str, console: Console) -> None:
         return
     if rc.exists():
         _backup(rc, console)
-    hook_line = f"\n{marker}\nfpath=(~/.zfunc $fpath)\ncompinit\n"
+    hook_line = f"\n{marker}\nfpath=($HOME/.zfunc $fpath)\ncompinit\n"
     with rc.open("a", encoding="utf-8") as fh:
         fh.write(hook_line)
     print_success(f"Added fpath/compinit to {rc}", console=console)
