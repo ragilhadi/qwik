@@ -12,7 +12,87 @@ from qwik.core.store import Store, get_store
 from qwik.ui.prompts import print_error, print_success, prompt_confirm
 from qwik.ui.theme import get_console
 
-__all__ = ["import_command", "preview_and_merge"]
+__all__ = ["import_command", "preview_and_merge", "preview_import", "merge_into"]
+
+
+def preview_import(
+    incoming: AliasStore,
+    data: AliasStore,
+    *,
+    yes: bool,
+    console: Console | None = None,
+) -> bool:
+    """Show a trust-boundary preview and prompt for confirmation.
+
+    Args:
+        incoming: The store parsed from the incoming source.
+        data: The current live store.
+        yes: If ``True``, skip the confirmation prompt (the warning is
+            still shown).
+        console: Optional Rich console for output.
+
+    Returns:
+        ``True`` if the user confirmed (or ``yes`` was set), ``False`` if
+        the user declined the prompt.
+    """
+    con = console if console is not None else get_console()
+
+    con.print("[qwik.warning]Commands to be imported:[/qwik.warning]")
+    for name, alias in list(incoming.aliases.items())[:20]:
+        con.print(f"  [bold]{name}[/bold] → {alias.command}")
+    if len(incoming.aliases) > 20:
+        con.print(f"  ... and {len(incoming.aliases) - 20} more")
+    con.print(
+        "[qwik.warning]Importing aliases is a trust boundary — "
+        "stored commands will run under `shell=True`.[/qwik.warning]"
+    )
+
+    existing_names = set(data.aliases)
+    incoming_names = set(incoming.aliases)
+    new_names = incoming_names - existing_names
+    conflict_names = incoming_names & existing_names
+
+    if conflict_names:
+        con.print(
+            f"[qwik.warning]Conflicts ({len(conflict_names)}):[/qwik.warning] "
+            f"{', '.join(sorted(conflict_names))}"
+        )
+    if new_names:
+        con.print(
+            f"[qwik.success]New aliases ({len(new_names)}):[/qwik.success] "
+            f"{', '.join(sorted(new_names))}"
+        )
+
+    if not yes:
+        if not prompt_confirm("Apply import?", default=False, console=con):
+            return False
+    return True
+
+
+def merge_into(incoming: AliasStore, data: AliasStore) -> tuple[int, int, int]:
+    """Merge *incoming* aliases into *data* in place; return counts.
+
+    Args:
+        incoming: The store to merge from.
+        data: The live store to merge into (mutated in place).
+
+    Returns:
+        ``(added, updated, unchanged)`` counts.
+    """
+    existing_names = set(data.aliases)
+    added = 0
+    updated = 0
+    unchanged = 0
+    for name, alias in incoming.aliases.items():
+        if name in existing_names:
+            if data.aliases[name].command != alias.command:
+                updated += 1
+            else:
+                unchanged += 1
+        else:
+            added += 1
+        data.aliases[name] = alias
+    return added, updated, unchanged
 
 
 def preview_and_merge(
@@ -40,54 +120,11 @@ def preview_and_merge(
         ``(added, updated, unchanged)`` counts on success, or ``None`` if
         the user declined the prompt.
     """
-    con = console if console is not None else get_console()
-
-    if not yes:
-        con.print("[qwik.warning]Commands to be imported:[/qwik.warning]")
-        for name, alias in list(incoming.aliases.items())[:20]:
-            con.print(f"  [bold]{name}[/bold] → {alias.command}")
-        if len(incoming.aliases) > 20:
-            con.print(f"  ... and {len(incoming.aliases) - 20} more")
-        con.print(
-            "[qwik.warning]Importing aliases is a trust boundary — "
-            "stored commands will run under `shell=True`.[/qwik.warning]"
-        )
-
-    existing_names = set(data.aliases)
-    incoming_names = set(incoming.aliases)
-    new_names = incoming_names - existing_names
-    conflict_names = incoming_names & existing_names
-
-    if conflict_names:
-        con.print(
-            f"[qwik.warning]Conflicts ({len(conflict_names)}):[/qwik.warning] "
-            f"{', '.join(sorted(conflict_names))}"
-        )
-    if new_names:
-        con.print(
-            f"[qwik.success]New aliases ({len(new_names)}):[/qwik.success] "
-            f"{', '.join(sorted(new_names))}"
-        )
-
-    if not yes:
-        if not prompt_confirm("Apply import?", default=False, console=con):
-            return None
-
-    added = 0
-    updated = 0
-    unchanged = 0
-    for name, alias in incoming.aliases.items():
-        if name in existing_names:
-            if data.aliases[name].command != alias.command:
-                updated += 1
-            else:
-                unchanged += 1
-        else:
-            added += 1
-        data.aliases[name] = alias
-
+    if not preview_import(incoming, data, yes=yes, console=console):
+        return None
+    counts = merge_into(incoming, data)
     store.save_with_backup(data)
-    return added, updated, unchanged
+    return counts
 
 
 def import_command(
@@ -129,8 +166,9 @@ def import_command(
         raise typer.Exit(1)
 
     if overwrite:
-        data = incoming
-        store.save_with_backup(data)
+        if not preview_import(incoming, data, yes=yes, console=console):
+            raise typer.Exit(0)
+        store.save_with_backup(incoming)
         print_success(f"Imported {len(incoming.aliases)} aliases.", console=console)
         return
 

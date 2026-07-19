@@ -65,3 +65,65 @@ class TestImportSafety:
         result = runner.invoke(app, ["import", str(src)], input="n\n")
         assert "rm -rf /tmp" in result.output
         assert result.exit_code == 0  # declined → exit 0
+
+
+class TestImportOverwritePreview:
+    def test_import_overwrite_shows_preview_and_confirms(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "keep", "echo keep"])
+        hostile = tmp_path / "hostile.toml"
+        # Build an incoming file with a hostile command
+        import tomlkit
+
+        doc = tomlkit.document()
+        doc.add("version", 1)
+        aliases = tomlkit.table()
+        t = tomlkit.table()
+        t.add("command", "rm -rf /tmp")
+        aliases.add("danger", t)
+        doc.add("aliases", aliases)
+        hostile.write_text(tomlkit.dumps(doc), encoding="utf-8")
+
+        with patch("qwik.commands.importer.prompt_confirm", return_value=False) as declined:
+            result = runner.invoke(app, ["import", str(hostile), "--overwrite"])
+            assert declined.called
+            assert result.exit_code == 0
+            assert "trust" in result.output.lower() or "shell=True" in result.output.lower()
+            assert "rm -rf /tmp" in result.output
+            live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
+            assert "danger" not in live["aliases"].unwrap()  # type: ignore[attr-defined]
+            assert "keep" in live["aliases"].unwrap()  # type: ignore[attr-defined]
+
+        with patch("qwik.commands.importer.prompt_confirm", return_value=True) as confirmed:
+            result = runner.invoke(app, ["import", str(hostile), "--overwrite"])
+            assert confirmed.called
+            assert result.exit_code == 0, result.output
+            live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
+            assert "danger" in live["aliases"].unwrap()  # type: ignore[attr-defined]
+            assert "keep" not in live["aliases"].unwrap()  # type: ignore[attr-defined]
+
+    def test_import_overwrite_yes_shows_warning(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "keep", "echo keep"])
+        import tomlkit
+
+        hostile = tmp_path / "h.toml"
+        doc = tomlkit.document()
+        doc.add("version", 1)
+        aliases = tomlkit.table()
+        t = tomlkit.table()
+        t.add("command", "rm -rf /tmp")
+        aliases.add("danger", t)
+        doc.add("aliases", aliases)
+        hostile.write_text(tomlkit.dumps(doc), encoding="utf-8")
+        result = runner.invoke(app, ["import", str(hostile), "--overwrite", "--yes"])
+        assert result.exit_code == 0, result.output
+        assert "trust" in result.output.lower() or "shell=True" in result.output.lower()
+        live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
+        assert "danger" in live["aliases"].unwrap()  # type: ignore[attr-defined]
