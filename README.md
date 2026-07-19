@@ -430,6 +430,15 @@ The hook generates native aliases/functions for each shell:
 | PowerShell | `function gs { echo hi @args }` | `function gs { echo "{1}" $args[0] }` |
 | cmd | `doskey gs=git status $*` | (best-effort, no template) |
 
+### Variable expansion
+
+On cmd and pwsh, `%VAR%` and `$VAR` in alias commands are expanded by the
+shell at run time, not treated as literal text. `qwik add` warns when it
+detects these patterns. On bash/zsh/fish, `$VAR` expansion is the expected
+behavior and no warning is shown. When the active shell is cmd and a template
+alias (`{1}`, `{name}`) is created, `qwik add` also warns that cmd/doskey
+cannot expand parameters and the alias will be omitted from cmd hooks.
+
 ---
 
 ## Conflict Detection

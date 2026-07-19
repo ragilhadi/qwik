@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-07-19
 
+### Added
+- `qwik add` now warns when a template alias is created and the active shell is cmd (cmd/doskey cannot expand parameters).
+- `qwik add` warns when the command contains a `%VAR%` (cmd) or `$VAR` (pwsh) reference that will be expanded by the shell at run time.
+
 ### Fixed
 - Builtin-conflict detection at `qwik add`/`rename` now uses the detected shell's builtin set, not bash's. Previously `setopt`/`abbr`/`Write-Output`/`dir` were allowed on their native shells.
 

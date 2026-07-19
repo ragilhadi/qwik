@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -11,6 +12,7 @@ from qwik.core.conflicts import ConflictChecker
 from qwik.core.models import Alias, validate_alias_name
 from qwik.core.shell_detect import detect_shell as _detect_shell
 from qwik.core.store import get_store
+from qwik.core.substitute import has_placeholders
 from qwik.ui.prompts import (
     print_error,
     print_info,
@@ -22,6 +24,9 @@ from qwik.ui.prompts import (
 from qwik.ui.theme import get_console
 
 __all__ = ["add_command"]
+
+_CMD_VAR_RE: re.Pattern[str] = re.compile(r"%[A-Za-z_][A-Za-z0-9_]*%")
+_PWSH_VAR_RE: re.Pattern[str] = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*")
 
 
 def add_command(
@@ -109,6 +114,29 @@ def add_command(
         except ValueError as exc:
             print_error(f'Invalid group "{group}": {exc}', console=console)
             raise typer.Exit(1)
+
+    if active_shell is not None:
+        if active_shell == "cmd" and has_placeholders(full_command):
+            print_warning(
+                "cmd/doskey does not support parameterized aliases; "
+                f'"{name}" will be omitted from cmd hooks. '
+                "Use bash/zsh/fish/pwsh for templates, or run "
+                f"`qwik run {name} ...` directly.",
+                console=console,
+            )
+        var_match: re.Match[str] | None = None
+        if active_shell == "cmd":
+            var_match = _CMD_VAR_RE.search(full_command)
+        elif active_shell == "pwsh":
+            var_match = _PWSH_VAR_RE.search(full_command)
+        if var_match is not None:
+            example = var_match.group(0)
+            print_warning(
+                f"Command contains {example} which will be expanded by "
+                f"{active_shell} at run time. If you want a literal {example}, "
+                "escape it per your shell's rules.",
+                console=console,
+            )
 
     alias = Alias(
         command=full_command,
