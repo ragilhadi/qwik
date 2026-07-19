@@ -262,27 +262,24 @@ class TestLatestValidBackupHelper:
     def test_returns_newest_valid(self, tmp_path: Path) -> None:
         backups = tmp_path / "backups"
         backups.mkdir()
-        (backups / "aliases-old.toml").write_text(
+        (backups / "aliases-20260719-120000-000001-0001.toml").write_text(
             'version = 1\n[aliases.a]\ncommand = "x"\n', encoding="utf-8"
         )
-        import os
-        from pathlib import Path as _P
-
-        newest = backups / "aliases-new.toml"
+        newest = backups / "aliases-20260719-120000-000002-0002.toml"
         newest.write_text(
             'version = 1\n[aliases.b]\ncommand = "y"\n', encoding="utf-8"
         )
-        newer_mtime = newest.stat().st_mtime + 100
-        os.utime(newest, (newer_mtime, newer_mtime))
         result = _latest_valid_backup(backups)
         assert result is not None
-        assert result.name == "aliases-new.toml"
+        assert result.name == "aliases-20260719-120000-000002-0002.toml"
 
     def test_skips_invalid_backups(self, tmp_path: Path) -> None:
         backups = tmp_path / "backups"
         backups.mkdir()
-        (backups / "aliases-bad.toml").write_text("not-valid", encoding="utf-8")
-        good = backups / "aliases-good.toml"
+        (backups / "aliases-20260719-120000-000001-0001.toml").write_text(
+            "not-valid", encoding="utf-8"
+        )
+        good = backups / "aliases-20260719-120000-000002-0002.toml"
         good.write_text(
             'version = 1\n[aliases.a]\ncommand = "x"\n', encoding="utf-8"
         )

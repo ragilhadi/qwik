@@ -31,9 +31,11 @@ __all__ = ["doctor_command"]
 def _latest_valid_backup(backup_dir: Path) -> Path | None:
     """Return the newest valid backup TOML in *backup_dir*, or ``None``.
 
-    Backups are named ``aliases-*.toml``. Each is validated by parsing the
-    TOML and constructing an :class:`~qwik.core.models.AliasStore`. The
-    newest (by modification time) backup that validates is returned.
+    Backups are named ``aliases-<stamp>.toml`` where ``<stamp>`` is a
+    UTC timestamp with microseconds and a per-process monotonic counter
+    (see :func:`qwik.core.store._now_stamp`). The filename therefore
+    sorts chronologically, which is more reliable than ``st_mtime`` on
+    filesystems with coarse mtime resolution (Windows ~15 ms).
 
     Args:
         backup_dir: Directory holding backup files.
@@ -44,11 +46,7 @@ def _latest_valid_backup(backup_dir: Path) -> Path | None:
     """
     if not backup_dir.exists():
         return None
-    candidates = sorted(
-        backup_dir.glob("aliases-*.toml"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
+    candidates = sorted(backup_dir.glob("aliases-*.toml"), reverse=True)
     for path in candidates:
         try:
             doc = tomlkit.parse(path.read_text(encoding="utf-8"))
