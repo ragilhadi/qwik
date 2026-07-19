@@ -1,4 +1,4 @@
-"""Thin subprocess wrappers around the ``git`` CLI for ``qwik sync``.
+﻿"""Thin subprocess wrappers around the ``git`` CLI for ``qwik sync``.
 
 Shells out to ``git`` via :func:`subprocess.run` so the project does not
 need a GitPython dependency.  Every function raises :class:`RuntimeError`
@@ -117,5 +117,8 @@ def ahead_behind(path: Path, remote: str, branch: str) -> tuple[int, int]:
         ["rev-list", "--left-right", "--count", f"{remote}/{branch}...HEAD"],
         path,
     )
-    left, right = out.split()
+    parts = out.split()
+    if len(parts) != 2:
+        raise RuntimeError(f"could not parse ahead/behind from {out!r}")
+    left, right = parts
     return int(left), int(right)

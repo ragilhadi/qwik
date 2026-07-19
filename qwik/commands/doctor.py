@@ -9,6 +9,7 @@ from pathlib import Path
 import typer
 
 from qwik.commands.init_shell import _fish_config_dir
+from qwik.commands.sync import _load_sync_config
 from qwik.config import get_config
 from qwik.core.git import ahead_behind, current_branch, git_available, is_dirty
 from qwik.core.store import get_store
@@ -84,13 +85,15 @@ def doctor_command() -> None:
         try:
             branch = current_branch(sync_repo)
             dirty = is_dirty(sync_repo)
+            remote_url, _ = _load_sync_config(sync_repo)
+            remote_str = remote_url if remote_url is not None else "<not set>"
             try:
                 behind, ahead = ahead_behind(sync_repo, "origin", branch)
                 ahead_behind_str = f", {ahead} ahead / {behind} behind"
             except RuntimeError:
                 ahead_behind_str = ""
             print_success(
-                f"Sync repo: configured ({branch}, remote set{ahead_behind_str}).",
+                f"Sync repo: configured ({branch}, remote={remote_str}{ahead_behind_str}).",
                 console=console,
             )
             if dirty:

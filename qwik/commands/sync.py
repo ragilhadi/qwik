@@ -1,13 +1,13 @@
-"""``qwik sync`` — git-backed dotfile sharing across machines.
+﻿"""``qwik sync`` â€” git-backed dotfile sharing across machines.
 
 The sync repo lives at ``<config_dir>/qwik-sync/`` and holds:
 
-- ``aliases.toml`` — a TOML export of the live store (the same format as
+- ``aliases.toml`` â€” a TOML export of the live store (the same format as
   ``qwik export``), committed and pushed on every ``sync push``.
-- ``sync.toml`` — the persisted sync config: ``remote_url`` + ``branch``.
+- ``sync.toml`` â€” the persisted sync config: ``remote_url`` + ``branch``.
 
-``push`` exports the live store → commits → pushes to the remote.
-``pull`` pulls the remote → reuses :func:`qwik.commands.importer.preview_and_merge`
+``push`` exports the live store â†’ commits â†’ pushes to the remote.
+``pull`` pulls the remote â†’ reuses :func:`qwik.commands.importer.preview_and_merge`
 to import-merge into the live store under a :class:`FileLock` (the same
 trust-boundary preview as ``qwik import``).
 """
@@ -198,7 +198,7 @@ def _do_push(
             console=con,
         )
     else:
-        print_info("Nothing to push — sync repo is clean.", console=con)
+        print_info("Nothing to push â€” sync repo is clean.", console=con)
 
 
 def _do_pull(
@@ -225,9 +225,12 @@ def _do_pull(
         )
         raise typer.Exit(1)
 
-    git_pull(sync_repo, "origin", branch)
-
-    incoming = _read_sync_aliases(sync_repo)
+    try:
+        git_pull(sync_repo, "origin", branch)
+        incoming = _read_sync_aliases(sync_repo)
+    except RuntimeError as exc:
+        print_error(str(exc), console=con)
+        raise typer.Exit(1)
 
     store = get_store()
     lock = FileLock(store.path.with_suffix(".toml.lock"))

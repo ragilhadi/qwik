@@ -1,4 +1,4 @@
-"""Tests for the sync command (git-backed dotfile sharing)."""
+﻿"""Tests for the sync command (git-backed dotfile sharing)."""
 
 from __future__ import annotations
 
@@ -72,10 +72,10 @@ class FakeGit:
             else:
                 stdout = "\n".join(self.remotes)
         elif sub == "rev-parse":
-            # --abbrev-ref HEAD → "main"
+            # --abbrev-ref HEAD â†’ "main"
             stdout = "main"
         elif sub == "rev-list":
-            # --left-right --count origin/main...HEAD → "<behind>\t<ahead>"
+            # --left-right --count origin/main...HEAD â†’ "<behind>\t<ahead>"
             stdout = f"{self.behind}\t{self.ahead}"
         return subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
 
@@ -163,7 +163,7 @@ class TestSyncPush:
         runner.invoke(app, ["add", "gs", "git", "status"])
         runner.invoke(app, ["sync", "init", "--remote", "https://example.com/d.git"])
         fake.calls.clear()
-        # tree is clean (default fake) → nothing to push
+        # tree is clean (default fake) â†’ nothing to push
         result = runner.invoke(app, ["sync", "push"])
         assert result.exit_code == 0, result.output
         assert "nothing to push" in result.output.lower()
@@ -298,7 +298,7 @@ class TestSyncTrustBoundary:
         result = runner.invoke(app, ["sync", "pull"], input="n\n")
         assert "trust" in result.output.lower() or "shell=True" in result.output.lower()
         assert "rm -rf /tmp" in result.output
-        # declined → live store unchanged
+        # declined â†’ live store unchanged
         live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
         assert "danger" not in live["aliases"].unwrap()  # type: ignore[attr-defined]
 
@@ -356,3 +356,23 @@ class TestSyncErrorPaths:
         result = runner.invoke(app, ["sync", "pull", "--yes"])
         assert result.exit_code == 1
         assert "no remote" in result.output.lower() or "not configured" in result.output.lower()
+
+    def test_sync_pull_git_failure_errors_cleanly(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake = _setup_env(tmp_path, monkeypatch)
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        runner.invoke(app, ["sync", "init", "--remote", "https://example.com/d.git"])
+        fake.calls.clear()
+
+        def failing_run(args, *, cwd=None, capture_output=False, text=False, check=False, **kwargs):
+            sub = args[1] if len(args) > 1 else ""
+            if sub == "pull":
+                raise subprocess.CalledProcessError(returncode=1, cmd=args, stderr="git pull failed: network", output="")
+            return fake.run(args, cwd=cwd, capture_output=capture_output, text=text, check=check, **kwargs)
+
+        monkeypatch.setattr("qwik.core.git.subprocess.run", failing_run)
+        result = runner.invoke(app, ["sync", "pull", "--yes"])
+        assert result.exit_code == 1
+        assert "git pull failed: network" in result.output
+        assert "Traceback" not in result.output
