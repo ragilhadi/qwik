@@ -74,11 +74,27 @@ class TestPlaceholderValidation:
         assert result.exit_code == 0
 
 
-class TestGlobalFlagHidden:
-    def test_global_flag_hidden(self, tmp_path, monkeypatch):
+class TestGroupFlag:
+    def test_group_flag_documented(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "--help"])
+        assert "--group" in result.output
+        assert "-g" in result.output
         assert "--global" not in result.output
-        assert "-g" not in result.output
+
+    def test_add_with_group(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "gs", "git", "status", "-g", "git"])
+        assert result.exit_code == 0
+        assert "Added" in result.output
+
+    def test_add_global_now_rejected(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "gs", "git", "status", "--global"])
+        assert result.exit_code != 0

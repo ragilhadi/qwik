@@ -35,15 +35,14 @@ def add_command(
     force: bool = typer.Option(
         False, "--force", "-f", help="Overwrite if alias already exists."
     ),
-    global_install: bool = typer.Option(
-        False, "--global", "-g", help="(Reserved) install for all users.", hidden=True,
+    group: Optional[str] = typer.Option(
+        None, "--group", "-g", help="Primary group for the alias."
     ),
 ) -> None:
     """Create a new alias.
 
     When *name* or *command* are omitted, the command runs interactively.
     """
-    del global_install  # reserved for future use
     store = get_store()
     store_data = store.load()
     console = get_console()
@@ -102,6 +101,7 @@ def add_command(
     alias = Alias(
         command=full_command,
         tag=tag or [],  # type: ignore[arg-type]
+        group=group,
         description=description or "",
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),

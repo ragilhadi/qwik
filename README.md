@@ -79,6 +79,7 @@ Both share the **same store and substitution engine** — behavior is identical.
 ```bash
 qwik add gs "git status"
 qwik add gs "git status" --tag git --description "Repo status"
+qwik add gs "git status" --group git
 qwik add gs "git status" --force       # overwrite existing
 qwik add                               # interactive mode
 ```
@@ -121,17 +122,18 @@ qwik enable gs                         # re-enables
 qwik list                              # all aliases
 qwik -l                                # shortcut
 qwik list --tag git                    # filter by tag
+qwik list --group git                   # filter by group
 qwik list --search stat                # filter by query
 ```
 
 Output:
 
 ```
-  Name   Command                     Tag    Used   Last
- ─────  ──────────────────────────  ─────  ─────  ───────────
-  gs     git status                  git     42     2 min ago
-  gco    git checkout {1}            git     18     1 hour ago
-  k      kubectl                     k8s      7     yesterday
+  Name   Command                     Group   Tag    Used   Last
+ ─────  ──────────────────────────  ──────  ─────  ─────  ───────────
+  gs     git status                  git     git     42     2 min ago
+  gco    git checkout {1}            git     git     18     1 hour ago
+  k      kubectl                     —       k8s     7     yesterday
 ```
 
 ### `show` — Detailed view
@@ -145,6 +147,7 @@ qwik show gs                           # full metadata
 ```bash
 qwik search "git"
 qwik -s "git"                          # shortcut
+qwik search "git" --group git          # restrict to a group
 ```
 
 ### `pick` — Interactive fuzzy picker
@@ -176,6 +179,17 @@ qwik tag gs git
 qwik tag gs work
 qwik untag gs work
 ```
+
+### `group` / `ungroup`
+
+```bash
+qwik group gs git                      # assign primary group
+qwik ungroup gs                        # remove the group
+```
+
+An alias has **at most one group** (the canonical primary namespace it
+belongs to) but may carry **many tags** (free-form labels).  Use `--group`
+on `add`, `list`, and `search` to filter by group.
 
 ### `export` / `import`
 
@@ -446,6 +460,7 @@ version = 1
 [aliases.gs]
 command = "git status"
 tag = ["git"]
+group = "git"
 description = "Quick git status"
 enabled = true
 created_at = "2026-05-10T10:00:00Z"

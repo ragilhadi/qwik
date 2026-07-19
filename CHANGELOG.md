@@ -23,11 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CHANGELOG.md`.
 - Schema migration framework with forward-only auto-migration on load (`qwik/core/migrations.py`); stores a `version = N` field in `aliases.toml`.
 - `qwik completion <shell> [--install/-i]` command: prints or installs shell completion scripts (bash/zsh/fish/pwsh/powershell) with rc backup and idempotent markers.
+- `Alias.group` optional field (canonical primary namespace) with `_coerce_group` validation (`^[A-Za-z_][A-Za-z0-9_-]*$`); persisted to `aliases.toml`.
+- `--group/-g` option on `qwik add` to assign the primary group at creation.
+- `qwik group <name> <group>` / `qwik ungroup <name>` commands to assign or clear the group of an existing alias.
+- `--group/-g` filter on `qwik list` and `qwik search`.
+- `Group` column in `qwik list` table and `Group` row in `qwik show` detail.
+- Group-aware search scoring (`group_score` boost in `score_alias`).
 
 ### Changed
 - `--global/-g` flag on `qwik add` is now hidden until implemented.
+- `-g` short flag on `qwik add`, `qwik list`, and `qwik search` now means `--group`.
 - Fish append-mode renderer wraps the command in single quotes so escaping is meaningful.
 - Commands construct their `Console` via `qwik.ui.theme.get_console` so `NO_COLOR` is honored globally.
 
 ### Removed
 - Dead `_has_shell_metacharacters` helper from `qwik.commands.run`.
+- `--global/-g` dead reserved flag on `qwik add` (replaced by `--group/-g`).

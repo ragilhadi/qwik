@@ -170,6 +170,8 @@ class Store:
             alias_table.add("command", alias.command)
             if alias.tag:
                 alias_table.add("tag", alias.tag)
+            if alias.group:
+                alias_table.add("group", alias.group)
             if alias.description:
                 alias_table.add("description", alias.description)
             if not alias.enabled:

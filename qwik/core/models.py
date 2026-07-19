@@ -17,6 +17,9 @@ __all__ = [
 # Regex used in conflict checks and model validation.
 _ALIAS_NAME_RE: re.Pattern[str] = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 
+# Regex validating group names (same syntax rules as alias names).
+_GROUP_NAME_RE: re.Pattern[str] = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+
 
 def validate_alias_name(name: str) -> str:
     """Ensure *name* is a legal alias identifier.
@@ -49,6 +52,9 @@ class Alias(BaseModel):
             template placeholders such as ``{1}``, ``{@}``, ``{*}``,
             or ``{1:-default}``.
         tag: Optional list of categorical tags (e.g. ``git``, ``work``).
+        group: Optional canonical primary group for the alias.  At most one
+            group may be assigned to an alias; tags are free-form labels and
+            many may be assigned.
         description: Human-readable explanation of the alias.
         enabled: Whether the alias is currently active.  Disabled aliases
             are kept in the store but ignored by the shell hook.
@@ -63,6 +69,7 @@ class Alias(BaseModel):
 
     command: str
     tag: list[str] = Field(default_factory=list)
+    group: str | None = None
     description: str = ""
     enabled: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -79,6 +86,29 @@ class Alias(BaseModel):
         if v is None:
             return []
         return list(v)
+
+    @field_validator("group", mode="before")
+    @classmethod
+    def _coerce_group(cls, v: Any) -> str | None:
+        """Normalise the optional group field.
+
+        Accept ``None`` or a string.  Whitespace is stripped; empty or
+        whitespace-only values become ``None``.  Non-empty values must
+        satisfy the group-name regex.
+        """
+        if v is None:
+            return None
+        if not isinstance(v, str):
+            raise ValueError(f'Invalid group "{v!r}": must be a string or None.')
+        cleaned = v.strip()
+        if not cleaned:
+            return None
+        if not _GROUP_NAME_RE.match(cleaned):
+            raise ValueError(
+                f'Invalid group "{cleaned}": groups must match '
+                r"^[A-Za-z_][A-Za-z0-9_-]*$"
+            )
+        return cleaned
 
     @model_validator(mode="after")
     def _check_updated(self) -> "Alias":

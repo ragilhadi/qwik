@@ -15,6 +15,7 @@ from qwik.commands.edit import edit_command
 from qwik.commands.enable_disable import disable_command, enable_command
 from qwik.commands.exporter import export_command
 from qwik.commands.importer import import_command
+from qwik.commands.group import group_command, ungroup_command
 from qwik.commands.init_shell import init_shell_command
 from qwik.commands.list import list_command
 from qwik.commands.pick import pick_command
@@ -58,6 +59,8 @@ app.command("search")(search_command)
 app.command("pick")(pick_command)
 app.command("tag")(tag_command)
 app.command("untag")(untag_command)
+app.command("group")(group_command)
+app.command("ungroup")(ungroup_command)
 app.command("export")(export_command)
 app.command("import")(import_command)
 app.command("init")(init_shell_command)

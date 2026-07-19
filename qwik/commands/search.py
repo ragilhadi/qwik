@@ -14,8 +14,11 @@ from qwik.ui.theme import get_console
 def search_command(
     query: str = typer.Argument(..., help="Search string."),
     tag: Optional[str] = typer.Option(None, "--tag", "-t", help="Restrict to a tag."),
+    group: Optional[str] = typer.Option(
+        None, "--group", "-g", help="Restrict to a group."
+    ),
 ) -> None:
-    """Search aliases by name, command, tag, or description."""
+    """Search aliases by name, command, tag, group, or description."""
     store = get_store()
     data = store.load()
     console = get_console()
@@ -24,7 +27,7 @@ def search_command(
         console.print("[dim]No aliases yet.[/dim]")
         raise typer.Exit(0)
 
-    results = search_aliases(data, query, tag=tag)
+    results = search_aliases(data, query, tag=tag, group=group)
     if not results:
         console.print("[dim]No matches.[/dim]")
         raise typer.Exit(0)
