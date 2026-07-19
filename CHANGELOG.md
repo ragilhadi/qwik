@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Builtin-conflict detection at `qwik add`/`rename` now uses the detected shell's builtin set, not bash's. Previously `setopt`/`abbr`/`Write-Output`/`dir` were allowed on their native shells.
+- `qwik doctor` now checks the correct PowerShell profile path on Windows (localized Documents folder), matching `qwik init`.
 
 ## [0.3.1] - 2026-07-19
 

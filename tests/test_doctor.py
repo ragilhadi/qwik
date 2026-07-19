@@ -150,6 +150,27 @@ class TestDoctorErrors:
         assert "Store unreadable" in result.output
 
 
+class TestPwshHookDetection:
+    """`_hook_installed("pwsh")` reuses `init_shell._rc_path` for parity."""
+
+    def test_pwsh_hook_present(self, tmp_path, monkeypatch) -> None:
+        rc = tmp_path / "Microsoft.PowerShell_profile.ps1"
+        rc.write_text("# qwik shell hook (pwsh)\nInvoke-Expression (qwik init pwsh)\n")
+        monkeypatch.setattr("qwik.commands.doctor._rc_path", lambda shell: rc)
+        assert _hook_installed("pwsh") is True
+
+    def test_pwsh_hook_absent_empty(self, tmp_path, monkeypatch) -> None:
+        rc = tmp_path / "Microsoft.PowerShell_profile.ps1"
+        rc.write_text("")
+        monkeypatch.setattr("qwik.commands.doctor._rc_path", lambda shell: rc)
+        assert _hook_installed("pwsh") is False
+
+    def test_pwsh_hook_absent_missing(self, tmp_path, monkeypatch) -> None:
+        rc = tmp_path / "missing_profile.ps1"
+        monkeypatch.setattr("qwik.commands.doctor._rc_path", lambda shell: rc)
+        assert _hook_installed("pwsh") is False
+
+
 class TestDoctorEdgeCases:
     def test_hook_installed_none(self) -> None:
         assert _hook_installed(None) is False
