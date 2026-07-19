@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--group/-g` filter on `qwik list` and `qwik search`.
 - `Group` column in `qwik list` table and `Group` row in `qwik show` detail.
 - Group-aware search scoring (`group_score` boost in `score_alias`).
+- `qwik sync <init|push|pull|status>` command for git-backed dotfile sharing across machines. Exports the live store to a separate repo at `<config_dir>/qwik-sync/`, commits and pushes on `sync push`, and pulls + import-merges (with a trust-boundary preview) on `sync pull`.
 
 ### Changed
 - `-g` short flag on `qwik add`, `qwik list`, and `qwik search` now means `--group`.

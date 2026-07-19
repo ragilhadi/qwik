@@ -199,10 +199,25 @@ qwik import ~/aliases.toml             # merge
 qwik import ~/aliases.toml --overwrite
 ```
 
+### `sync` — Dotfile sharing across machines
+
+`qwik sync` keeps a separate git repo at `<config_dir>/qwik-sync/` so your aliases travel between machines. `push` exports the live store → commits → pushes; `pull` pulls the remote → import-merges into your live store (with the same trust-boundary preview as `qwik import`).
+
+```bash
+qwik sync init --remote <git-url>      # one-time setup; exports current store + first commit
+qwik sync push [-m "msg"]              # export → commit (if dirty) → push
+qwik sync pull [-y]                    # pull → preview → merge into live store
+qwik sync status                       # branch, remote, dirty, ahead/behind, alias count
+```
+
+`sync init` writes `sync.toml` (remote + branch) and `aliases.toml` (your store) into the sync repo and makes the first commit. `sync push` overwrites `aliases.toml` with the current live store, commits only if the tree is dirty, then pushes to `origin <branch>`. `sync pull` runs `git pull`, then shows the same trust-boundary preview as `qwik import` — incoming commands run under `shell=True`, so review the preview before confirming.
+
+> **Trust warning:** pulled stores are a code-execution vector. Always review the command preview before confirming a `sync pull`; only sync with repos you control.
+
 ### `doctor` — Health check
 
 ```bash
-qwik doctor                            # shell, hook, store, conflicts
+qwik doctor                            # shell, hook, store, conflicts, sync repo
 ```
 
 ### `init` — Shell hook

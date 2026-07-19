@@ -76,6 +76,25 @@ class Config:
         """
         return self._data_dir
 
+    @property
+    def sync_repo_dir(self) -> Path:
+        """Return the directory of the git-backed sync repo.
+
+        Returns:
+            ``<config_dir>/qwik-sync``.  Honors ``QWIK_CONFIG_DIR`` so tests
+            land the repo under ``tmp_path``.
+        """
+        return self._config_dir / "qwik-sync"
+
+    @property
+    def sync_config_file(self) -> Path:
+        """Return the sync repo's persisted config file.
+
+        Returns:
+            ``<sync_repo_dir>/sync.toml`` holding ``remote_url`` + ``branch``.
+        """
+        return self.sync_repo_dir / "sync.toml"
+
     def ensure_dirs(self) -> None:
         """Create all required directories if they do not exist."""
         self._config_dir.mkdir(parents=True, exist_ok=True)

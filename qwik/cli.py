@@ -24,6 +24,7 @@ from qwik.commands.rename import rename_command
 from qwik.commands.run import run_command
 from qwik.commands.search import search_command
 from qwik.commands.show import show_command
+from qwik.commands.sync import sync_command
 from qwik.commands.tag import tag_command, untag_command
 from qwik.ui.theme import get_console
 
@@ -66,6 +67,7 @@ app.command("import")(import_command)
 app.command("init")(init_shell_command)
 app.command("doctor")(doctor_command)
 app.command("completion")(completion_command)
+app.command("sync")(sync_command)
 
 
 @app.callback(invoke_without_command=True)
