@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-shell `SHELL_BUILTINS` sets and `is_builtin(name, shell)`.
 - `CHANGELOG.md`.
 - Schema migration framework with forward-only auto-migration on load (`qwik/core/migrations.py`); stores a `version = N` field in `aliases.toml`.
+- `qwik completion <shell> [--install/-i]` command: prints or installs shell completion scripts (bash/zsh/fish/pwsh/powershell) with rc backup and idempotent markers.
 
 ### Changed
 - `--global/-g` flag on `qwik add` is now hidden until implemented.

@@ -9,6 +9,7 @@ import typer
 
 from qwik import __version__
 from qwik.commands.add import add_command
+from qwik.commands.completion import completion_command
 from qwik.commands.doctor import doctor_command
 from qwik.commands.edit import edit_command
 from qwik.commands.enable_disable import disable_command, enable_command
@@ -61,6 +62,7 @@ app.command("export")(export_command)
 app.command("import")(import_command)
 app.command("init")(init_shell_command)
 app.command("doctor")(doctor_command)
+app.command("completion")(completion_command)
 
 
 @app.callback(invoke_without_command=True)

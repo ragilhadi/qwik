@@ -200,6 +200,26 @@ qwik init zsh --install                # append to ~/.zshrc with backup
 
 Supported shells: `bash`, `zsh`, `fish`, `pwsh`.
 
+### `completion` — Shell completions
+
+Generate or install shell completion scripts for `qwik` itself (so `qwik <Tab>` offers command/alias suggestions).
+
+```bash
+qwik completion bash            # print completion script to stdout
+qwik completion zsh --install   # install into ~/.zshrc + ~/.zfunc/_qwik
+```
+
+| Shell | `--install` action |
+|---|---|
+| bash | writes `~/.bash_completions/qwik.sh` + appends `source` line to `~/.bashrc` |
+| zsh | writes `~/.zfunc/_qwik` + appends `fpath`/`compinit` to `~/.zshrc` |
+| fish | writes `<fish config>/completions/qwik.fish` (auto-loaded, no rc edit) |
+| pwsh / powershell | appends the script to `$PROFILE` |
+
+Installs are idempotent (a `# qwik completion (<shell>)` marker is checked before appending) and back up the rc file with a timestamp before modifying it.
+
+> Typer's built-in `qwik --install-completion <shell>` / `qwik --show-completion <shell>` also works; `qwik completion` provides the same scripts with qwik's own backup + idempotency behavior.
+
 ### Version & Help
 
 ```bash
