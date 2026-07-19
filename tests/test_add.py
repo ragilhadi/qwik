@@ -95,7 +95,7 @@ class TestMalformedPlaceholderCLI:
         from qwik.config import _reset_config
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
-        result = runner.invoke(app, ["add", "lit", "echo {}"])
+        result = runner.invoke(app, ["add", "zz_lit", "echo {}"])
         assert result.exit_code == 0, f"exit={result.exit_code} out={result.output!r}"
         assert "Added" in result.output
 
