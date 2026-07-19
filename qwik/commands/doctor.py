@@ -6,18 +6,57 @@ import os
 import shutil
 from pathlib import Path
 
+import tomlkit
 import typer
 
 from qwik.commands.init_shell import _fish_config_dir
 from qwik.commands.sync import _load_sync_config
 from qwik.config import get_config
 from qwik.core.git import behind_ahead, current_branch, git_available, is_dirty
+from qwik.core.models import AliasStore
 from qwik.core.store import get_store
 from qwik.shells.base import SUPPORTED_SHELLS
-from qwik.ui.prompts import print_error, print_info, print_success, print_warning
+from qwik.ui.prompts import (
+    print_error,
+    print_info,
+    print_success,
+    print_warning,
+    prompt_confirm,
+)
 from qwik.ui.theme import get_console
 
 __all__ = ["doctor_command"]
+
+
+def _latest_valid_backup(backup_dir: Path) -> Path | None:
+    """Return the newest valid backup TOML in *backup_dir*, or ``None``.
+
+    Backups are named ``aliases-*.toml``. Each is validated by parsing the
+    TOML and constructing an :class:`~qwik.core.models.AliasStore`. The
+    newest (by modification time) backup that validates is returned.
+
+    Args:
+        backup_dir: Directory holding backup files.
+
+    Returns:
+        The :class:`~pathlib.Path` of the newest valid backup, or ``None``
+        if none validate (or the directory is empty/missing).
+    """
+    if not backup_dir.exists():
+        return None
+    candidates = sorted(
+        backup_dir.glob("aliases-*.toml"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for path in candidates:
+        try:
+            doc = tomlkit.parse(path.read_text(encoding="utf-8"))
+            AliasStore.model_validate(doc.unwrap())
+        except Exception:
+            continue
+        return path
+    return None
 
 
 def doctor_command() -> None:
@@ -60,6 +99,44 @@ def doctor_command() -> None:
     except Exception as exc:
         print_error(f"Store unreadable: {exc}", console=console)
         checks_err += 1
+        backup_dir = get_config().backup_dir
+        backup = _latest_valid_backup(backup_dir)
+        if backup is None:
+            print_error(
+                "No valid backup found. Restore manually from "
+                f"{backup_dir} (see `qwik doctor`).",
+                console=console,
+            )
+        else:
+            try:
+                backup_store = AliasStore.model_validate(
+                    tomlkit.parse(backup.read_text(encoding="utf-8")).unwrap()
+                )
+                count = len(backup_store.aliases)
+            except Exception:
+                print_error(
+                    f"Could not read backup {backup.name}.",
+                    console=console,
+                )
+            else:
+                if prompt_confirm(
+                    f"Restore from latest valid backup ({backup.name}, {count} aliases)?",
+                    default=False,
+                    console=console,
+                ):
+                    shutil.copy2(backup, store.path)
+                    data = store.load()
+                    print_success(
+                        f"Restored store from {backup.name} ({count} aliases).",
+                        console=console,
+                    )
+                    checks_err -= 1
+                    checks_ok += 1
+                else:
+                    print_error(
+                        "Restore declined. Repair manually or rerun `qwik doctor`.",
+                        console=console,
+                    )
 
     # Conflicts with system commands
     if data is not None:

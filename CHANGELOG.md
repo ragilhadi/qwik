@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.1] - 2026-07-19
 
+### Added
+- `qwik doctor` can now restore the live store from the latest valid backup when the store is corrupt (interactive confirm).
+
 ### Fixed
 - Malformed placeholders (e.g. `{bad name}`) are now rejected at `qwik add` time instead of silently being treated as literal text.
 
