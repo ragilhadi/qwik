@@ -69,19 +69,20 @@ def completion_command(
         console.print(_get_script(shell))
         raise typer.Exit(0)
 
-    marker = _marker(shell)
+    canonical = "pwsh" if shell in {"pwsh", "powershell"} else shell
+    marker = _marker(canonical)
 
-    if shell == "bash":
+    if canonical == "bash":
         _install_bash(marker, console)
         print_info("Open a new terminal or run: source ~/.bashrc", console=console)
         raise typer.Exit(0)
 
-    if shell == "zsh":
+    if canonical == "zsh":
         _install_zsh(marker, console)
         print_info("Open a new terminal or run: source ~/.zshrc", console=console)
         raise typer.Exit(0)
 
-    if shell == "fish":
+    if canonical == "fish":
         _install_fish(console)
         print_info(
             "fish auto-loads completions on next shell start", console=console

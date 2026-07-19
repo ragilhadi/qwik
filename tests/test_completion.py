@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pytest
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
 from qwik.cli import app
 
@@ -44,9 +43,9 @@ class TestCompletionInstall:
         self,
         shell: str,
         rc: Path | None,
-        monkeypatch: Any,
+        monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
-    ) -> Any:
+    ) -> Result:
         from qwik.commands import completion as cmp_mod
         from qwik.commands import init_shell as is_mod
 
@@ -126,6 +125,32 @@ class TestCompletionInstall:
         assert r2.exit_code == 0
         assert "already installed" in r2.output
         assert rc.read_text().count("# qwik completion (bash)") == 1
+
+    def test_completion_install_powershell_alias_idempotent_with_pwsh(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        rc = tmp_path / "profile.ps1"
+        rc.write_text("# pre-existing\n")
+        from qwik.commands import completion as cmp_mod
+        from qwik.commands import init_shell as is_mod
+
+        for mod in (cmp_mod, is_mod):
+            monkeypatch.setattr(
+                mod, "_rc_path", lambda s: rc if s in {"pwsh", "powershell"} else None
+            )
+        monkeypatch.setattr(
+            cmp_mod, "_fish_config_dir", lambda: tmp_path / "fish"
+        )
+        monkeypatch.setattr(
+            is_mod, "_fish_config_dir", lambda: tmp_path / "fish"
+        )
+
+        r1 = runner.invoke(app, ["completion", "powershell", "--install"])
+        assert r1.exit_code == 0
+        r2 = runner.invoke(app, ["completion", "pwsh", "--install"])
+        assert r2.exit_code == 0
+        assert "already installed" in r2.output
+        assert rc.read_text().count("# qwik completion (pwsh)") == 1
 
     def test_install_fish_xdg(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
