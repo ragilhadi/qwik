@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-07-19
 
 ### Fixed
 - Command injection through unquoted template args (`{N}`, `{@}`, `{N:-default}`) — all interpolated args are now `shlex.quote`d (`substitute.py`).
