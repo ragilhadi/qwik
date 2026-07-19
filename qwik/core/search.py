@@ -37,12 +37,20 @@ def score_alias(alias: Alias, name: str, query: str) -> float:
         (fuzz.ratio(t.lower(), query.lower()) for t in alias.tag),
         default=0,
     )
+    group_score = (
+        fuzz.ratio(alias.group.lower(), query.lower()) if alias.group else 0
+    )
     field_text = " ".join(
         getattr(alias, f, "") for f in _SEARCH_FIELDS if getattr(alias, f, "")
     )
     field_score = fuzz.ratio(field_text.lower(), query.lower())
 
-    return name_score * 0.5 + tag_score * 0.25 + field_score * 0.25
+    return (
+        name_score * 0.5
+        + tag_score * 0.2
+        + group_score * 0.05
+        + field_score * 0.25
+    )
 
 
 def search_aliases(
@@ -50,15 +58,17 @@ def search_aliases(
     query: str,
     *,
     tag: str | None = None,
+    group: str | None = None,
     enabled_only: bool = False,
     limit: int = 20,
 ) -> list[tuple[str, Alias, float]]:
-    """Search aliases with optional tag filter and fuzzy ranking.
+    """Search aliases with optional tag/group filter and fuzzy ranking.
 
     Args:
         store: The alias database.
         query: Free-text search string.
         tag: If provided, restrict results to aliases containing this tag.
+        group: If provided, restrict results to aliases in this group.
         enabled_only: If ``True``, exclude disabled aliases.
         limit: Maximum number of results to return.
 
@@ -71,6 +81,8 @@ def search_aliases(
         if enabled_only and not alias.enabled:
             continue
         if tag is not None and tag not in alias.tag:
+            continue
+        if group is not None and alias.group != group:
             continue
         candidates.append((name, alias))
 

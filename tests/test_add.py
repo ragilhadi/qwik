@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from unittest.mock import patch
 
 from typer.testing import CliRunner
@@ -9,6 +10,12 @@ from typer.testing import CliRunner
 from qwik.cli import app
 
 runner = CliRunner()
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(s: str) -> str:
+    return _ANSI_RE.sub("", s)
 
 
 class TestAddInteractive:
@@ -74,11 +81,37 @@ class TestPlaceholderValidation:
         assert result.exit_code == 0
 
 
-class TestGlobalFlagHidden:
-    def test_global_flag_hidden(self, tmp_path, monkeypatch):
+class TestGroupFlag:
+    def test_group_flag_documented(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "--help"])
-        assert "--global" not in result.output
-        assert "-g" not in result.output
+        out = _strip_ansi(result.output)
+        assert "--group" in out
+        assert "-g" in out
+        assert "--global" not in out
+
+    def test_add_with_group(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "gs", "git", "status", "-g", "git"])
+        assert result.exit_code == 0
+        assert "Added" in result.output
+
+    def test_add_global_now_rejected(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "gs", "git", "status", "--global"])
+        assert result.exit_code != 0
+
+    def test_add_invalid_group_name_errors(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "gs", "git", "status", "--group", "1bad"])
+        assert result.exit_code == 1
+        assert "Invalid group" in result.output
+        assert "Traceback" not in result.output

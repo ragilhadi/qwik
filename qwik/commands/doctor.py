@@ -9,9 +9,12 @@ from pathlib import Path
 import typer
 
 from qwik.commands.init_shell import _fish_config_dir
+from qwik.commands.sync import _load_sync_config
+from qwik.config import get_config
+from qwik.core.git import behind_ahead, current_branch, git_available, is_dirty
 from qwik.core.store import get_store
 from qwik.shells.base import SUPPORTED_SHELLS
-from qwik.ui.prompts import print_error, print_success, print_warning
+from qwik.ui.prompts import print_error, print_info, print_success, print_warning
 from qwik.ui.theme import get_console
 
 __all__ = ["doctor_command"]
@@ -74,6 +77,43 @@ def doctor_command() -> None:
         else:
             print_success("No aliases — nothing to shadow.", console=console)
             checks_ok += 1
+
+    # Sync repo status
+    config = get_config()
+    sync_repo = config.sync_repo_dir
+    if (sync_repo / ".git").exists():
+        try:
+            branch = current_branch(sync_repo)
+            dirty = is_dirty(sync_repo)
+            remote_url, _ = _load_sync_config(sync_repo)
+            remote_str = remote_url if remote_url is not None else "<not set>"
+            try:
+                behind, ahead = behind_ahead(sync_repo, "origin", branch)
+                ahead_behind_str = f", {ahead} ahead / {behind} behind"
+            except RuntimeError:
+                ahead_behind_str = ""
+            print_success(
+                f"Sync repo: configured ({branch}, remote={remote_str}{ahead_behind_str}).",
+                console=console,
+            )
+            if dirty:
+                print_warning("Sync repo has uncommitted changes.", console=console)
+                checks_warn += 1
+            else:
+                checks_ok += 1
+        except RuntimeError as exc:
+            print_warning(f"Sync repo present but unreadable: {exc}", console=console)
+            checks_warn += 1
+    else:
+        print_info("Sync repo: not initialized.", console=console)
+        checks_ok += 1
+
+    if not git_available():
+        print_warning(
+            "git not found on PATH — `qwik sync` will not work.",
+            console=console,
+        )
+        checks_warn += 1
 
     # Summary
     console.print()

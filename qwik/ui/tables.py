@@ -22,6 +22,7 @@ def render_list_table(
     store: "AliasStore",
     *,
     tag_filter: str | None = None,
+    group_filter: str | None = None,
     search_query: str | None = None,
     console: Console | None = None,
 ) -> Table:
@@ -30,6 +31,7 @@ def render_list_table(
     Args:
         store: The alias database.
         tag_filter: If provided, only show aliases containing this tag.
+        group_filter: If provided, only show aliases in this group.
         search_query: If provided, only show aliases whose name, command,
             or tag contains this substring.
         console: Optional Rich console (unused, reserved for future theming).
@@ -46,6 +48,7 @@ def render_list_table(
     )
     table.add_column("Name", style="qwik.highlight", no_wrap=True)
     table.add_column("Command", no_wrap=False)
+    table.add_column("Group")
     table.add_column("Tag")
     table.add_column("Used", justify="right")
     table.add_column("Last")
@@ -53,6 +56,8 @@ def render_list_table(
     for name in sorted(store.aliases):
         alias = store.aliases[name]
         if tag_filter is not None and tag_filter not in alias.tag:
+            continue
+        if group_filter is not None and alias.group != group_filter:
             continue
         if search_query is not None:
             haystack = f"{name} {alias.command} {' '.join(alias.tag)}"
@@ -62,6 +67,7 @@ def render_list_table(
         table.add_row(
             name,
             alias.command,
+            alias.group or "—",
             ", ".join(alias.tag),
             str(alias.run_count),
             alias.format_last_used(),
@@ -87,6 +93,7 @@ def render_alias_detail(name: str, alias: "Alias") -> Table:
 
     table.add_row("Name", name)
     table.add_row("Command", alias.command)
+    table.add_row("Group", alias.group or "—")
     table.add_row("Tags", ", ".join(alias.tag) or "—")
     table.add_row("Description", alias.description or "—")
     table.add_row("Enabled", "yes" if alias.enabled else "no")

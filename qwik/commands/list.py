@@ -13,6 +13,7 @@ from qwik.ui.theme import get_console
 
 def list_command(
     tag: Optional[str] = typer.Option(None, "--tag", "-t", help="Filter by tag."),
+    group: Optional[str] = typer.Option(None, "--group", "-g", help="Filter by group."),
     search: Optional[str] = typer.Option(
         None, "--search", "-s", help="Filter by substring."
     ),
@@ -28,5 +29,5 @@ def list_command(
         )
         raise typer.Exit(0)
 
-    table = render_list_table(data, tag_filter=tag, search_query=search)
+    table = render_list_table(data, tag_filter=tag, group_filter=group, search_query=search)
     console.print(table)

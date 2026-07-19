@@ -79,6 +79,7 @@ Both share the **same store and substitution engine** — behavior is identical.
 ```bash
 qwik add gs "git status"
 qwik add gs "git status" --tag git --description "Repo status"
+qwik add gs "git status" --group git
 qwik add gs "git status" --force       # overwrite existing
 qwik add                               # interactive mode
 ```
@@ -121,17 +122,18 @@ qwik enable gs                         # re-enables
 qwik list                              # all aliases
 qwik -l                                # shortcut
 qwik list --tag git                    # filter by tag
+qwik list --group git                   # filter by group
 qwik list --search stat                # filter by query
 ```
 
 Output:
 
 ```
-  Name   Command                     Tag    Used   Last
- ─────  ──────────────────────────  ─────  ─────  ───────────
-  gs     git status                  git     42     2 min ago
-  gco    git checkout {1}            git     18     1 hour ago
-  k      kubectl                     k8s      7     yesterday
+  Name   Command                     Group   Tag    Used   Last
+ ─────  ──────────────────────────  ──────  ─────  ─────  ───────────
+  gs     git status                  git     git     42     2 min ago
+  gco    git checkout {1}            git     git     18     1 hour ago
+  k      kubectl                     —       k8s     7     yesterday
 ```
 
 ### `show` — Detailed view
@@ -145,6 +147,7 @@ qwik show gs                           # full metadata
 ```bash
 qwik search "git"
 qwik -s "git"                          # shortcut
+qwik search "git" --group git          # restrict to a group
 ```
 
 ### `pick` — Interactive fuzzy picker
@@ -177,6 +180,17 @@ qwik tag gs work
 qwik untag gs work
 ```
 
+### `group` / `ungroup`
+
+```bash
+qwik group gs git                      # assign primary group
+qwik ungroup gs                        # remove the group
+```
+
+An alias has **at most one group** (the canonical primary namespace it
+belongs to) but may carry **many tags** (free-form labels).  Use `--group`
+on `add`, `list`, and `search` to filter by group.
+
 ### `export` / `import`
 
 ```bash
@@ -185,10 +199,25 @@ qwik import ~/aliases.toml             # merge
 qwik import ~/aliases.toml --overwrite
 ```
 
+### `sync` — Dotfile sharing across machines
+
+`qwik sync` keeps a separate git repo at `<config_dir>/qwik-sync/` so your aliases travel between machines. `push` exports the live store → commits → pushes; `pull` pulls the remote → import-merges into your live store (with the same trust-boundary preview as `qwik import`).
+
+```bash
+qwik sync init --remote <git-url>      # one-time setup; exports current store + first commit
+qwik sync push [-m "msg"]              # export → commit (if dirty) → push
+qwik sync pull [-y]                    # pull → preview → merge into live store
+qwik sync status                       # branch, remote, dirty, ahead/behind, alias count
+```
+
+`sync init` writes `sync.toml` (remote + branch) and `aliases.toml` (your store) into the sync repo and makes the first commit. `sync push` overwrites `aliases.toml` with the current live store, commits only if the tree is dirty, then pushes to `origin <branch>`. `sync pull` runs `git pull`, then shows the same trust-boundary preview as `qwik import` — incoming commands run under `shell=True`, so review the preview before confirming.
+
+> **Trust warning:** pulled stores are a code-execution vector. Always review the command preview before confirming a `sync pull`; only sync with repos you control.
+
 ### `doctor` — Health check
 
 ```bash
-qwik doctor                            # shell, hook, store, conflicts
+qwik doctor                            # shell, hook, store, conflicts, sync repo
 ```
 
 ### `init` — Shell hook
@@ -199,6 +228,26 @@ qwik init zsh --install                # append to ~/.zshrc with backup
 ```
 
 Supported shells: `bash`, `zsh`, `fish`, `pwsh`.
+
+### `completion` — Shell completions
+
+Generate or install shell completion scripts for `qwik` itself (so `qwik <Tab>` offers command/alias suggestions).
+
+```bash
+qwik completion bash            # print completion script to stdout
+qwik completion zsh --install   # install into ~/.zshrc + ~/.zfunc/_qwik
+```
+
+| Shell | `--install` action |
+|---|---|
+| bash | writes `~/.bash_completions/qwik.sh` + appends `source` line to `~/.bashrc` |
+| zsh | writes `~/.zfunc/_qwik` + appends `fpath`/`compinit` to `~/.zshrc` |
+| fish | writes `<fish config>/completions/qwik.fish` (auto-loaded, no rc edit) |
+| pwsh / powershell | appends the script to `$PROFILE` |
+
+Installs are idempotent (a `# qwik completion (<shell>)` marker is checked before appending) and back up the rc file with a timestamp before modifying it.
+
+> Typer's built-in `qwik --install-completion <shell>` / `qwik --show-completion <shell>` also works; `qwik completion` provides the same scripts with qwik's own backup + idempotency behavior.
 
 ### Version & Help
 
@@ -421,9 +470,12 @@ qwik add "my alias" "echo hi"
 Example store file:
 
 ```toml
+version = 1
+
 [aliases.gs]
 command = "git status"
 tag = ["git"]
+group = "git"
 description = "Quick git status"
 enabled = true
 created_at = "2026-05-10T10:00:00Z"
@@ -431,6 +483,12 @@ updated_at = "2026-05-10T10:00:00Z"
 last_used = "2026-05-10T11:30:00Z"
 run_count = 42
 ```
+
+### Store versioning
+
+qwik writes a `version = N` field to the top of `aliases.toml` describing the schema of the file. On load, if the file's version is older than the current schema, qwik auto-migrates it forward (one migrator per version step) and backs up the pre-migration file before writing the new shape. Migration is forward-only — downgrade is not supported; restore from a backup (see `qwik doctor`) instead.
+
+If the file's version is newer than the version qwik understands, qwik refuses to load it and points at `qwik doctor` — typically you need to upgrade qwik to a newer release.
 
 ---
 

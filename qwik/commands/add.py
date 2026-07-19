@@ -8,7 +8,7 @@ from typing import Optional
 import typer
 
 from qwik.core.conflicts import ConflictChecker
-from qwik.core.models import Alias
+from qwik.core.models import Alias, validate_alias_name
 from qwik.core.store import get_store
 from qwik.ui.prompts import (
     print_error,
@@ -35,15 +35,14 @@ def add_command(
     force: bool = typer.Option(
         False, "--force", "-f", help="Overwrite if alias already exists."
     ),
-    global_install: bool = typer.Option(
-        False, "--global", "-g", help="(Reserved) install for all users.", hidden=True,
+    group: Optional[str] = typer.Option(
+        None, "--group", "-g", help="Primary group for the alias."
     ),
 ) -> None:
     """Create a new alias.
 
     When *name* or *command* are omitted, the command runs interactively.
     """
-    del global_install  # reserved for future use
     store = get_store()
     store_data = store.load()
     console = get_console()
@@ -99,9 +98,17 @@ def add_command(
         if not prompt_confirm("Continue?", default=False, console=console):
             raise typer.Exit(0)
 
+    if group is not None:
+        try:
+            validate_alias_name(group)
+        except ValueError as exc:
+            print_error(f'Invalid group "{group}": {exc}', console=console)
+            raise typer.Exit(1)
+
     alias = Alias(
         command=full_command,
         tag=tag or [],  # type: ignore[arg-type]
+        group=group,
         description=description or "",
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),

@@ -9,11 +9,13 @@ import typer
 
 from qwik import __version__
 from qwik.commands.add import add_command
+from qwik.commands.completion import completion_command
 from qwik.commands.doctor import doctor_command
 from qwik.commands.edit import edit_command
 from qwik.commands.enable_disable import disable_command, enable_command
 from qwik.commands.exporter import export_command
 from qwik.commands.importer import import_command
+from qwik.commands.group import group_command, ungroup_command
 from qwik.commands.init_shell import init_shell_command
 from qwik.commands.list import list_command
 from qwik.commands.pick import pick_command
@@ -22,6 +24,7 @@ from qwik.commands.rename import rename_command
 from qwik.commands.run import run_command
 from qwik.commands.search import search_command
 from qwik.commands.show import show_command
+from qwik.commands.sync import sync_command
 from qwik.commands.tag import tag_command, untag_command
 from qwik.ui.theme import get_console
 
@@ -57,10 +60,14 @@ app.command("search")(search_command)
 app.command("pick")(pick_command)
 app.command("tag")(tag_command)
 app.command("untag")(untag_command)
+app.command("group")(group_command)
+app.command("ungroup")(ungroup_command)
 app.command("export")(export_command)
 app.command("import")(import_command)
 app.command("init")(init_shell_command)
 app.command("doctor")(doctor_command)
+app.command("completion")(completion_command)
+app.command("sync")(sync_command)
 
 
 @app.callback(invoke_without_command=True)
