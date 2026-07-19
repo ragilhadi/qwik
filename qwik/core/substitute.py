@@ -17,6 +17,7 @@ _NAMED_RE = r"[A-Za-z_][A-Za-z0-9_-]*"
 _PLACEHOLDER_RE: re.Pattern[str] = re.compile(
     r"\{(?:(\d+)|(@)|(\*)|(\d+):-([^}]*)|(" + _NAMED_RE + r")|(" + _NAMED_RE + r"):-([^}]*))\}"
 )
+_BRACE_SPAN_RE: re.Pattern[str] = re.compile(r"\{[^{}]*\}")
 
 
 def has_placeholders(command: str) -> bool:
@@ -60,14 +61,21 @@ def _named_placeholder_index_map(command: str) -> dict[str, int]:
 
 
 def validate_placeholders_static(command: str) -> None:
-    """Reject {0} and other structurally-invalid placeholders without
-    requiring the runtime args.
+    """Reject structurally-invalid placeholders without runtime args.
+
+    Two rejection paths:
+
+    1. Numeric placeholders ``{0}`` / negative indices (1-based requirement).
+    2. ``{...}`` spans that *look like a placeholder attempt* but fail the
+       ``_PLACEHOLDER_RE`` grammar. See :func:`find_unrecognized_braces` for
+       the heuristic that distinguishes attempts from literal braces.
 
     Args:
         command: The alias command to check.
 
     Raises:
-        ValueError: If any placeholder uses a 0 (or negative) index.
+        ValueError: If any placeholder is structurally invalid. The message
+            names the first offending token.
     """
     for match in _PLACEHOLDER_RE.finditer(command):
         for gidx in (1, 4):
@@ -78,6 +86,71 @@ def validate_placeholders_static(command: str) -> None:
                         f'Invalid placeholder {{{idx}}} in alias: "{command}". '
                         f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
                     )
+
+    unrecognized = find_unrecognized_braces(command)
+    if unrecognized:
+        token = unrecognized[0]
+        raise ValueError(
+            f'Malformed placeholder {token!r} in alias: "{command}". '
+            f"Use {{N}}, {{@}}, {{*}}, {{N:-default}}, {{name}}, or "
+            f"{{name:-default}}."
+        )
+
+
+def find_unrecognized_braces(command: str) -> list[str]:
+    """Return ``{...}`` spans that look like placeholder attempts but
+    fail the ``_PLACEHOLDER_RE`` grammar.
+
+    A ``{...}`` span (a ``{`` immediately followed by a matching ``}`` with
+    no nested braces in between) is considered a *placeholder attempt* and
+    therefore rejected when any of the following hold:
+
+    - its inner text contains ``:-`` (the default separator),
+    - its inner text contains ``@`` or ``*`` (special placeholders), or
+    - its inner text starts with an ASCII letter, digit, or underscore
+      (a name or numeric index would start with one of these).
+
+    Spans that do not meet any of the above (e.g. ``{}``, ``{ }``,
+    ``{$$$}``) are left as literal text — the user most likely intended a
+    literal brace pair. Unclosed ``{`` (no matching ``}``) is also left
+    literal.
+
+    Spans matched by ``_PLACEHOLDER_RE`` are always skipped (they are
+    valid placeholders). Each ``{...}`` span matched by ``_BRACE_SPAN_RE``
+    that does not overlap a valid placeholder match is checked against the
+    heuristic above.
+
+    Args:
+        command: The alias command string to scan.
+
+    Returns:
+        A list of offending ``{...}`` token strings, in order of
+        appearance. Empty when the command has no malformed placeholder
+        attempts.
+    """
+    valid_spans = [
+        (m.start(), m.end()) for m in _PLACEHOLDER_RE.finditer(command)
+    ]
+
+    def _overlaps_valid(start: int, end: int) -> bool:
+        for vs, ve in valid_spans:
+            if start < ve and vs < end:
+                return True
+        return False
+
+    offenders: list[str] = []
+    for m in _BRACE_SPAN_RE.finditer(command):
+        if _overlaps_valid(m.start(), m.end()):
+            continue
+        inner = m.group(0)[1:-1]
+        if (
+            ":-" in inner
+            or "@" in inner
+            or "*" in inner
+            or (inner[:1].isascii() and (inner[:1].isalnum() or inner[:1] == "_"))
+        ):
+            offenders.append(m.group(0))
+    return offenders
 
 
 def _raise_invalid_index(idx: int, command: str) -> None:

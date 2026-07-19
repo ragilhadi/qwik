@@ -4,7 +4,12 @@ import shlex
 
 import pytest
 
-from qwik.core.substitute import expand, has_placeholders
+from qwik.core.substitute import (
+    expand,
+    find_unrecognized_braces,
+    has_placeholders,
+    validate_placeholders_static,
+)
 
 
 class TestHasPlaceholders:
@@ -172,3 +177,102 @@ class TestNamedExpand:
 
     def test_named_with_surplus_appended(self) -> None:
         assert expand("kubectl {verb}", ["get", "pods"]) == "kubectl get pods"
+
+
+class TestMalformedPlaceholders:
+    """Malformed ``{...}`` spans are rejected at add-time, not silently literal.
+
+    The heuristic (documented in ``find_unrecognized_braces``): a ``{...}`` span
+    not matched by ``_PLACEHOLDER_RE`` is rejected only when it *looks like a
+    placeholder attempt* — i.e. its inner text contains one of ``:-``, ``@``,
+    ``*``, or starts with a digit/letter/underscore. Pure-punctuation spans
+    (``{$$$}``, ``{}``, ``{ }``) and unclosed braces are left as literals.
+    """
+
+    REJECT_CASES = [
+        "echo {bad name}",
+        "echo {1foo}",
+        "echo {@x}",
+        "echo {1:}",
+    ]
+    ACCEPT_LITERAL_CASES = [
+        "echo {}",
+        "echo {}:-x}",
+        "echo {$$$}",
+        "echo { not closed",
+    ]
+
+    @pytest.mark.parametrize("command", REJECT_CASES)
+    def test_validate_rejects_malformed(self, command: str) -> None:
+        with pytest.raises(ValueError) as exc_info:
+            validate_placeholders_static(command)
+        msg = str(exc_info.value)
+        assert "placeholder" in msg.lower()
+        assert command in msg
+
+    @pytest.mark.parametrize("command", ACCEPT_LITERAL_CASES)
+    def test_validate_accepts_literal_spans(self, command: str) -> None:
+        # These look like literal braces / punctuation, not placeholder attempts.
+        validate_placeholders_static(command)
+
+    def test_validate_reports_first_offending_token(self) -> None:
+        command = "echo {bad name} then {1foo}"
+        with pytest.raises(ValueError) as exc_info:
+            validate_placeholders_static(command)
+        assert "{bad name}" in str(exc_info.value)
+
+    def test_find_returns_offending_spans(self) -> None:
+        spans = find_unrecognized_braces("echo {bad name} and {1foo}")
+        assert spans == ["{bad name}", "{1foo}"]
+
+    def test_find_ignores_valid_placeholders(self) -> None:
+        valid = "git checkout {1} {@} {*} {name} {1:-x} {name:-y}"
+        assert find_unrecognized_braces(valid) == []
+
+    def test_find_ignores_pure_punctuation_braces(self) -> None:
+        assert find_unrecognized_braces("echo {$$$}") == []
+        assert find_unrecognized_braces("echo {}") == []
+        assert find_unrecognized_braces("echo { }") == []
+
+    def test_find_ignores_unclosed_brace(self) -> None:
+        assert find_unrecognized_braces("echo { not closed") == []
+
+    def test_find_ignores_nested_literal_braces(self) -> None:
+        # ``{{1}}`` — the inner ``{1}`` is a valid placeholder; the outer
+        # brace pair does not form a separate ``{...}`` span. No rejection.
+        assert find_unrecognized_braces("echo {{1}}") == []
+
+    @pytest.mark.parametrize("command", REJECT_CASES)
+    def test_add_rejects_malformed_cli(
+        self, tmp_path, monkeypatch, command: str
+    ) -> None:
+        from qwik.config import _reset_config
+        from typer.testing import CliRunner
+
+        from qwik.cli import app
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = CliRunner().invoke(app, ["add", "bad", command])
+        assert result.exit_code == 1
+        assert "Traceback" not in result.output
+        # The offending token should appear in the surfaced error.
+        for token in ("bad name", "1foo", "@x", "1:"):
+            if token in command:
+                assert token in result.output
+                break
+
+    @pytest.mark.parametrize("command", ACCEPT_LITERAL_CASES)
+    def test_add_accepts_literal_cli(
+        self, tmp_path, monkeypatch, command: str
+    ) -> None:
+        from qwik.config import _reset_config
+        from typer.testing import CliRunner
+
+        from qwik.cli import app
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = CliRunner().invoke(app, ["add", "lit", command])
+        assert result.exit_code == 0
+        assert "Added" in result.output
