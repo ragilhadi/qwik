@@ -1,10 +1,10 @@
-﻿"""``qwik sync`` â€” git-backed dotfile sharing across machines.
+"""``qwik sync`` — git-backed dotfile sharing across machines.
 
 The sync repo lives at ``<config_dir>/qwik-sync/`` and holds:
 
-- ``aliases.toml`` â€” a TOML export of the live store (the same format as
+- ``aliases.toml`` — a TOML export of the live store (the same format as
   ``qwik export``), committed and pushed on every ``sync push``.
-- ``sync.toml`` â€” the persisted sync config: ``remote_url`` + ``branch``.
+- ``sync.toml`` — the persisted sync config: ``remote_url`` + ``branch``.
 
 ``push`` exports the live store â†’ commits â†’ pushes to the remote.
 ``pull`` pulls the remote â†’ reuses :func:`qwik.commands.importer.preview_and_merge`
@@ -198,7 +198,7 @@ def _do_push(
             console=con,
         )
     else:
-        print_info("Nothing to push â€” sync repo is clean.", console=con)
+        print_info("Nothing to push — sync repo is clean.", console=con)
 
 
 def _do_pull(
