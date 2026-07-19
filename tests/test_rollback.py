@@ -11,6 +11,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
 import tomlkit
 from typer.testing import CliRunner
 
@@ -19,7 +20,7 @@ from qwik.cli import app
 runner = CliRunner()
 
 
-def _setup(tmp_path: Path, monkeypatch) -> Path:
+def _setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Isolate config under ``tmp_path`` and return the backup directory."""
     from qwik.config import _reset_config, get_config
 
@@ -49,7 +50,7 @@ def _restore_and_load(tmp_path: Path):
 
 class TestRollbackRm:
     def test_rm_creates_backup_and_doctor_restores_pre_op(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         backup_dir = _setup(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
@@ -69,7 +70,7 @@ class TestRollbackRm:
 
 class TestRollbackRename:
     def test_rename_creates_backup_and_doctor_restores_pre_op(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         backup_dir = _setup(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "old", "git", "status"])
@@ -88,7 +89,7 @@ class TestRollbackRename:
 
 class TestRollbackEdit:
     def test_edit_creates_backup_and_doctor_restores_pre_op(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         backup_dir = _setup(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
@@ -115,7 +116,7 @@ class TestRollbackEdit:
 
 class TestRollbackImport:
     def test_import_creates_backup_and_doctor_restores_pre_op(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         backup_dir = _setup(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "keep", "echo keep"])

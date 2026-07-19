@@ -101,8 +101,9 @@ def doctor_command() -> None:
         backup = _latest_valid_backup(backup_dir)
         if backup is None:
             print_error(
-                "No valid backup found. Restore manually from "
-                f"{backup_dir} (see `qwik doctor`).",
+                f"No valid backup found in {backup_dir}. Recover manually from an "
+                "external copy, or rerun after placing a valid aliases-*.toml in "
+                "that directory.",
                 console=console,
             )
         else:

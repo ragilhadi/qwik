@@ -8,6 +8,7 @@ from typing import Sequence
 
 __all__ = [
     "expand",
+    "find_unrecognized_braces",
     "has_placeholders",
     "validate_placeholders",
     "validate_placeholders_static",

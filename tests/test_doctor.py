@@ -276,7 +276,7 @@ class TestLatestValidBackupHelper:
     def test_skips_invalid_backups(self, tmp_path: Path) -> None:
         backups = tmp_path / "backups"
         backups.mkdir()
-        (backups / "aliases-20260719-120000-000001-0001.toml").write_text(
+        (backups / "aliases-99990101-000000-000000-9999.toml").write_text(
             "not-valid", encoding="utf-8"
         )
         good = backups / "aliases-20260719-120000-000002-0002.toml"
