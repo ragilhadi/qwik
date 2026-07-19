@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from unittest.mock import patch
 
 from typer.testing import CliRunner
@@ -9,6 +10,12 @@ from typer.testing import CliRunner
 from qwik.cli import app
 
 runner = CliRunner()
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(s: str) -> str:
+    return _ANSI_RE.sub("", s)
 
 
 class TestAddInteractive:
@@ -80,9 +87,10 @@ class TestGroupFlag:
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "--help"])
-        assert "--group" in result.output
-        assert "-g" in result.output
-        assert "--global" not in result.output
+        out = _strip_ansi(result.output)
+        assert "--group" in out
+        assert "-g" in out
+        assert "--global" not in out
 
     def test_add_with_group(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
