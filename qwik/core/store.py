@@ -83,7 +83,15 @@ class Store:
             raw = self._path.read_text(encoding="utf-8")
             doc = tomlkit.parse(raw)
             data: dict[str, Any] = doc.unwrap()
-            return AliasStore.model_validate(data)
+            from qwik.core.migrations import migrate
+
+            pre_version = data.get("version")
+            data = migrate(data)
+            migrated = data.get("version") != pre_version
+            validated = AliasStore.model_validate(data)
+            if migrated:
+                self.save_with_backup(validated)
+            return validated
         except (TOMLDecodeError, ValueError) as exc:
             raise RuntimeError(
                 f"Could not read alias store at {self._path}: {exc}. "

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `QWIK_DEBUG=1` enables debug logging.
 - Per-shell `SHELL_BUILTINS` sets and `is_builtin(name, shell)`.
 - `CHANGELOG.md`.
+- Schema migration framework with forward-only auto-migration on load (`qwik/core/migrations.py`); stores a `version = N` field in `aliases.toml`.
 
 ### Changed
 - `--global/-g` flag on `qwik add` is now hidden until implemented.

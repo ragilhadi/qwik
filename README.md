@@ -421,6 +421,8 @@ qwik add "my alias" "echo hi"
 Example store file:
 
 ```toml
+version = 1
+
 [aliases.gs]
 command = "git status"
 tag = ["git"]
@@ -431,6 +433,12 @@ updated_at = "2026-05-10T10:00:00Z"
 last_used = "2026-05-10T11:30:00Z"
 run_count = 42
 ```
+
+### Store versioning
+
+qwik writes a `version = N` field to the top of `aliases.toml` describing the schema of the file. On load, if the file's version is older than the current schema, qwik auto-migrates it forward (one migrator per version step) and backs up the pre-migration file before writing the new shape. Migration is forward-only — downgrade is not supported; restore from a backup (see `qwik doctor`) instead.
+
+If the file's version is newer than the version qwik understands, qwik refuses to load it and points at `qwik doctor` — typically you need to upgrade qwik to a newer release.
 
 ---
 
