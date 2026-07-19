@@ -31,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Group-aware search scoring (`group_score` boost in `score_alias`).
 
 ### Changed
-- `--global/-g` flag on `qwik add` is now hidden until implemented.
 - `-g` short flag on `qwik add`, `qwik list`, and `qwik search` now means `--group`.
 - Fish append-mode renderer wraps the command in single quotes so escaping is meaningful.
 - Commands construct their `Console` via `qwik.ui.theme.get_console` so `NO_COLOR` is honored globally.
