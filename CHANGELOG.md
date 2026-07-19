@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `qwik doctor` can now restore the live store from the latest valid backup when the store is corrupt (interactive confirm).
+- Syrupy snapshots now lock per-shell hook rendering output (bash/zsh/fish/pwsh/cmd).
 
 ### Fixed
 - Malformed placeholders (e.g. `{bad name}`) are now rejected at `qwik add` time instead of silently being treated as literal text.
