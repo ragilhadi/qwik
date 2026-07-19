@@ -8,7 +8,7 @@ from typing import Optional
 import typer
 
 from qwik.core.conflicts import ConflictChecker
-from qwik.core.models import Alias
+from qwik.core.models import Alias, validate_alias_name
 from qwik.core.store import get_store
 from qwik.ui.prompts import (
     print_error,
@@ -97,6 +97,13 @@ def add_command(
         )
         if not prompt_confirm("Continue?", default=False, console=console):
             raise typer.Exit(0)
+
+    if group is not None:
+        try:
+            validate_alias_name(group)
+        except ValueError as exc:
+            print_error(f'Invalid group "{group}": {exc}', console=console)
+            raise typer.Exit(1)
 
     alias = Alias(
         command=full_command,

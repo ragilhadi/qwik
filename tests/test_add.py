@@ -98,3 +98,12 @@ class TestGroupFlag:
         _reset_config()
         result = runner.invoke(app, ["add", "gs", "git", "status", "--global"])
         assert result.exit_code != 0
+
+    def test_add_invalid_group_name_errors(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "gs", "git", "status", "--group", "1bad"])
+        assert result.exit_code == 1
+        assert "Invalid group" in result.output
+        assert "Traceback" not in result.output

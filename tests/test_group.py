@@ -55,6 +55,15 @@ class TestGroupUngroup:
         assert result.exit_code == 1
         assert "Invalid group" in result.output
 
+    def test_group_command_strips_whitespace(self, tmp_path, monkeypatch) -> None:
+        _setup(tmp_path, monkeypatch)
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        result = runner.invoke(app, ["group", "gs", "  git  "])
+        assert result.exit_code == 0
+        assert "Grouped" in result.output
+        store = get_store().load()
+        assert store.get("gs").group == "git"
+
     def test_ungroup_noop_when_no_group(self, tmp_path, monkeypatch) -> None:
         _setup(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])

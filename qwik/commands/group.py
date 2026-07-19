@@ -28,6 +28,7 @@ def group_command(
         print_error(f'Alias "{name}" does not exist.', console=console)
         raise typer.Exit(1)
 
+    group = group.strip()
     try:
         validated = validate_alias_name(group)
     except ValueError as exc:
