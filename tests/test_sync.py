@@ -1,4 +1,4 @@
-﻿"""Tests for the sync command (git-backed dotfile sharing)."""
+"""Tests for the sync command (git-backed dotfile sharing)."""
 
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ class FakeGit:
         self.ahead: int = 0
         self.behind: int = 0
         self.remotes: list[str] = []
+        self.remote_urls: dict[str, str] = {}
 
     def run(
         self,
@@ -66,16 +67,19 @@ class FakeGit:
         elif sub == "remote":
             # `git remote` lists configured remotes; `git remote add <name> <url>`
             # records one so a subsequent listing returns it.
-            if len(args) >= 4 and args[2] == "add":
+            if len(args) >= 5 and args[2] == "add":
                 self.remotes.append(args[3])
+                self.remote_urls[args[3]] = args[4]
                 stdout = ""
+            elif len(args) >= 3 and args[2] == "get-url":
+                stdout = self.remote_urls.get(args[3], "")
             else:
                 stdout = "\n".join(self.remotes)
         elif sub == "rev-parse":
-            # --abbrev-ref HEAD â†’ "main"
+            # --abbrev-ref HEAD → "main"
             stdout = "main"
         elif sub == "rev-list":
-            # --left-right --count origin/main...HEAD â†’ "<behind>\t<ahead>"
+            # --left-right --count origin/main...HEAD → "<behind>\t<ahead>"
             stdout = f"{self.behind}\t{self.ahead}"
         return subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
 
@@ -133,6 +137,30 @@ class TestSyncInit:
         remotes = [c for c in fake.git_calls if c[1] == "remote"]
         assert any("add" in c for c in remotes)
 
+    def test_sync_init_remote_mismatch_errors(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake = _setup_env(tmp_path, monkeypatch)
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        url_a = "https://example.com/a.git"
+        runner.invoke(app, ["sync", "init", "--remote", url_a])
+        # re-run init with a different remote URL
+        url_b = "https://example.com/b.git"
+        result = runner.invoke(app, ["sync", "init", "--remote", url_b])
+        assert result.exit_code == 1, result.output
+        assert url_a in result.output
+        assert "set-url" in result.output.lower()
+
+    def test_sync_init_remote_same_is_idempotent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _setup_env(tmp_path, monkeypatch)
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        url = "https://example.com/a.git"
+        runner.invoke(app, ["sync", "init", "--remote", url])
+        result = runner.invoke(app, ["sync", "init", "--remote", url])
+        assert result.exit_code == 0, result.output
+
 
 class TestSyncPush:
     def test_sync_push(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -163,7 +191,7 @@ class TestSyncPush:
         runner.invoke(app, ["add", "gs", "git", "status"])
         runner.invoke(app, ["sync", "init", "--remote", "https://example.com/d.git"])
         fake.calls.clear()
-        # tree is clean (default fake) â†’ nothing to push
+        # tree is clean (default fake) → nothing to push
         result = runner.invoke(app, ["sync", "push"])
         assert result.exit_code == 0, result.output
         assert "nothing to push" in result.output.lower()
@@ -298,7 +326,7 @@ class TestSyncTrustBoundary:
         result = runner.invoke(app, ["sync", "pull"], input="n\n")
         assert "trust" in result.output.lower() or "shell=True" in result.output.lower()
         assert "rm -rf /tmp" in result.output
-        # declined â†’ live store unchanged
+        # declined → live store unchanged
         live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
         assert "danger" not in live["aliases"].unwrap()  # type: ignore[attr-defined]
 
@@ -376,3 +404,37 @@ class TestSyncErrorPaths:
         assert result.exit_code == 1
         assert "git pull failed: network" in result.output
         assert "Traceback" not in result.output
+
+
+class TestSyncGroupsIntegration:
+    def test_sync_push_pull_preserves_group(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The ``group`` field survives a sync push → pull round-trip."""
+        _setup_env(tmp_path, monkeypatch)
+        runner.invoke(app, ["add", "gs", "git", "status", "--group", "work"])
+        runner.invoke(app, ["sync", "init", "--remote", "https://example.com/d.git"])
+        sync_repo = tmp_path / "qwik-sync"
+        # push writes aliases.toml with the group field
+        pushed = tomlkit.parse((sync_repo / "aliases.toml").read_text(encoding="utf-8"))
+        assert pushed["aliases"]["gs"]["group"] == "work"  # type: ignore[index]
+
+        # simulate pull into a fresh config dir by clearing the live store
+        (tmp_path / "aliases.toml").unlink()
+        from qwik.config import _reset_config
+
+        _reset_config()
+        # rewrite sync aliases.toml fresh to ensure group is present
+        doc = tomlkit.document()
+        doc.add("version", 1)
+        aliases = tomlkit.table()
+        t = tomlkit.table()
+        t.add("command", "git status")
+        t.add("group", "work")
+        aliases.add("gs", t)
+        doc.add("aliases", aliases)
+        (sync_repo / "aliases.toml").write_text(tomlkit.dumps(doc), encoding="utf-8")
+        result = runner.invoke(app, ["sync", "pull", "--yes"])
+        assert result.exit_code == 0, result.output
+        live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
+        assert live["aliases"]["gs"]["group"] == "work"  # type: ignore[index]

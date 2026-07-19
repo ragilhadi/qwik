@@ -11,7 +11,7 @@ import typer
 from qwik.commands.init_shell import _fish_config_dir
 from qwik.commands.sync import _load_sync_config
 from qwik.config import get_config
-from qwik.core.git import ahead_behind, current_branch, git_available, is_dirty
+from qwik.core.git import behind_ahead, current_branch, git_available, is_dirty
 from qwik.core.store import get_store
 from qwik.shells.base import SUPPORTED_SHELLS
 from qwik.ui.prompts import print_error, print_info, print_success, print_warning
@@ -88,7 +88,7 @@ def doctor_command() -> None:
             remote_url, _ = _load_sync_config(sync_repo)
             remote_str = remote_url if remote_url is not None else "<not set>"
             try:
-                behind, ahead = ahead_behind(sync_repo, "origin", branch)
+                behind, ahead = behind_ahead(sync_repo, "origin", branch)
                 ahead_behind_str = f", {ahead} ahead / {behind} behind"
             except RuntimeError:
                 ahead_behind_str = ""

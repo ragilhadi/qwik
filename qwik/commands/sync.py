@@ -6,8 +6,8 @@ The sync repo lives at ``<config_dir>/qwik-sync/`` and holds:
   ``qwik export``), committed and pushed on every ``sync push``.
 - ``sync.toml`` — the persisted sync config: ``remote_url`` + ``branch``.
 
-``push`` exports the live store â†’ commits â†’ pushes to the remote.
-``pull`` pulls the remote â†’ reuses :func:`qwik.commands.importer.preview_and_merge`
+``push`` exports the live store → commits → pushes to the remote.
+``pull`` pulls the remote → reuses :func:`qwik.commands.importer.preview_and_merge`
 to import-merge into the live store under a :class:`FileLock` (the same
 trust-boundary preview as ``qwik import``).
 """
@@ -20,13 +20,14 @@ from typing import TYPE_CHECKING
 import typer
 import tomlkit
 
-from qwik.commands.importer import preview_and_merge
+from qwik.commands.importer import merge_into, preview_import
 from qwik.config import get_config
 from qwik.core.git import (
     add_all_and_commit,
     add_remote,
-    ahead_behind,
+    behind_ahead,
     current_branch,
+    get_remote_url,
     git_available,
     has_remote,
     init_repo,
@@ -83,9 +84,12 @@ def _export_live_store_to_sync(sync_repo: Path, store: Store) -> int:
 
 def _read_sync_aliases(sync_repo: Path) -> AliasStore:
     """Parse ``<sync_repo>/aliases.toml`` into an :class:`AliasStore`."""
+    from qwik.core.migrations import migrate
+
     raw = (sync_repo / "aliases.toml").read_text(encoding="utf-8")
-    parsed = dict(tomlkit.parse(raw).unwrap())
-    return AliasStore.model_validate(parsed)
+    data = dict(tomlkit.parse(raw).unwrap())
+    data = migrate(data)
+    return AliasStore.model_validate(data)
 
 
 def sync_command(
@@ -143,6 +147,15 @@ def _do_init(
     if remote is not None:
         if not has_remote(sync_repo):
             add_remote(sync_repo, remote)
+        else:
+            current_url = get_remote_url(sync_repo, "origin")
+            if current_url is not None and current_url != remote:
+                print_error(
+                    f"Remote 'origin' already set to {current_url}. "
+                    "Use 'git remote set-url origin <new>' to change.",
+                    console=con,
+                )
+                raise typer.Exit(1)
         _save_sync_config(sync_repo, remote, branch)
 
     store = get_store()
@@ -233,13 +246,19 @@ def _do_pull(
         raise typer.Exit(1)
 
     store = get_store()
+    # Load without the lock for the preview/confirm so a user sitting at the
+    # prompt does not block concurrent `qwik run` invocations (which take the
+    # same lock in `bump_usage`). The lock is re-acquired for the
+    # read-modify-write below.
+    preview_data = store.load()
+    if not preview_import(incoming, preview_data, yes=yes, console=con):
+        raise typer.Exit(0)
+
     lock = FileLock(store.path.with_suffix(".toml.lock"))
     with lock:
         data = store.load()
-        result = preview_and_merge(incoming, data, store, yes=yes, console=con)
-    if result is None:
-        raise typer.Exit(0)
-    added, updated, unchanged = result
+        added, updated, unchanged = merge_into(incoming, data)
+        store.save_with_backup(data)
     print_success(
         f"Pulled {len(incoming.aliases)} aliases from {remote_url} ({branch}): "
         f"{added} added, {updated} updated, {unchanged} unchanged.",
@@ -276,7 +295,7 @@ def _do_status(
         con.print(f"  Branch: {cur_branch}")
         con.print(f"  Remote: {remote_url}")
         try:
-            behind, ahead = ahead_behind(sync_repo, "origin", branch)
+            behind, ahead = behind_ahead(sync_repo, "origin", branch)
             con.print(f"  Ahead/behind origin/{branch}: {ahead} ahead, {behind} behind")
         except RuntimeError as exc:
             con.print(f"  Ahead/behind: [qwik.warning]unavailable ({exc})[/qwik.warning]")

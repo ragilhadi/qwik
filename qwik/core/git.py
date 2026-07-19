@@ -1,4 +1,4 @@
-﻿"""Thin subprocess wrappers around the ``git`` CLI for ``qwik sync``.
+"""Thin subprocess wrappers around the ``git`` CLI for ``qwik sync``.
 
 Shells out to ``git`` via :func:`subprocess.run` so the project does not
 need a GitPython dependency.  Every function raises :class:`RuntimeError`
@@ -23,7 +23,8 @@ __all__ = [
     "push",
     "pull",
     "status_short",
-    "ahead_behind",
+    "behind_ahead",
+    "get_remote_url",
 ]
 
 
@@ -111,7 +112,15 @@ def status_short(path: Path) -> str:
     return _run_git(["status", "--short"], path)
 
 
-def ahead_behind(path: Path, remote: str, branch: str) -> tuple[int, int]:
+def get_remote_url(path: Path, name: str = "origin") -> str | None:
+    """Return the URL of remote *name*, or ``None`` if it is not configured."""
+    try:
+        return _run_git(["remote", "get-url", name], path)
+    except RuntimeError:
+        return None
+
+
+def behind_ahead(path: Path, remote: str, branch: str) -> tuple[int, int]:
     """Return ``(behind, ahead)`` counts for HEAD vs ``<remote>/<branch>``."""
     out = _run_git(
         ["rev-list", "--left-right", "--count", f"{remote}/{branch}...HEAD"],
