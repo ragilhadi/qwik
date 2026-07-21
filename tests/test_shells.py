@@ -2,6 +2,8 @@
 
 from qwik.core.models import Alias
 from qwik.shells.base import SUPPORTED_SHELLS, get_renderer
+from qwik.shells.bash import BashRenderer
+from qwik.shells.zsh import ZshRenderer
 
 
 class TestRenderers:
@@ -26,6 +28,16 @@ class TestRenderers:
         renderer = get_renderer("bash")
         out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
         assert 'qwik run "gco" "$@"' in out
+
+    def test_bash_append_alias_with_trailing_backslash(self) -> None:
+        """Bash single quotes are literal; backslash needs no escaping."""
+        out = BashRenderer().render_alias("bsg", Alias(command="echo hello\\"))
+        assert out == "alias bsg='echo hello\\'"
+
+    def test_zsh_append_alias_with_trailing_backslash(self) -> None:
+        """Zsh single quotes are literal; backslash needs no escaping."""
+        out = ZshRenderer().render_alias("bsg", Alias(command="echo hello\\"))
+        assert out == "alias bsg='echo hello\\'"
 
     def test_zsh_append_alias_with_quotes(self) -> None:
         renderer = get_renderer("zsh")

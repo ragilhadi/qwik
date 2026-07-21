@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 import typer
 from rich.console import Console
 
 from qwik.core.conflicts import ConflictChecker
+from qwik.core.shell_detect import detect_shell as _detect_shell
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success
 
@@ -18,6 +21,9 @@ def rename_command(
     force: bool = typer.Option(
         False, "--force", "-f", help="Overwrite if target exists."
     ),
+    shell: Optional[str] = typer.Option(
+        None, "--shell", hidden=True, help="Override shell detection for conflict checks."
+    ),
 ) -> None:
     """Rename an alias, checking for conflicts."""
     store = get_store()
@@ -29,7 +35,8 @@ def rename_command(
         raise typer.Exit(1)
 
     checker = ConflictChecker(data)
-    result = checker.check(new)
+    active_shell = shell or _detect_shell()
+    result = checker.check(new, shell=active_shell)
 
     if not result.valid_syntax:
         print_error(new, suggestion="Names must match ^[A-Za-z_][A-Za-z0-9_-]*$")

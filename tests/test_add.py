@@ -134,3 +134,157 @@ class TestGroupFlag:
         assert result.exit_code == 1
         assert "Invalid group" in result.output
         assert "Traceback" not in result.output
+
+
+class TestAddBuiltinDetection:
+    def test_add_rejects_zsh_builtin_when_detected_zsh(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "zsh")
+        result = runner.invoke(app, ["add", "setopt", "echo", "hi"])
+        assert result.exit_code == 1
+        assert "shell builtin" in result.output
+
+    def test_add_rejects_fish_builtin_when_detected_fish(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "fish")
+        result = runner.invoke(app, ["add", "abbr", "echo", "hi"])
+        assert result.exit_code == 1
+        assert "shell builtin" in result.output
+
+    def test_add_allows_zsh_builtin_when_shell_override_bash(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "zsh")
+        result = runner.invoke(app, ["add", "setopt", "echo", "hi", "--shell", "bash"])
+        assert result.exit_code == 0
+        assert "Added" in result.output
+
+    def test_add_rejects_bash_builtin_with_shell_override_bash(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "fish")
+        result = runner.invoke(app, ["add", "compgen", "echo", "hi", "--shell", "bash"])
+        assert result.exit_code == 1
+        assert "shell builtin" in result.output
+
+    def test_add_allows_bash_builtin_with_shell_override_fish(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "bash")
+        result = runner.invoke(app, ["add", "compgen", "echo", "hi", "--shell", "fish"])
+        assert result.exit_code == 0
+        assert "Added" in result.output
+
+    def test_add_shell_flag_hidden_from_help(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "--help"])
+        out = _strip_ansi(result.output)
+        assert "--shell" not in out
+
+
+class TestCmdTemplateWarning:
+    def test_cmd_template_warns(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "cmd")
+        result = runner.invoke(app, ["add", "zz_gco", "git checkout {1}"])
+        assert result.exit_code == 0, f"exit={result.exit_code} out={result.output!r}"
+        assert "Added" in result.output
+        out = _strip_ansi(result.output)
+        assert "cmd" in out.lower() or "doskey" in out.lower()
+        assert "template" in out.lower() or "parameter" in out.lower() or "placeholder" in out.lower()
+
+    def test_cmd_non_template_does_not_warn(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "cmd")
+        result = runner.invoke(app, ["add", "zz_gs", "git status"])
+        assert result.exit_code == 0
+        assert "Added" in result.output
+        out = _strip_ansi(result.output)
+        assert "⚠" not in out
+
+    def test_bash_template_does_not_warn(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "bash")
+        result = runner.invoke(app, ["add", "zz_gco", "git checkout {1}"])
+        assert result.exit_code == 0
+        out = _strip_ansi(result.output)
+        assert "⚠" not in out
+
+    def test_no_shell_no_template_warning(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: None)
+        result = runner.invoke(app, ["add", "zz_gco", "git checkout {1}"])
+        assert result.exit_code == 0
+        out = _strip_ansi(result.output)
+        assert "⚠" not in out
+
+
+class TestVarExpansionWarning:
+    def test_cmd_percent_var_warns(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "cmd")
+        result = runner.invoke(app, ["add", "zz_p", "echo %USERPROFILE%"])
+        assert result.exit_code == 0, f"exit={result.exit_code} out={result.output!r}"
+        out = _strip_ansi(result.output)
+        assert "%USERPROFILE%" in out
+        assert "cmd" in out.lower()
+
+    def test_pwsh_dollar_var_warns(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "pwsh")
+        result = runner.invoke(app, ["add", "zz_h", "echo $HOME"])
+        assert result.exit_code == 0, f"exit={result.exit_code} out={result.output!r}"
+        out = _strip_ansi(result.output)
+        assert "$HOME" in out
+        assert "pwsh" in out.lower() or "powershell" in out.lower()
+
+    def test_bash_dollar_var_does_not_warn(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "bash")
+        result = runner.invoke(app, ["add", "zz_b", "echo $HOME"])
+        assert result.exit_code == 0
+        out = _strip_ansi(result.output)
+        assert "⚠" not in out
+
+    def test_pwsh_dollar_syntax_not_warned(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "pwsh")
+        result = runner.invoke(app, ["add", "zz_d", "echo $(date)"])
+        assert result.exit_code == 0
+        out = _strip_ansi(result.output)
+        assert "⚠" not in out
+
+    def test_no_shell_no_var_warning(self, tmp_path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: None)
+        result = runner.invoke(app, ["add", "zz_p", "echo %USERPROFILE%"])
+        assert result.exit_code == 0
+        out = _strip_ansi(result.output)
+        assert "⚠" not in out

@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-19
+
+### Added
+- `qwik add` now warns when a template alias is created and the active shell is cmd (cmd/doskey cannot expand parameters).
+- `qwik add` warns when the command contains a `%VAR%` (cmd) or `$VAR` (pwsh) reference that will be expanded by the shell at run time.
+
+### Changed
+- Verified bash/zsh renderers handle literal backslashes correctly in single-quoted aliases without escaping (bash/zsh single quotes are literal, unlike fish); added a `bsg` snapshot alias to lock the behavior.
+
+### Fixed
+- Builtin-conflict detection at `qwik add`/`rename` now uses the detected shell's builtin set, not bash's. Previously `setopt`/`abbr`/`Write-Output`/`dir` were allowed on their native shells.
+- `qwik doctor` now checks the correct PowerShell profile path on Windows (localized Documents folder), matching `qwik init`.
+
 ## [0.3.1] - 2026-07-19
 
 ### Added
