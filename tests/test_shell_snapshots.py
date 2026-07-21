@@ -18,6 +18,7 @@ def _build_store() -> AliasStore:
     store.add("gs", Alias(command="git status"))
     store.add("lsg", Alias(command="echo 'hello world'"))
     store.add("envg", Alias(command="echo $HOME %USERPROFILE%"))
+    store.add("bsg", Alias(command="echo hello\\"))
     return store
 
 

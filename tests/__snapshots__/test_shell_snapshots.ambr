@@ -1,6 +1,7 @@
 # serializer version: 1
 # name: test_render_all_snapshot[bash]
   '''
+  alias bsg='echo hello\'
   alias envg='echo $HOME %USERPROFILE%'
   gco() {
       qwik run "gco" "$@"
@@ -12,6 +13,7 @@
 # name: test_render_all_snapshot[cmd]
   '''
   REM qwik cmd hook (best-effort; template aliases omitted)
+  doskey bsg=echo hello\ $*
   doskey envg=echo $HOME %USERPROFILE% $*
   REM omitted gco: template mode unsupported in cmd
   doskey gs=git status $*
@@ -20,6 +22,9 @@
 # ---
 # name: test_render_all_snapshot[fish]
   '''
+  function bsg
+      'echo hello\\' $argv
+  end
   function envg
       'echo $HOME %USERPROFILE%' $argv
   end
@@ -36,6 +41,9 @@
 # ---
 # name: test_render_all_snapshot[pwsh]
   '''
+  function bsg {
+      echo hello\ @args
+  }
   function envg {
       echo $HOME %USERPROFILE% @args
   }
@@ -52,6 +60,7 @@
 # ---
 # name: test_render_all_snapshot[zsh]
   '''
+  alias bsg='echo hello\'
   alias envg='echo $HOME %USERPROFILE%'
   gco() {
       qwik run "gco" "$@"
