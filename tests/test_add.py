@@ -81,6 +81,25 @@ class TestPlaceholderValidation:
         assert result.exit_code == 0
 
 
+class TestMalformedPlaceholderCLI:
+    def test_add_rejects_malformed_placeholder(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "foo", "echo {bad name}"])
+        assert result.exit_code == 1
+        assert "bad name" in result.output
+        assert "Traceback" not in result.output
+
+    def test_add_accepts_literal_braces(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["add", "zz_lit", "echo {}"])
+        assert result.exit_code == 0, f"exit={result.exit_code} out={result.output!r}"
+        assert "Added" in result.output
+
+
 class TestGroupFlag:
     def test_group_flag_documented(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config

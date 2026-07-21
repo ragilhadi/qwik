@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-19
+
+### Added
+- `qwik doctor` can now restore the live store from the latest valid backup when the store is corrupt (interactive confirm).
+- Syrupy snapshots now lock per-shell hook rendering output (bash/zsh/fish/pwsh/cmd).
+- CLI-level rollback tests verify `qwik rm`/`rename`/`edit`/`import` create backups and `doctor` can restore the pre-operation state.
+
+### Fixed
+- Malformed placeholders (e.g. `{bad name}`) are now rejected at `qwik add` time instead of silently being treated as literal text.
+
 ## [0.3.0] - 2026-07-19
 
 ### Fixed
