@@ -77,6 +77,16 @@
   }
   '''
 # ---
+# name: test_render_all_snapshot[xonsh]
+  '''
+  aliases["bsg"] = "echo hello\\"
+  aliases["envg"] = "echo $HOME %USERPROFILE%"
+  def gco(*args):
+      qwik run("gco", *args)
+  aliases["gs"] = "git status"
+  aliases["lsg"] = "echo 'hello world'"
+  '''
+# ---
 # name: test_render_all_snapshot[zsh]
   '''
   alias bsg='echo hello\'

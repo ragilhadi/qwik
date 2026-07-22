@@ -120,3 +120,32 @@ class TestRenderers:
         monkeypatch.setenv("NU_CONFIG_DIR", str(custom))
         rc = NuRenderer().rc_path()
         assert rc == custom / "config.nu"
+
+    def test_xonsh_template_function(self) -> None:
+        renderer = get_renderer("xonsh")
+        out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
+        assert 'qwik run' in out
+        assert "gco" in out
+
+    def test_xonsh_append_alias(self) -> None:
+        renderer = get_renderer("xonsh")
+        out = renderer.render_alias("gs", Alias(command="git status"))
+        assert "aliases" in out
+        assert "git status" in out
+
+    def test_xonsh_rc_path(self, tmp_path, monkeypatch) -> None:
+        from qwik.shells.xonsh import XonshRenderer
+
+        monkeypatch.delenv("XONSHRC", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        rc = XonshRenderer().rc_path()
+        assert rc is not None
+        assert rc.name == ".xonshrc"
+
+    def test_xonsh_rc_path_env_override(self, tmp_path, monkeypatch) -> None:
+        from qwik.shells.xonsh import XonshRenderer
+
+        custom = tmp_path / "custom.xonshrc"
+        monkeypatch.setenv("XONSHRC", str(custom))
+        rc = XonshRenderer().rc_path()
+        assert rc == custom

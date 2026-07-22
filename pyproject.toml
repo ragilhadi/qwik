@@ -43,6 +43,7 @@ fish = "qwik.shells.fish:FishRenderer"
 pwsh = "qwik.shells.pwsh:PwshRenderer"
 cmd = "qwik.shells.cmd:CmdRenderer"
 nu = "qwik.shells.nu:NuRenderer"
+xonsh = "qwik.shells.xonsh:XonshRenderer"
 
 [project.optional-dependencies]
 dev = [
