@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-07-22
+
+### Added
+- PyPI trusted publishing (OIDC) via `pypa/gh-action-pypi-publish` with PEP 740 attestations.
+- Search performance benchmark at 1k/5k/10k alias counts (all under 200ms median).
+
+### Changed
+- `Development Status` classifier bumped to `5 - Production/Stable`.
+- Python 3.13 classifier added.
+- `publish.yml` split into `test` (OS matrix), `build`, and `publish` (OIDC) jobs.
+- README updated with PyPI install instructions, Nushell/Xonsh shells, overlay/completion/plugin docs.
+
+### Removed
+- Long-lived `PYPI_API_TOKEN` secret (replaced by OIDC trusted publishing).
+
 ## [0.6.0] - 2026-07-22
 
 ### Added

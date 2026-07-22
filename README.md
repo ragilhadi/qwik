@@ -4,7 +4,7 @@
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=ragilhadi_qwik&metric=bugs)](https://sonarcloud.io/summary/new_code?id=ragilhadi_qwik)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ragilhadi_qwik&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ragilhadi_qwik)
 
-Create, manage, and run shell aliases from a single interface. Works cross-platform with bash, zsh, fish, PowerShell, and cmd.
+Create, manage, and run shell aliases from a single interface. Works cross-platform with bash, zsh, fish, PowerShell, cmd, Nushell, and Xonsh.
 
 **Two ways to run any alias:**
 - **`gs`** — native shell command (after one-time hook install)
@@ -29,16 +29,14 @@ Create, manage, and run shell aliases from a single interface. Works cross-platf
 
 ## Installation
 
-Not yet published to PyPI; install from source.
-
 ```bash
-pipx install git+https://github.com/ragilhadi/qwik.git
+pipx install qwik
 ```
 
 Or with `uv`:
 
 ```bash
-uv tool install git+https://github.com/ragilhadi/qwik.git
+uv tool install qwik
 ```
 
 ## Quick Start
@@ -214,6 +212,20 @@ qwik sync status                       # branch, remote, dirty, ahead/behind, al
 
 > **Trust warning:** pulled stores are a code-execution vector. Always review the command preview before confirming a `sync pull`; only sync with repos you control.
 
+### `overlay` — Team/shared read-only alias store
+
+```bash
+qwik overlay add --url https://github.com/team/qwik-aliases --branch main
+qwik overlay list           # show overlay aliases
+qwik overlay update         # git pull the overlay repo
+qwik overlay copy --name gs # copy an overlay alias to your user store
+qwik overlay remove         # remove the overlay
+```
+
+Overlay aliases appear in search, `qwik init`, and the picker, but cannot be
+edited or removed (they're read-only). Running an overlay alias copies it to
+your user store for usage tracking.
+
 ### `doctor` — Health check
 
 ```bash
@@ -248,6 +260,19 @@ qwik completion zsh --install   # install into ~/.zshrc + ~/.zfunc/_qwik
 Installs are idempotent (a `# qwik completion (<shell>)` marker is checked before appending) and back up the rc file with a timestamp before modifying it.
 
 > Typer's built-in `qwik --install-completion <shell>` / `qwik --show-completion <shell>` also works; `qwik completion` provides the same scripts with qwik's own backup + idempotency behavior.
+
+### Plugin System
+
+qwik supports third-party shell renderers and CLI commands via Python entry points:
+
+- **Shell renderers:** Register a class implementing `ShellRenderer` under the `qwik.shell_renderers` entry-point group in your `pyproject.toml`.
+- **CLI commands:** Register a Typer-compatible callable under the `qwik.commands` entry-point group.
+
+```toml
+# In your plugin's pyproject.toml
+[project.entry-points."qwik.shell_renderers"]
+myshell = "my_package.shell:MyShellRenderer"
+```
 
 ### Version & Help
 
