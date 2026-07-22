@@ -36,6 +36,13 @@ dependencies = [
 [project.scripts]
 qwik = "qwik.cli:app"
 
+[project.entry-points."qwik.shell_renderers"]
+bash = "qwik.shells.bash:BashRenderer"
+zsh = "qwik.shells.zsh:ZshRenderer"
+fish = "qwik.shells.fish:FishRenderer"
+pwsh = "qwik.shells.pwsh:PwshRenderer"
+cmd = "qwik.shells.cmd:CmdRenderer"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",

@@ -72,7 +72,7 @@ def _rc_path(shell: str) -> Path | None:
 
 def init_shell_command(
     shell: str = typer.Argument(
-        "bash", help="Target shell (bash, zsh, fish, pwsh, cmd)."
+        "bash", help="Target shell (e.g. bash, zsh, fish, pwsh, cmd)."
     ),
     install: bool = typer.Option(
         False, "--install", "-i", help="Append hook to rc file with backup."

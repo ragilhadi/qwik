@@ -1,14 +1,14 @@
 """Unit tests for shell renderers."""
 
 from qwik.core.models import Alias
-from qwik.shells.base import SUPPORTED_SHELLS, get_renderer
+from qwik.shells.base import supported_shells, get_renderer
 from qwik.shells.bash import BashRenderer
 from qwik.shells.zsh import ZshRenderer
 
 
 class TestRenderers:
     def test_all_shells_supported(self) -> None:
-        for shell in SUPPORTED_SHELLS:
+        for shell in supported_shells():
             renderer = get_renderer(shell)
             assert renderer.shell_name == shell
 

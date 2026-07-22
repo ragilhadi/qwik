@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from qwik.core.models import Alias, AliasStore
-from qwik.shells.base import SUPPORTED_SHELLS, get_renderer
+from qwik.shells.base import supported_shells, get_renderer
 
 
 def _build_store() -> AliasStore:
@@ -22,7 +22,7 @@ def _build_store() -> AliasStore:
     return store
 
 
-@pytest.mark.parametrize("shell", SUPPORTED_SHELLS)
+@pytest.mark.parametrize("shell", supported_shells())
 def test_render_all_snapshot(shell: str, snapshot: str) -> None:
     store = _build_store()
     rendered = get_renderer(shell).render_all(store.aliases)

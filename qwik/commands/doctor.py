@@ -19,7 +19,7 @@ from qwik.core.shell_detect import (
     shell_name_from_proc,
 )
 from qwik.core.store import get_store
-from qwik.shells.base import SUPPORTED_SHELLS
+from qwik.shells.base import supported_shells
 from qwik.ui.prompts import (
     print_error,
     print_info,
@@ -77,7 +77,7 @@ def doctor_command() -> None:
     # Detect shell
     shell = _detect_shell()
     console.print(f"[bold]Shell detected:[/bold] {shell or 'unknown'}")
-    if shell in SUPPORTED_SHELLS:
+    if shell in supported_shells():
         print_success(f"{shell} is supported.", console=console)
         checks_ok += 1
     elif shell:
