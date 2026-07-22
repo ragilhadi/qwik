@@ -91,3 +91,32 @@ class TestRenderers:
         out = renderer.render_all(aliases)
         assert "alias gs" in out
         assert "gd" not in out
+
+    def test_nu_template_function(self) -> None:
+        renderer = get_renderer("nu")
+        out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
+        assert 'qwik run "gco"' in out
+        assert "...$args" in out
+
+    def test_nu_append_function(self) -> None:
+        renderer = get_renderer("nu")
+        out = renderer.render_alias("gs", Alias(command="git status"))
+        assert "def gs" in out
+        assert "^git status" in out
+
+    def test_nu_rc_path(self, tmp_path, monkeypatch) -> None:
+        from qwik.shells.nu import NuRenderer
+
+        monkeypatch.delenv("NU_CONFIG_DIR", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        rc = NuRenderer().rc_path()
+        assert rc is not None
+        assert "nushell" in str(rc).lower()
+
+    def test_nu_rc_path_env_override(self, tmp_path, monkeypatch) -> None:
+        from qwik.shells.nu import NuRenderer
+
+        custom = tmp_path / "nuconfig"
+        monkeypatch.setenv("NU_CONFIG_DIR", str(custom))
+        rc = NuRenderer().rc_path()
+        assert rc == custom / "config.nu"

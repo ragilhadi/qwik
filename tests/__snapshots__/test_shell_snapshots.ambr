@@ -39,6 +39,25 @@
   end
   '''
 # ---
+# name: test_render_all_snapshot[nu]
+  '''
+  def bsg [...args] {
+      ^echo hello\ ...$args
+  }
+  def envg [...args] {
+      ^echo $HOME %USERPROFILE% ...$args
+  }
+  def gco [...args] {
+      qwik run "gco" ...$args
+  }
+  def gs [...args] {
+      ^git status ...$args
+  }
+  def lsg [...args] {
+      ^echo 'hello world' ...$args
+  }
+  '''
+# ---
 # name: test_render_all_snapshot[pwsh]
   '''
   function bsg {
