@@ -47,6 +47,10 @@ def pick_command() -> None:
 
     name = selected
     alias = data.get(name)
+    if alias is None and name in data.overlay_aliases:
+        alias = data.overlay_aliases[name]
+        data.add(name, alias)
+        store.save_with_backup(data)
     if alias is None:
         print_error(f'Alias "{name}" disappeared.', console=console)
         raise typer.Exit(1)

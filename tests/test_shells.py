@@ -1,14 +1,14 @@
 """Unit tests for shell renderers."""
 
 from qwik.core.models import Alias
-from qwik.shells.base import SUPPORTED_SHELLS, get_renderer
+from qwik.shells.base import supported_shells, get_renderer
 from qwik.shells.bash import BashRenderer
 from qwik.shells.zsh import ZshRenderer
 
 
 class TestRenderers:
     def test_all_shells_supported(self) -> None:
-        for shell in SUPPORTED_SHELLS:
+        for shell in supported_shells():
             renderer = get_renderer(shell)
             assert renderer.shell_name == shell
 
@@ -91,3 +91,61 @@ class TestRenderers:
         out = renderer.render_all(aliases)
         assert "alias gs" in out
         assert "gd" not in out
+
+    def test_nu_template_function(self) -> None:
+        renderer = get_renderer("nu")
+        out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
+        assert 'qwik run "gco"' in out
+        assert "...$args" in out
+
+    def test_nu_append_function(self) -> None:
+        renderer = get_renderer("nu")
+        out = renderer.render_alias("gs", Alias(command="git status"))
+        assert "def gs" in out
+        assert "^git status" in out
+
+    def test_nu_rc_path(self, tmp_path, monkeypatch) -> None:
+        from qwik.shells.nu import NuRenderer
+
+        monkeypatch.delenv("NU_CONFIG_DIR", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        rc = NuRenderer().rc_path()
+        assert rc is not None
+        assert "nushell" in str(rc).lower()
+
+    def test_nu_rc_path_env_override(self, tmp_path, monkeypatch) -> None:
+        from qwik.shells.nu import NuRenderer
+
+        custom = tmp_path / "nuconfig"
+        monkeypatch.setenv("NU_CONFIG_DIR", str(custom))
+        rc = NuRenderer().rc_path()
+        assert rc == custom / "config.nu"
+
+    def test_xonsh_template_function(self) -> None:
+        renderer = get_renderer("xonsh")
+        out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
+        assert 'qwik run' in out
+        assert "gco" in out
+
+    def test_xonsh_append_alias(self) -> None:
+        renderer = get_renderer("xonsh")
+        out = renderer.render_alias("gs", Alias(command="git status"))
+        assert "aliases" in out
+        assert "git status" in out
+
+    def test_xonsh_rc_path(self, tmp_path, monkeypatch) -> None:
+        from qwik.shells.xonsh import XonshRenderer
+
+        monkeypatch.delenv("XONSHRC", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        rc = XonshRenderer().rc_path()
+        assert rc is not None
+        assert rc.name == ".xonshrc"
+
+    def test_xonsh_rc_path_env_override(self, tmp_path, monkeypatch) -> None:
+        from qwik.shells.xonsh import XonshRenderer
+
+        custom = tmp_path / "custom.xonshrc"
+        monkeypatch.setenv("XONSHRC", str(custom))
+        rc = XonshRenderer().rc_path()
+        assert rc == custom

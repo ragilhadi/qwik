@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qwik"
-version = "0.4.0"
+version = "1.0.0"
 description = "A Friendly CLI Alias Manager"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -14,13 +14,14 @@ authors = [
 ]
 keywords = ["cli", "alias", "shell", "productivity"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Utilities",
 ]
 dependencies = [
@@ -36,6 +37,15 @@ dependencies = [
 [project.scripts]
 qwik = "qwik.cli:app"
 
+[project.entry-points."qwik.shell_renderers"]
+bash = "qwik.shells.bash:BashRenderer"
+zsh = "qwik.shells.zsh:ZshRenderer"
+fish = "qwik.shells.fish:FishRenderer"
+pwsh = "qwik.shells.pwsh:PwshRenderer"
+cmd = "qwik.shells.cmd:CmdRenderer"
+nu = "qwik.shells.nu:NuRenderer"
+xonsh = "qwik.shells.xonsh:XonshRenderer"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
@@ -49,9 +59,10 @@ packages = ["qwik"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "--cov=qwik --cov-report=term-missing --cov-report=xml --cov-fail-under=85"
+addopts = "--cov=qwik --cov-report=term-missing --cov-report=xml --cov-fail-under=85 -m 'not benchmark'"
 markers = [
     "integration: end-to-end tests that spawn real shell subprocesses",
+    "benchmark: performance benchmarks (run manually)",
 ]
 
 [tool.coverage.run]

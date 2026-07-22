@@ -72,7 +72,7 @@ def _rc_path(shell: str) -> Path | None:
 
 def init_shell_command(
     shell: str = typer.Argument(
-        "bash", help="Target shell (bash, zsh, fish, pwsh, cmd)."
+        "bash", help="Target shell (e.g. bash, zsh, fish, pwsh, cmd)."
     ),
     install: bool = typer.Option(
         False, "--install", "-i", help="Append hook to rc file with backup."
@@ -89,15 +89,15 @@ def init_shell_command(
         print_error(str(exc), console=console)
         raise typer.Exit(1)
 
-    snippet = renderer.render_all(data.aliases)
+    snippet = renderer.render_all(data.all_aliases())
 
     if not install:
         console.print(snippet)
         raise typer.Exit(0)
 
-    rc = _rc_path(shell)
+    rc = renderer.rc_path()
     if rc is None:
-        print_error(f"Cannot determine rc file for {shell}.", console=console)
+        print_error(f"Shell {shell} does not support --install.", console=console)
         raise typer.Exit(1)
 
     rc.parent.mkdir(parents=True, exist_ok=True)
@@ -110,20 +110,19 @@ def init_shell_command(
         print_info(f"Open a new terminal or run: source {rc}", console=console)
         raise typer.Exit(0)
 
-    # Backup
     if rc.exists():
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         backup = rc.parent / f"{rc.name}.qwik-backup-{stamp}"
         shutil.copy2(rc, backup)
         print_success(f"Backed up {rc} to {backup}", console=console)
 
-    hook_line = f'\n# qwik shell hook ({shell})\neval "$(qwik init {shell})"\n'
-    if shell == "pwsh":
-        hook_line = f"\n# qwik shell hook ({shell})\nInvoke-Expression (qwik init pwsh | Out-String)\n"
-    elif shell == "fish":
-        hook_line = f"\n# qwik shell hook ({shell})\nqwik init fish | source -\n"
+    hook_line = renderer.install_hook_line()
+    if hook_line is None:
+        print_error(f"Shell {shell} does not support --install.", console=console)
+        raise typer.Exit(1)
 
     with rc.open("a", encoding="utf-8") as fh:
+        fh.write(f"\n# qwik shell hook ({shell})\n")
         fh.write(hook_line)
 
     print_success(f"Added hook to {rc}", console=console)

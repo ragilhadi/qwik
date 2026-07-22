@@ -153,6 +153,7 @@ class AliasStore(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     aliases: dict[str, Alias] = Field(default_factory=dict)
+    overlay_aliases: dict[str, Alias] = Field(default_factory=dict)
     version: int = 1
 
     @model_validator(mode="after")
@@ -160,7 +161,15 @@ class AliasStore(BaseModel):
         """Run every alias key through the name validator."""
         for name in self.aliases:
             validate_alias_name(name)
+        for name in self.overlay_aliases:
+            validate_alias_name(name)
         return self
+
+    def all_aliases(self) -> dict[str, Alias]:
+        """Return merged view: user aliases take precedence over overlay."""
+        merged = dict(self.overlay_aliases)
+        merged.update(self.aliases)
+        return merged
 
     def get(self, name: str) -> Alias | None:
         """Look up an alias by name.

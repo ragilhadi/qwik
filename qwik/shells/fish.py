@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from qwik.shells.base import ShellRenderer
@@ -41,3 +43,17 @@ class FishRenderer(ShellRenderer):
             return f'function {name}\n    qwik run "{name}" $argv\nend'
         escaped = alias.command.replace("\\", "\\\\").replace("'", "\\'")
         return f"function {name}\n    '{escaped}' $argv\nend"
+
+    def rc_path(self) -> Path | None:
+        """Return the fish config path honoring env overrides."""
+        env_val = os.environ.get("__fish_config_dir")
+        if env_val:
+            return Path(env_val) / "config.fish"
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        if xdg:
+            return Path(xdg) / "fish" / "config.fish"
+        return Path.home() / ".config" / "fish" / "config.fish"
+
+    def install_hook_line(self) -> str | None:
+        """Return the fish hook line."""
+        return "\nqwik init fish | source -\n"

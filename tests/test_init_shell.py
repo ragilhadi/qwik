@@ -14,14 +14,15 @@ runner = CliRunner()
 
 class TestInitShellInstall:
     def _run_install(self, shell: str, rc: Path) -> Any:
-        from qwik.commands import init_shell as is_mod
+        from qwik.shells.base import get_renderer
 
-        orig = is_mod._rc_path
+        renderer_cls = type(get_renderer(shell))
+        orig = renderer_cls.rc_path
         try:
-            is_mod._rc_path = lambda s: rc
+            renderer_cls.rc_path = lambda self: rc
             result = runner.invoke(app, ["init", shell, "--install"])
         finally:
-            is_mod._rc_path = orig
+            renderer_cls.rc_path = orig
         return result
 
     def test_install_bash_first_time(self, tmp_path, monkeypatch) -> None:
@@ -93,30 +94,28 @@ class TestInitShellInstall:
 
     def test_install_rc_path_none(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+        from qwik.shells.bash import BashRenderer
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
-        from qwik.commands import init_shell as is_mod
-
-        orig = is_mod._rc_path
+        orig = BashRenderer.rc_path
         try:
-            is_mod._rc_path = lambda s: None
+            BashRenderer.rc_path = lambda self: None
             result = runner.invoke(app, ["init", "bash", "--install"])
             assert result.exit_code == 1
-            assert "Cannot determine rc file" in result.output
+            assert "does not support" in result.output
         finally:
-            is_mod._rc_path = orig
+            BashRenderer.rc_path = orig
 
     def test_install_hook_idempotent(self, tmp_path, monkeypatch) -> None:
-        from qwik.commands import init_shell as is_mod
+        from qwik.shells.bash import BashRenderer
 
         rc = tmp_path / ".bashrc"
         rc.write_text("# existing\n")
-        orig_rc_path = is_mod._rc_path
-        is_mod._rc_path = lambda shell: rc
+        orig_rc_path = BashRenderer.rc_path
+        BashRenderer.rc_path = lambda self: rc
         try:
             r1 = runner.invoke(app, ["init", "bash", "--install"])
-            is_mod._rc_path = lambda shell: rc
             r2 = runner.invoke(app, ["init", "bash", "--install"])
             assert (
                 "already present" in r2.output
@@ -124,7 +123,7 @@ class TestInitShellInstall:
                 or "Added hook" in r1.output
             )
         finally:
-            is_mod._rc_path = orig_rc_path
+            BashRenderer.rc_path = orig_rc_path
 
 
 class TestInitShellRcPath:
@@ -149,53 +148,53 @@ class TestInitShellRcPath:
 
     def test_init_install_creates_rc(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
-        from qwik.commands import init_shell as is_mod
+        from qwik.shells.bash import BashRenderer
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         runner.invoke(app, ["add", "gs", "git", "status"])
         rc = tmp_path / ".bashrc"
-        original = is_mod._rc_path
+        original = BashRenderer.rc_path
         try:
-            is_mod._rc_path = lambda shell: rc
+            BashRenderer.rc_path = lambda self: rc
             result = runner.invoke(app, ["init", "bash", "--install"])
             assert result.exit_code in (0, 1)
         finally:
-            is_mod._rc_path = original
+            BashRenderer.rc_path = original
 
     def test_init_install_idempotent_existing(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
-        from qwik.commands import init_shell as is_mod
+        from qwik.shells.bash import BashRenderer
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         runner.invoke(app, ["add", "gs", "git", "status"])
         rc = tmp_path / ".bashrc"
         rc.write_text('# qwik shell hook (bash)\neval "$(qwik init bash)"')
-        original = is_mod._rc_path
+        original = BashRenderer.rc_path
         try:
-            is_mod._rc_path = lambda shell: rc
+            BashRenderer.rc_path = lambda self: rc
             result = runner.invoke(app, ["init", "bash", "--install"])
             assert result.exit_code == 0
             assert "already present" in result.output
         finally:
-            is_mod._rc_path = original
+            BashRenderer.rc_path = original
 
     def test_init_install_unknown_shell(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
-        from qwik.commands import init_shell as is_mod
+        from qwik.shells.bash import BashRenderer
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         runner.invoke(app, ["add", "gs", "git", "status"])
-        original = is_mod._rc_path
+        original = BashRenderer.rc_path
         try:
-            is_mod._rc_path = lambda shell: None
+            BashRenderer.rc_path = lambda self: None
             result = runner.invoke(app, ["init", "bash", "--install"])
             assert result.exit_code == 1
-            assert "Cannot determine rc file" in result.output
+            assert "does not support" in result.output
         finally:
-            is_mod._rc_path = original
+            BashRenderer.rc_path = original
 
     def test_fish_rc_path_respects_xdg(self, tmp_path, monkeypatch) -> None:
         from qwik.commands.init_shell import _rc_path

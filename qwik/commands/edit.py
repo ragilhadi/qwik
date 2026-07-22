@@ -58,6 +58,14 @@ def edit_command(
     data = store.load()
     console = get_console()
 
+    if name in data.overlay_aliases and name not in data.aliases:
+        print_error(
+            f"'{name}' is an overlay alias (read-only). "
+            f"Copy it first: qwik overlay copy --name {name}",
+            console=console,
+        )
+        raise typer.Exit(1)
+
     alias = data.get(name)
     if alias is None:
         print_error(f'Alias "{name}" does not exist.', console=console)

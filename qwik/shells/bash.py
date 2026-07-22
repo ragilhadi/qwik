@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from qwik.shells.base import ShellRenderer
@@ -42,3 +43,11 @@ class BashRenderer(ShellRenderer):
             return f"{name}() {{\n" f'    qwik run "{name}" "$@"\n' f"}}"
         escaped = alias.command.replace("'", "'\"'\"'")
         return f"alias {name}='{escaped}'"
+
+    def rc_path(self) -> Path | None:
+        """Return ``~/.bashrc``."""
+        return Path.home() / ".bashrc"
+
+    def install_hook_line(self) -> str | None:
+        """Return the bash hook line."""
+        return '\neval "$(qwik init bash)"\n'

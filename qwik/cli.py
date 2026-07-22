@@ -17,6 +17,7 @@ from qwik.commands.exporter import export_command
 from qwik.commands.importer import import_command
 from qwik.commands.group import group_command, ungroup_command
 from qwik.commands.init_shell import init_shell_command
+from qwik.commands.overlay import overlay_command
 from qwik.commands.list import list_command
 from qwik.commands.pick import pick_command
 from qwik.commands.remove import remove_command
@@ -68,6 +69,23 @@ app.command("init")(init_shell_command)
 app.command("doctor")(doctor_command)
 app.command("completion")(completion_command)
 app.command("sync")(sync_command)
+app.command("overlay")(overlay_command)
+
+
+def _discover_plugin_commands() -> None:
+    """Register CLI commands from the ``qwik.commands`` entry-point group."""
+    import importlib.metadata
+    import sys
+
+    for ep in importlib.metadata.entry_points(group="qwik.commands"):
+        try:
+            cmd = ep.load()
+            app.command(ep.name)(cmd)
+        except Exception as exc:
+            print(f"Warning: failed to load plugin command {ep.name!r}: {exc}", file=sys.stderr)
+
+
+_discover_plugin_commands()
 
 
 @app.callback(invoke_without_command=True)
