@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
@@ -55,12 +56,18 @@ def _get_preview_lines(
     if not results or selected_index >= len(results):
         return [("dim", "  (no selection)\n")]
     name, alias, _ = results[selected_index]
-    return [
+    lines: list[tuple[str, str]] = [
         ("bold", f"  Name: {name}\n"),
         ("", f"  Cmd:  {alias.command}\n"),
+        ("", f"  Group: {alias.group or '—'}\n"),
         ("", f"  Tag:  {', '.join(alias.tag) or '—'}\n"),
-        ("", f"  Used: {alias.run_count} times\n"),
+        ("", f"  Used: {alias.run_count} times (last: {alias.format_last_used()})\n"),
+        ("", f"  Created: {alias.created_at.strftime('%Y-%m-%d')}\n"),
+        ("", f"  Enabled: {'yes' if alias.enabled else 'no'}\n"),
     ]
+    if alias.description:
+        lines.append(("", f"  Desc:  {alias.description}\n"))
+    return lines
 
 
 class _PickerState:
@@ -68,10 +75,12 @@ class _PickerState:
         self.selected_index: int = 0
         self.results: list[tuple[str, Alias, float]] = []
         self.selected_name: str | None = None
+        self.history_mode: bool = False
 
 
 def _bind_keys(
     kb: KeyBindings,
+    store: "AliasStore",
     state: _PickerState,
     result_window: Window,
     preview_window: Window,
@@ -121,6 +130,11 @@ def _bind_keys(
             state.selected_name = f"__delete__:{state.results[state.selected_index][0]}"
             event.app.exit()
 
+    @kb.add("c-r")
+    def _toggle_history(event) -> None:  # type: ignore[no-untyped-def]
+        state.history_mode = not state.history_mode
+        _refresh(store, state, result_window, preview_window, "")
+
 
 def run_picker(
     store: "AliasStore",
@@ -160,7 +174,7 @@ def run_picker(
         wrap_lines=False,
     )
 
-    _bind_keys(kb, state, result_window, preview_window)
+    _bind_keys(kb, store, state, result_window, preview_window)
 
     input_buffer = Buffer(
         on_text_changed=lambda buf: _refresh(
@@ -191,7 +205,7 @@ def run_picker(
                         [
                             (
                                 "dim",
-                                "↑↓ navigate  Enter run  Ctrl-E edit  Ctrl-D delete  Esc cancel",
+                                "↑↓ navigate  Enter run  Ctrl-E edit  Ctrl-D delete  Ctrl-R history  Esc cancel",
                             )
                         ]
                     ),
@@ -223,8 +237,28 @@ def _refresh(
     preview_window: Window,
     query: str,
 ) -> None:
+    current_name = None
+    if state.results and state.selected_index < len(state.results):
+        current_name = state.results[state.selected_index][0]
+
     state.results = search_aliases(store, query, limit=50)
-    state.selected_index = 0
+
+    if state.history_mode:
+        state.results.sort(
+            key=lambda t: t[1].last_used or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True,
+        )
+
+    if current_name is not None:
+        for i, (n, _, _) in enumerate(state.results):
+            if n == current_name:
+                state.selected_index = i
+                break
+        else:
+            state.selected_index = 0
+    else:
+        state.selected_index = 0
+
     result_window.content = FormattedTextControl(
         lambda: _get_result_lines(state.results, state.selected_index)
     )

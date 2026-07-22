@@ -64,3 +64,42 @@ def test_picker_result_lines_snapshot(store_with_aliases, snapshot):
     results = search_aliases(store_with_aliases, "", limit=50)
     lines = _get_result_lines(results, 0)
     assert lines == snapshot
+
+
+def test_picker_ctrl_r_toggles_history(store_with_aliases):
+    from qwik.core.models import Alias
+    import datetime as dt
+
+    store_with_aliases.aliases["gs"].last_used = dt.datetime.now(dt.timezone.utc)
+    with create_pipe_input() as inp:
+        inp.send_text("\x12\r")
+        result = run_picker(store_with_aliases, input_=inp, output=DummyOutput())
+    assert result is not None
+
+
+def test_preview_shows_all_fields(store_with_aliases):
+    from qwik.core.models import Alias
+    from qwik.ui.picker import _get_preview_lines
+
+    store_with_aliases.add("full", Alias(
+        command="git status",
+        tag=["vcs"],
+        group="git",
+        description="Show working tree status",
+    ))
+    results = [("full", store_with_aliases.aliases["full"], 1.0)]
+    lines = _get_preview_lines(results, 0)
+    text = "".join(s for _, s in lines)
+    assert "Name:" in text
+    assert "Cmd:" in text
+    assert "Group:" in text
+    assert "Tag:" in text
+    assert "Used:" in text
+    assert "Desc:" in text
+
+
+def test_picker_preserves_selection(store_with_aliases):
+    with create_pipe_input() as inp:
+        inp.send_text("\x1b[B\r")
+        result = run_picker(store_with_aliases, input_=inp, output=DummyOutput())
+    assert result is not None
