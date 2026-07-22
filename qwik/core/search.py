@@ -77,7 +77,7 @@ def search_aliases(
         score.
     """
     candidates: list[tuple[str, Alias]] = []
-    for name, alias in store.aliases.items():
+    for name, alias in store.all_aliases().items():
         if enabled_only and not alias.enabled:
             continue
         if tag is not None and tag not in alias.tag:

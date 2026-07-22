@@ -70,34 +70,63 @@ class Store:
         """
         return self._path
 
-    def load(self) -> AliasStore:
+    def load(self, include_overlay: bool = True) -> AliasStore:
         """Read the alias database from disk.
+
+        Args:
+            include_overlay: If ``True`` and an overlay config exists, merge
+                overlay aliases into ``store.overlay_aliases`` (read-only).
 
         Returns:
             An :class:`~qwik.core.models.AliasStore` populated from the TOML
             file.  If the file does not exist, an empty store is returned.
         """
         if not self._path.exists():
-            return AliasStore()
-        try:
-            raw = self._path.read_text(encoding="utf-8")
-            doc = tomlkit.parse(raw)
-            data: dict[str, Any] = doc.unwrap()
-            from qwik.core.migrations import migrate
+            store = AliasStore()
+        else:
+            try:
+                raw = self._path.read_text(encoding="utf-8")
+                doc = tomlkit.parse(raw)
+                data: dict[str, Any] = doc.unwrap()
+                from qwik.core.migrations import migrate
 
-            pre_version = data.get("version")
-            data = migrate(data)
-            migrated = data.get("version") != pre_version
-            validated = AliasStore.model_validate(data)
-            if migrated:
-                self.save_with_backup(validated)
-            return validated
-        except (TOMLDecodeError, ValueError) as exc:
-            raise RuntimeError(
-                f"Could not read alias store at {self._path}: {exc}. "
-                f"Run `qwik doctor` to diagnose or restore from "
-                f"{self._backup_dir}."
-            ) from exc
+                pre_version = data.get("version")
+                data = migrate(data)
+                migrated = data.get("version") != pre_version
+                store = AliasStore.model_validate(data)
+                if migrated:
+                    self.save_with_backup(store)
+            except (TOMLDecodeError, ValueError) as exc:
+                raise RuntimeError(
+                    f"Could not read alias store at {self._path}: {exc}. "
+                    f"Run `qwik doctor` to diagnose or restore from "
+                    f"{self._backup_dir}."
+                ) from exc
+
+        if include_overlay:
+            self._merge_overlay(store)
+        return store
+
+    def _merge_overlay(self, store: AliasStore) -> None:
+        """Merge overlay aliases into ``store.overlay_aliases`` (non-fatal)."""
+        config_file = self._config.overlay_config_file
+        if not config_file.exists():
+            return
+        overlay_file = self._config.overlay_aliases_file
+        if not overlay_file.exists():
+            return
+        try:
+            from qwik.core.migrations import migrate as do_migrate
+
+            raw = overlay_file.read_text(encoding="utf-8")
+            data: dict[str, Any] = dict(tomlkit.parse(raw).unwrap())
+            data = do_migrate(data)
+            overlay_store = AliasStore.model_validate(data)
+            for name, alias in overlay_store.aliases.items():
+                if name not in store.aliases:
+                    store.overlay_aliases[name] = alias
+        except Exception:
+            pass
 
     def save(self, store: AliasStore) -> None:
         """Persist *store* atomically to disk.

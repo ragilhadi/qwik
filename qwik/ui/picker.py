@@ -136,7 +136,7 @@ def run_picker(
     Returns:
         The chosen alias name, or ``None`` if the user cancelled.
     """
-    if not store.aliases:
+    if not store.all_aliases():
         get_console().print(
             "[qwik.error]No aliases found. Run `qwik add` first.[/qwik.error]"
         )

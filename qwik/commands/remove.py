@@ -21,6 +21,14 @@ def remove_command(
     data = store.load()
     console = Console()
 
+    if name in data.overlay_aliases and name not in data.aliases:
+        print_error(
+            f"'{name}' is an overlay alias (read-only). "
+            f"Copy it first: qwik overlay copy --name {name}",
+            console=console,
+        )
+        raise typer.Exit(1)
+
     if name not in data.aliases:
         print_error(f'Alias "{name}" does not exist.', console=console)
         raise typer.Exit(1)

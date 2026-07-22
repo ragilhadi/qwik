@@ -89,7 +89,7 @@ def init_shell_command(
         print_error(str(exc), console=console)
         raise typer.Exit(1)
 
-    snippet = renderer.render_all(data.aliases)
+    snippet = renderer.render_all(data.all_aliases())
 
     if not install:
         console.print(snippet)
