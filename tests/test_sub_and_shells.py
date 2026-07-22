@@ -159,28 +159,25 @@ class TestInitShellInstall:
     def test_install_hook_idempotent(self, tmp_path, monkeypatch) -> None:
         from typer.testing import CliRunner
 
-        # Create a fake rc file for bash
         rc = tmp_path / ".bashrc"
         rc.write_text("# existing\n")
 
-        # Mock _rc_path to use our temp rc
-        from qwik.commands import init_shell as is_mod
-
-        orig_rc_path = is_mod._rc_path
-        is_mod._rc_path = lambda shell: rc
-
+        from qwik.config import _reset_config
+        from qwik.shells.bash import BashRenderer
         from qwik.cli import app
 
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
         runner = CliRunner()
-        # First install should work
-        r1 = runner.invoke(app, ["init", "bash", "--install"])
-        # Restore
-        is_mod._rc_path = orig_rc_path
+        runner.invoke(app, ["add", "gs", "git", "status"])
 
-        # Idempotent second install
-        is_mod._rc_path = lambda shell: rc
-        r2 = runner.invoke(app, ["init", "bash", "--install"])
-        is_mod._rc_path = orig_rc_path
+        orig = BashRenderer.rc_path
+        try:
+            BashRenderer.rc_path = lambda self: rc
+            r1 = runner.invoke(app, ["init", "bash", "--install"])
+            r2 = runner.invoke(app, ["init", "bash", "--install"])
+        finally:
+            BashRenderer.rc_path = orig
 
         assert (
             "already present" in r2.output
