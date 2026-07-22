@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from qwik.core.models import Alias
 
 __all__ = [
@@ -65,6 +66,14 @@ class ShellRenderer(ABC):
     def render_footer(self) -> str:
         """Return an optional footer emitted after alias definitions."""
         return ""
+
+    def rc_path(self) -> "Path | None":
+        """Return the RC file path for this shell, or ``None`` if unsupported."""
+        return None
+
+    def install_hook_line(self) -> str | None:
+        """Return the hook line to append to the RC file, or ``None``."""
+        return None
 
     def render_all(self, aliases: dict[str, "Alias"]) -> str:
         """Render a complete hook snippet for the given alias map.

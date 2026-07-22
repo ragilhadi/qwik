@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from qwik.shells.base import ShellRenderer
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from qwik.core.models import Alias
 
 __all__ = ["CmdRenderer"]
@@ -49,3 +50,11 @@ class CmdRenderer(ShellRenderer):
         if has_placeholders(alias.command):
             return f"REM omitted {name}: template mode unsupported in cmd"
         return f"doskey {name}={alias.command} $*"
+
+    def rc_path(self) -> "Path | None":
+        """Return ``None``; cmd has no rc file."""
+        return None
+
+    def install_hook_line(self) -> str | None:
+        """Return ``None``; cmd install is unsupported."""
+        return None

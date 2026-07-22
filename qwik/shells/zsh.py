@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from qwik.shells.base import ShellRenderer
@@ -38,3 +39,11 @@ class ZshRenderer(ShellRenderer):
             return f"{name}() {{\n" f'    qwik run "{name}" "$@"\n' f"}}"
         escaped = alias.command.replace("'", "'\"'\"'")
         return f"alias {name}='{escaped}'"
+
+    def rc_path(self) -> Path | None:
+        """Return ``~/.zshrc``."""
+        return Path.home() / ".zshrc"
+
+    def install_hook_line(self) -> str | None:
+        """Return the zsh hook line."""
+        return '\neval "$(qwik init zsh)"\n'
