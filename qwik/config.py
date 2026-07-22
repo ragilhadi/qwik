@@ -95,6 +95,21 @@ class Config:
         """
         return self.sync_repo_dir / "sync.toml"
 
+    @property
+    def overlay_config_file(self) -> Path:
+        """Return the overlay config file path."""
+        return self._config_dir / "overlay.toml"
+
+    @property
+    def overlay_repo_dir(self) -> Path:
+        """Return the directory for the cloned overlay git repo."""
+        return self._config_dir / "overlay-repo"
+
+    @property
+    def overlay_aliases_file(self) -> Path:
+        """Return the overlay repo's aliases.toml path."""
+        return self.overlay_repo_dir / "aliases.toml"
+
     def ensure_dirs(self) -> None:
         """Create all required directories if they do not exist."""
         self._config_dir.mkdir(parents=True, exist_ok=True)
