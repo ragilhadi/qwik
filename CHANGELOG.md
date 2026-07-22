@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-22
+
+### Added
+- Plugin/hook extensibility: shell renderers are now discovered via the `qwik.shell_renderers` entry-point group. Third-party packages can register custom renderers without modifying qwik core.
+- `ShellRenderer.rc_path()` and `ShellRenderer.install_hook_line()` methods let renderer plugins self-contain their rc-file path and hook installation logic.
+- CLI command plugins: commands can be registered via the `qwik.commands` entry-point group.
+- Nushell (`nu`) shell renderer with template/append modes and rc-path detection.
+- Xonsh (`xonsh`) shell renderer with template/append modes and rc-path detection.
+
+### Changed
+- `get_renderer(shell)` now uses `importlib.metadata.entry_points` instead of a hardcoded if/elif chain.
+- `SUPPORTED_SHELLS` is now derived dynamically from installed entry points via `supported_shells()`.
+- `qwik init <shell> --install` now uses `renderer.rc_path()` and `renderer.install_hook_line()` instead of hardcoded paths.
+
 ## [0.4.0] - 2026-07-19
 
 ### Added

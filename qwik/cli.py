@@ -70,6 +70,22 @@ app.command("completion")(completion_command)
 app.command("sync")(sync_command)
 
 
+def _discover_plugin_commands() -> None:
+    """Register CLI commands from the ``qwik.commands`` entry-point group."""
+    import importlib.metadata
+    import sys
+
+    for ep in importlib.metadata.entry_points(group="qwik.commands"):
+        try:
+            cmd = ep.load()
+            app.command(ep.name)(cmd)
+        except Exception as exc:
+            print(f"Warning: failed to load plugin command {ep.name!r}: {exc}", file=sys.stderr)
+
+
+_discover_plugin_commands()
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
