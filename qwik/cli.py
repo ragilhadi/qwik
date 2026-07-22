@@ -17,6 +17,7 @@ from qwik.commands.exporter import export_command
 from qwik.commands.importer import import_command
 from qwik.commands.group import group_command, ungroup_command
 from qwik.commands.init_shell import init_shell_command
+from qwik.commands.overlay import overlay_command
 from qwik.commands.list import list_command
 from qwik.commands.pick import pick_command
 from qwik.commands.remove import remove_command
@@ -68,6 +69,7 @@ app.command("init")(init_shell_command)
 app.command("doctor")(doctor_command)
 app.command("completion")(completion_command)
 app.command("sync")(sync_command)
+app.command("overlay")(overlay_command)
 
 
 def _discover_plugin_commands() -> None:
