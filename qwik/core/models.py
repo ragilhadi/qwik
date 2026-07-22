@@ -161,6 +161,8 @@ class AliasStore(BaseModel):
         """Run every alias key through the name validator."""
         for name in self.aliases:
             validate_alias_name(name)
+        for name in self.overlay_aliases:
+            validate_alias_name(name)
         return self
 
     def all_aliases(self) -> dict[str, Alias]:

@@ -9,7 +9,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from qwik.commands.init_shell import _fish_config_dir, _rc_path
+from qwik.shells.base import get_renderer
 from qwik.ui.prompts import print_error, print_info, print_success
 from qwik.ui.theme import get_console
 
@@ -95,7 +95,7 @@ def completion_command(
 
 
 def _install_bash(marker: str, console: Console) -> None:
-    rc = _rc_path("bash")
+    rc = get_renderer("bash").rc_path()
     if rc is None:
         print_error("Cannot determine rc file for bash.", console=console)
         raise typer.Exit(1)
@@ -119,7 +119,7 @@ def _install_bash(marker: str, console: Console) -> None:
 
 
 def _install_zsh(marker: str, console: Console) -> None:
-    rc = _rc_path("zsh")
+    rc = get_renderer("zsh").rc_path()
     if rc is None:
         print_error("Cannot determine rc file for zsh.", console=console)
         raise typer.Exit(1)
@@ -143,7 +143,11 @@ def _install_zsh(marker: str, console: Console) -> None:
 
 
 def _install_fish(console: Console) -> None:
-    fish_dir = _fish_config_dir()
+    rc = get_renderer("fish").rc_path()
+    if rc is None:
+        print_error("Cannot determine fish config directory.", console=console)
+        raise typer.Exit(1)
+    fish_dir = rc.parent
     script_path = fish_dir / "completions" / "qwik.fish"
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.write_text(_get_script("fish"), encoding="utf-8")
@@ -151,7 +155,7 @@ def _install_fish(console: Console) -> None:
 
 
 def _install_pwsh(marker: str, console: Console) -> None:
-    rc = _rc_path("pwsh")
+    rc = get_renderer("pwsh").rc_path()
     if rc is None:
         print_error("Cannot determine PowerShell profile path.", console=console)
         raise typer.Exit(1)

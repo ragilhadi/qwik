@@ -46,25 +46,24 @@ class TestCompletionInstall:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> Result:
-        from qwik.commands import completion as cmp_mod
-        from qwik.commands import init_shell as is_mod
+        from qwik.shells.bash import BashRenderer
+        from qwik.shells.fish import FishRenderer
+        from qwik.shells.pwsh import PwshRenderer
+        from qwik.shells.zsh import ZshRenderer
 
-        monkeypatch.setattr(
-            cmp_mod, "_rc_path", lambda s: rc if s == shell else None
-        )
-        monkeypatch.setattr(
-            is_mod, "_rc_path", lambda s: rc if s == shell else None
-        )
-        monkeypatch.setattr(
-            cmp_mod,
-            "_fish_config_dir",
-            lambda: tmp_path / "fish",
-        )
-        monkeypatch.setattr(
-            is_mod,
-            "_fish_config_dir",
-            lambda: tmp_path / "fish",
-        )
+        renderer_cls = {
+            "bash": BashRenderer,
+            "zsh": ZshRenderer,
+            "fish": FishRenderer,
+            "pwsh": PwshRenderer,
+        }.get(shell)
+        if renderer_cls is not None:
+            if shell == "fish":
+                monkeypatch.setattr(
+                    renderer_cls, "rc_path", lambda self: tmp_path / "fish" / "config.fish"
+                )
+            else:
+                monkeypatch.setattr(renderer_cls, "rc_path", lambda self: rc)
         return runner.invoke(app, ["completion", shell, "--install"])
 
     def test_install_bash(
@@ -131,19 +130,9 @@ class TestCompletionInstall:
     ) -> None:
         rc = tmp_path / "profile.ps1"
         rc.write_text("# pre-existing\n")
-        from qwik.commands import completion as cmp_mod
-        from qwik.commands import init_shell as is_mod
+        from qwik.shells.pwsh import PwshRenderer
 
-        for mod in (cmp_mod, is_mod):
-            monkeypatch.setattr(
-                mod, "_rc_path", lambda s: rc if s in {"pwsh", "powershell"} else None
-            )
-        monkeypatch.setattr(
-            cmp_mod, "_fish_config_dir", lambda: tmp_path / "fish"
-        )
-        monkeypatch.setattr(
-            is_mod, "_fish_config_dir", lambda: tmp_path / "fish"
-        )
+        monkeypatch.setattr(PwshRenderer, "rc_path", lambda self: rc)
 
         r1 = runner.invoke(app, ["completion", "powershell", "--install"])
         assert r1.exit_code == 0
@@ -155,15 +144,12 @@ class TestCompletionInstall:
     def test_install_fish_xdg(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from qwik.commands import completion as cmp_mod
+        from qwik.shells.fish import FishRenderer
 
         xdg = tmp_path / "xdg"
         xdg.mkdir()
         monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
         monkeypatch.delenv("__fish_config_dir", raising=False)
-        monkeypatch.setattr(
-            cmp_mod, "_fish_config_dir", lambda: xdg / "fish"
-        )
         result = runner.invoke(app, ["completion", "fish", "--install"])
         assert result.exit_code == 0
         script = xdg / "fish" / "completions" / "qwik.fish"

@@ -46,7 +46,10 @@ def export_command(
         import json
 
         path.write_text(
-            json.dumps(data.model_dump(mode="json"), indent=2),
+            json.dumps(
+                data.model_dump(mode="json", exclude={"overlay_aliases"}),
+                indent=2,
+            ),
             encoding="utf-8",
         )
 

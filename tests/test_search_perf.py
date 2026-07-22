@@ -21,6 +21,7 @@ def _build_store(n: int) -> AliasStore:
     return store
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize("count", [1000, 5000, 10000])
 def test_search_perf_under_200ms(count: int) -> None:
     store = _build_store(count)
@@ -36,6 +37,7 @@ def test_search_perf_under_200ms(count: int) -> None:
     assert median < 200, f"Search too slow: {median:.1f}ms for {count} aliases"
 
 
+@pytest.mark.benchmark
 def test_search_empty_query_fast() -> None:
     store = _build_store(1000)
     start = time.perf_counter()

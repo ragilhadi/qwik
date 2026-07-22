@@ -8,7 +8,6 @@ from pathlib import Path
 import tomlkit
 import typer
 
-from qwik.commands.init_shell import _fish_config_dir, _rc_path
 from qwik.commands.sync import _load_sync_config
 from qwik.config import get_config
 from qwik.core.git import behind_ahead, current_branch, git_available, is_dirty
@@ -221,13 +220,12 @@ def _hook_installed(shell: str | None) -> bool:
     """
     if shell is None:
         return False
-    rc_map: dict[str, Path | None] = {
-        "bash": Path.home() / ".bashrc",
-        "zsh": Path.home() / ".zshrc",
-        "fish": _fish_config_dir() / "config.fish",
-        "pwsh": _rc_path("pwsh"),
-    }
-    rc = rc_map.get(shell)
+    try:
+        from qwik.shells.base import get_renderer
+
+        rc = get_renderer(shell).rc_path()
+    except ValueError:
+        return False
     if rc is None or not rc.exists():
         return False
     try:

@@ -60,9 +60,10 @@ packages = ["qwik"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "--cov=qwik --cov-report=term-missing --cov-report=xml --cov-fail-under=85"
+addopts = "--cov=qwik --cov-report=term-missing --cov-report=xml --cov-fail-under=85 -m 'not benchmark'"
 markers = [
     "integration: end-to-end tests that spawn real shell subprocesses",
+    "benchmark: performance benchmarks (run manually)",
 ]
 
 [tool.coverage.run]

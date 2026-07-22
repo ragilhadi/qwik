@@ -121,13 +121,14 @@ def _do_add(
 
     if not has_remote(overlay_repo):
         add_remote(overlay_repo, url)
-    _save_overlay_config(config.overlay_config_file, url, branch)
 
     try:
         git_pull(overlay_repo, "origin", branch)
     except RuntimeError as exc:
         print_error(f"Failed to pull overlay: {exc}", console=console)
         raise typer.Exit(1)
+
+    _save_overlay_config(config.overlay_config_file, url, branch)
 
     overlay_file = config.overlay_aliases_file
     if not overlay_file.exists():
