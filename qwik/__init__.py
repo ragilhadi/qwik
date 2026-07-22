@@ -21,4 +21,4 @@ def _force_utf8(stream: Any) -> None:
 _force_utf8(sys.stdout)
 _force_utf8(sys.stderr)
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

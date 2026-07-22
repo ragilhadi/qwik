@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-07-22
+
+### Added
+- Team/shared read-only overlay store: `qwik overlay add/remove/update/list/copy` commands for merging a remote git-hosted alias set beneath the user store.
+- Overlay aliases are merged at load time (user store takes precedence); overlay-only aliases are copy-on-run (copied to user store on first execution).
+- Overlay alias protection: `rm`, `edit`, `rename` are blocked on overlay-only aliases with an actionable message.
+- TUI history view: `Ctrl-R` in the picker toggles recent-first mode sorted by `last_used`.
+- Richer picker preview: shows group, tags, usage with relative time, created date, enabled status, and description.
+- Selection stability: the picker preserves the highlighted alias across keystrokes instead of resetting to the top.
+- Search performance benchmark test at 1k/5k/10k alias counts.
+
+### Changed
+- `Store.load()` accepts `include_overlay` parameter (default `True`) to merge overlay aliases.
+- `search_aliases` and `run_picker` operate on `all_aliases()` (merged view) instead of `aliases` only.
+- `qwik init` renders `all_aliases()` so overlay aliases appear in shell hooks.
+
 ## [0.5.0] - 2026-07-22
 
 ### Added
