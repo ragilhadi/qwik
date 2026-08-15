@@ -45,39 +45,67 @@ argument quoting is POSIX-only everywhere.
 
 ---
 
-## Priority order for publishing
+## Published issues
 
-Suggested order, so the issue list reads as a coherent plan rather than a dump:
+All 31 drafts were filed on 2026-08-15 as issues **#10–#40**.
 
-| # | Title | Labels |
-|---|---|---|
-| B1 | fish append-mode aliases render as `'git status' $argv` | `bug` `shells` `correctness` |
-| B2 | xonsh hook is a SyntaxError — one template alias disables every alias | `bug` `shells` `correctness` |
-| B3 | `qwik run <alias> --flag` fails with "No such option" | `bug` `cli` `correctness` |
-| B4 | `qwik run` writes its banner to stdout, corrupting piped aliases | `bug` `cli` `correctness` |
-| B5 | Concurrent store writes silently lose aliases | `bug` `store` `data-loss` |
-| B6 | `qwik edit` silently deletes the alias's `group` | `bug` `commands` `data-loss` |
-| B7 | `import --overwrite` destroys the store behind a misleading preview | `bug` `commands` `data-loss` |
-| B8 | Imported `version` is never validated — one import bricks the CLI | `bug` `store` `correctness` |
-| B9 | Runtime quoting is POSIX-only — templates broken on cmd.exe | `bug` `windows` `correctness` |
-| B10 | `detect_shell()` returns `None` on Windows; cmd/nu/xonsh unreachable | `bug` `windows` `cross-platform` |
-| B11 | Builtin conflict check is case-sensitive; cmd/PowerShell are not | `bug` `windows` `correctness` |
-| B12 | pwsh, nu and cmd renderers never escape the command body | `bug` `shells` `security` |
-| B13 | `completion zsh --install` writes bare `compinit` | `bug` `shells` `dx` |
-| B14 | `list`/`search` say "No aliases yet" for overlay-only users | `bug` `overlay` `dx` |
-| B15 | `overlay update` installs remote commands with no preview | `bug` `overlay` `security` |
-| B16 | `search_aliases` ignores `limit` for empty queries | `bug` `correctness` |
-| B17 | Picker Ctrl+E / Ctrl+D route through `typer.testing.CliRunner` | `bug` `ui` `dx` |
-| B18 | `--no-color` ignored by rm, rename, tag, export, init | `bug` `ui` |
-| B19 | `mypy --strict` fails on master; CI installs mypy unpinned | `chore` `ci` |
-| B20 | Shell integration tests never invoke a generated alias | `chore` `testing` |
-| B21 | ruff not in CI; Sonar action `@master`; PyPI token not OIDC | `chore` `ci` `security` |
-| B22 | `qwik init` adds ~300 ms to every shell start | `bug` `performance` |
+| Ref | Issue | Title | Labels |
+|---|---|---|---|
+| B1 | [#10](https://github.com/ragilhadi/qwik/issues/10) | fish append-mode aliases render as `'git status' $argv` | `bug` `shells` `correctness` |
+| B2 | [#11](https://github.com/ragilhadi/qwik/issues/11) | xonsh hook is a SyntaxError — one template alias disables every alias | `bug` `shells` `correctness` |
+| B3 | [#12](https://github.com/ragilhadi/qwik/issues/12) | `qwik run gs --short` fails with "No such option" | `bug` `cli` `correctness` |
+| B4 | [#13](https://github.com/ragilhadi/qwik/issues/13) | `qwik run` writes its banner to stdout, corrupting piped aliases | `bug` `cli` `correctness` |
+| B5 | [#14](https://github.com/ragilhadi/qwik/issues/14) | Concurrent store writes silently lose aliases | `bug` `store` `data-loss` |
+| B6 | [#15](https://github.com/ragilhadi/qwik/issues/15) | `qwik edit` silently deletes the alias's `group` | `bug` `commands` `data-loss` |
+| B7 | [#16](https://github.com/ragilhadi/qwik/issues/16) | `import --overwrite` destroys the store behind a misleading preview | `bug` `commands` `data-loss` |
+| B8 | [#17](https://github.com/ragilhadi/qwik/issues/17) | Imported `version` is never validated — one import bricks the CLI | `bug` `store` `correctness` |
+| B9 | [#18](https://github.com/ragilhadi/qwik/issues/18) | Runtime quoting is POSIX-only — templates broken on cmd.exe | `bug` `windows` `security` |
+| B10 | [#19](https://github.com/ragilhadi/qwik/issues/19) | `detect_shell()` returns `None` on Windows; cmd/nu/xonsh unreachable | `bug` `windows` `cross-platform` |
+| B11 | [#20](https://github.com/ragilhadi/qwik/issues/20) | Builtin conflict check is case-sensitive; cmd/PowerShell are not | `bug` `windows` `correctness` |
+| B12 | [#21](https://github.com/ragilhadi/qwik/issues/21) | pwsh, nu and cmd renderers never escape the command body | `bug` `shells` `security` |
+| B13 | [#22](https://github.com/ragilhadi/qwik/issues/22) | `completion zsh --install` writes bare `compinit` | `bug` `shells` `dx` |
+| B14 | [#23](https://github.com/ragilhadi/qwik/issues/23) | `list`/`search` say "No aliases yet" for overlay-only users | `bug` `overlay` `dx` |
+| B15 | [#24](https://github.com/ragilhadi/qwik/issues/24) | `overlay update` installs remote commands with no preview | `bug` `overlay` `security` |
+| B16 | [#25](https://github.com/ragilhadi/qwik/issues/25) | `search_aliases` ignores `limit` for empty queries | `bug` `correctness` |
+| B17 | [#26](https://github.com/ragilhadi/qwik/issues/26) | Picker Ctrl+E / Ctrl+D route through `typer.testing.CliRunner` | `bug` `ui` `dx` |
+| B18 | [#27](https://github.com/ragilhadi/qwik/issues/27) | `--no-color` ignored by rm, rename, tag, export, init | `bug` `ui` |
+| B19 | [#28](https://github.com/ragilhadi/qwik/issues/28) | `mypy --strict` fails on master; CI installs mypy unpinned | `chore` `ci` |
+| B20 | [#29](https://github.com/ragilhadi/qwik/issues/29) | Shell integration tests never invoke a generated alias | `chore` `testing` |
+| B21 | [#30](https://github.com/ragilhadi/qwik/issues/30) | ruff not in CI; Sonar action `@master`; PyPI token not OIDC | `chore` `ci` `security` |
+| B22 | [#31](https://github.com/ragilhadi/qwik/issues/31) | `qwik init` adds ~300 ms to every shell start | `bug` `performance` |
+| F1 | [#32](https://github.com/ragilhadi/qwik/issues/32) | `qwik undo` — front door for the backup directory | `feature` `store` `dx` |
+| F2 | [#33](https://github.com/ragilhadi/qwik/issues/33) | `qwik doctor --fix` — non-interactive repair | `feature` `commands` `dx` |
+| F3 | [#34](https://github.com/ragilhadi/qwik/issues/34) | Platform-conditional alias commands | `feature` `store` `cross-platform` |
+| F4 | [#35](https://github.com/ragilhadi/qwik/issues/35) | Native template rendering | `feature` `shells` `performance` |
+| F5 | [#36](https://github.com/ragilhadi/qwik/issues/36) | `qwik suggest` — mine shell history | `feature` `commands` `dx` |
+| F6 | [#37](https://github.com/ragilhadi/qwik/issues/37) | `qwik stats` — usage dashboard | `feature` `commands` `dx` |
+| F7 | [#38](https://github.com/ragilhadi/qwik/issues/38) | Argument-aware completions for aliases | `feature` `shells` `dx` |
+| F8 | [#39](https://github.com/ragilhadi/qwik/issues/39) | Project-scoped aliases (`.qwik.toml`) | `feature` `store` `security` |
+| F9 | [#40](https://github.com/ragilhadi/qwik/issues/40) | Overlay trust model v2 | `feature` `overlay` `security` |
 
-## Labels to create first
+### Milestone dependency graph
+
+```
+v1.1  #32 undo ────────── needs #14 #16 #17
+      #33 doctor --fix ── needs #17
+
+v1.2  #34 platforms ───── needs #19
+      #35 native tmpl ─── needs #21 #31
+
+v1.3  #36 suggest ─────── needs #31
+      #37 stats ───────── needs #14
+      #38 completions ─── needs #35
+
+v1.4  #39 project ─────── needs #23 #24 #31
+      #40 overlay v2 ──── needs #24 #32
+```
+
+## Labels
+
+Auto-created on first use (all default grey — worth recolouring by group):
 
 **Type:** `bug`, `feature`, `chore`
-**Component:** `shells`, `store`, `cli`, `commands`, `ui`, `sync`, `overlay`, `ci`
+**Component:** `shells`, `store`, `cli`, `commands`, `ui`, `overlay`, `ci`
 **Concern:** `correctness`, `data-loss`, `windows`, `cross-platform`, `security`,
 `dx`, `performance`, `documentation`, `testing`
 
