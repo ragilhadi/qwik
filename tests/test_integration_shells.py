@@ -1,9 +1,31 @@
-"""End-to-end tests: source generated hooks in real shells."""
+"""End-to-end tests: source generated hooks in real shells and invoke the
+resulting aliases exactly as an interactive user would.
+
+Every test writes the rendered hook plus an alias invocation to a small
+script file and runs it through the real shell binary, then asserts on
+*exact* stdout/stderr — never a substring, an ``or`` across streams, or a
+tolerant set of exit codes. A weak assertion is what let the fish and
+xonsh renderers ship completely broken with a green suite: the previous
+version of this file mostly invoked ``qwik run`` (the substitution
+engine, already covered by unit tests) rather than the alias the
+renderer actually emits, so it could never have caught a rendering bug.
+
+Hook + invocation are joined with a newline, not a semicolon, and read
+from a script file rather than passed as a single ``-c`` string. Both
+bash and zsh only refresh their alias table at a line boundary; a
+same-line ``hook; alias-name`` is parsed as one unit before the alias
+definition takes effect and fails with "command not found" even though
+the alias would work fine sourced from an rc file, which is exactly how
+these hooks are used in practice.
+"""
+
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -12,42 +34,108 @@ from qwik.cli import app
 
 runner = CliRunner()
 
+# Exact expected output of `git status` on a freshly committed, clean
+# repo checked out on "trunk" (see the git_repo fixture), and of
+# `git checkout main` from there. git always writes the checkout message
+# to stderr, never stdout, regardless of shell.
+GIT_STATUS_CLEAN = "On branch trunk\nnothing to commit, working tree clean\n"
+SWITCHED_TO_MAIN = "Switched to branch 'main'\n"
+
+# One append-mode alias whose command contains a single-quoted argument —
+# the same adversarial case the render_all snapshot tests pin (see
+# tests/test_shell_snapshots.py) — run for real here to prove the quoting
+# each renderer applies actually round-trips through its shell.
+QUOTED_ECHO_OUTPUT = "hello world\n"
+
+_SCRIPT_EXT = {
+    "bash": ".sh",
+    "zsh": ".zsh",
+    "fish": ".fish",
+    "pwsh": ".ps1",
+    "nu": ".nu",
+    "xonsh": ".xsh",
+}
+
+# bash disables alias expansion in non-interactive shells unless told
+# otherwise; an interactive shell (the only place a real .bashrc runs)
+# has this on by default, so this is a test-harness accommodation, not a
+# change in what's being tested.
+_SHELL_PRELUDE = {"bash": "shopt -s expand_aliases"}
+
+HOOK_TESTED_SHELLS = ["bash", "zsh", "fish", "pwsh", "nu", "xonsh"]
+
 
 def _shell_available(name: str) -> bool:
     return shutil.which(name) is not None
 
 
+def _require_shell(name: str) -> None:
+    """Skip, unless ``QWIK_REQUIRE_SHELLS`` demands the shell exist.
+
+    Silent skips are how a shell quietly falling out of a CI image goes
+    unnoticed. Set ``QWIK_REQUIRE_SHELLS=1`` in CI once every shell under
+    test is actually installed, and a missing one becomes a hard failure.
+    """
+    if _shell_available(name):
+        return
+    if os.environ.get("QWIK_REQUIRE_SHELLS"):
+        pytest.fail(f"{name} is required by QWIK_REQUIRE_SHELLS but is not installed")
+    pytest.skip(f"{name} not installed")
+
+
 def _qwik_env() -> dict[str, str]:
     """Environment for qwik subprocesses: force UTF-8 stdio on Windows."""
-    import os
-
     env = dict(os.environ)
     env.setdefault("PYTHONUTF8", "1")
     env.setdefault("PYTHONIOENCODING", "utf-8")
     return env
 
 
+def _shell_invocation(shell: str, script: Path) -> list[str]:
+    if shell == "pwsh":
+        return ["pwsh", "-NoProfile", "-File", str(script)]
+    return [shell, str(script)]
+
+
+def _render_hook(shell: str) -> str:
+    return subprocess.run(
+        ["qwik", "init", shell], capture_output=True, text=True, check=True, env=_qwik_env()
+    ).stdout
+
+
+def _run_hook_script(
+    shell: str, hook: str, command: str, cwd: Path, tmp_path: Path
+) -> subprocess.CompletedProcess[str]:
+    lines = [_SHELL_PRELUDE[shell]] if shell in _SHELL_PRELUDE else []
+    lines += [hook, command]
+    script = tmp_path / f"hook_{shell}{_SCRIPT_EXT[shell]}"
+    script.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return subprocess.run(
+        _shell_invocation(shell, script),
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        env=_qwik_env(),
+    )
+
+
 @pytest.fixture
 def qwik_store(tmp_path, monkeypatch):
     from qwik.config import _reset_config
+
     monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
     _reset_config()
     runner.invoke(app, ["add", "gs", "git", "status"])
     runner.invoke(app, ["add", "gco", "git", "checkout", "{1}"])
+    runner.invoke(app, ["add", "lsg", "echo", "'hello", "world'"])
     return tmp_path
 
 
 @pytest.fixture
 def git_repo(tmp_path):
-    """A real git repo with a ``main`` branch to check out into.
-
-    The ``gco main`` tests below run in whatever directory the test
-    process's cwd is; asserting on git's own success/failure text only
-    makes sense if "main" actually exists as a branch there. Rather than
-    depend on this repository's own default branch (which is "master",
-    not "main"), build an isolated repo with a real "main" branch and
-    run the shell subprocess with this as its cwd — deterministic
-    regardless of the ambient environment.
+    """A real git repo with a ``main`` branch to check out into, on
+    ``trunk`` so that a clean ``git status`` has deterministic, exact
+    output regardless of this repository's own default branch name.
     """
     repo = tmp_path / "workdir"
     repo.mkdir()
@@ -66,33 +154,44 @@ def git_repo(tmp_path):
 
 
 @pytest.mark.integration
-def test_bash_hook_runs_alias(qwik_store, tmp_path):
-    if not _shell_available("bash"):
-        pytest.skip("bash not installed")
-    rcfile = tmp_path / "bashrc"
-    hook = subprocess.run(
-        ["qwik", "init", "bash"], capture_output=True, text=True, check=True, env=_qwik_env()
-    ).stdout
-    rcfile.write_text(f"{hook}\n", encoding="utf-8")
-    result = subprocess.run(
-        ["bash", "-c", f"source {rcfile}; qwik run gs"],
-        capture_output=True, text=True, env=_qwik_env(),
-    )
-    assert result.returncode in (0, 1, 128)
+@pytest.mark.parametrize("shell", HOOK_TESTED_SHELLS)
+def test_hook_runs_append_mode_alias(shell, qwik_store, git_repo, tmp_path):
+    """``gs`` (append mode, no placeholders) prints exactly what
+    ``git status`` prints, with nothing on stderr.
+    """
+    _require_shell(shell)
+    hook = _render_hook(shell)
+    result = _run_hook_script(shell, hook, "gs", git_repo, tmp_path)
+    assert result.stderr == "", result.stderr
+    assert result.stdout == GIT_STATUS_CLEAN
 
 
 @pytest.mark.integration
-def test_zsh_hook_runs_alias(qwik_store, git_repo, tmp_path):
-    if not _shell_available("zsh"):
-        pytest.skip("zsh not installed")
-    hook = subprocess.run(
-        ["qwik", "init", "zsh"], capture_output=True, text=True, check=True, env=_qwik_env()
-    ).stdout
-    result = subprocess.run(
-        ["zsh", "-c", f"{hook}; gco main"],
-        capture_output=True, text=True, env=_qwik_env(), cwd=git_repo,
-    )
-    assert "Switched to branch" in result.stdout or "Switched to branch" in result.stderr
+@pytest.mark.parametrize("shell", HOOK_TESTED_SHELLS)
+def test_hook_runs_template_mode_alias(shell, qwik_store, git_repo, tmp_path):
+    """``gco main`` (template mode, ``{1}`` substitution) runs
+    ``git checkout main`` exactly, with nothing on stdout.
+    """
+    _require_shell(shell)
+    hook = _render_hook(shell)
+    result = _run_hook_script(shell, hook, "gco main", git_repo, tmp_path)
+    assert result.stdout == "", result.stdout
+    assert result.stderr == SWITCHED_TO_MAIN
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shell", HOOK_TESTED_SHELLS)
+def test_hook_runs_quoted_append_mode_alias(shell, qwik_store, tmp_path):
+    """``lsg`` carries a single-quoted argument in its command text —
+    the adversarial case the render_all snapshots pin. Each renderer's
+    escaping must round-trip through its own shell back to a literal
+    ``hello world``, not a shell-interpreted fragment of it.
+    """
+    _require_shell(shell)
+    hook = _render_hook(shell)
+    result = _run_hook_script(shell, hook, "lsg", tmp_path, tmp_path)
+    assert result.stderr == "", result.stderr
+    assert result.stdout == QUOTED_ECHO_OUTPUT
 
 
 @pytest.mark.integration
@@ -100,8 +199,7 @@ def test_zsh_completion_install_clean_startup(qwik_store, tmp_path):
     # Regression: the installed block called bare `compinit` with no
     # `autoload -Uz compinit` first, so every new zsh session printed
     # "command not found: compinit" and completions never activated.
-    if not _shell_available("zsh"):
-        pytest.skip("zsh not installed")
+    _require_shell("zsh")
     rc = tmp_path / ".zshrc"
     rc.write_text("", encoding="utf-8")
     env = _qwik_env()
@@ -122,49 +220,28 @@ def test_zsh_completion_install_clean_startup(qwik_store, tmp_path):
 
 
 @pytest.mark.integration
-def test_fish_hook_runs_alias(qwik_store, git_repo, tmp_path):
-    if not _shell_available("fish"):
-        pytest.skip("fish not installed")
-    hook = subprocess.run(
-        ["qwik", "init", "fish"], capture_output=True, text=True, check=True, env=_qwik_env()
-    ).stdout
+def test_cmd_hook_runs_append_mode_alias(qwik_store, git_repo, tmp_path):
+    # doskey macros are only expanded when cmd.exe reads commands through
+    # its own line-input processing — the interactive console or a piped
+    # stdin — never when running a .bat/.cmd file, so the hook and the
+    # alias invocation are fed to cmd via stdin rather than as a script
+    # argument (unlike every other shell tested above).
+    if sys.platform != "win32":
+        pytest.skip("cmd.exe only available on Windows")
+    _require_shell("cmd")
+    hook = _render_hook("cmd")
+    script = f"{hook}\r\ngs\r\n"
     result = subprocess.run(
-        ["fish", "-c", f"{hook}; gco main"],
-        capture_output=True, text=True, env=_qwik_env(), cwd=git_repo,
+        ["cmd", "/Q"],
+        input=script,
+        cwd=git_repo,
+        capture_output=True,
+        text=True,
+        env=_qwik_env(),
     )
-    assert "Switched to branch" in result.stdout or "Switched to branch" in result.stderr
-
-
-@pytest.mark.integration
-def test_fish_hook_runs_append_mode_alias(qwik_store, tmp_path):
-    if not _shell_available("fish"):
-        pytest.skip("fish not installed")
-    hook = subprocess.run(
-        ["qwik", "init", "fish"], capture_output=True, text=True, check=True, env=_qwik_env()
-    ).stdout
-    result = subprocess.run(
-        ["fish", "-c", f"{hook}; gs"],
-        capture_output=True, text=True, env=_qwik_env(),
-    )
-    assert "Unknown command" not in result.stderr
-    assert result.returncode in (0, 1, 128)
-
-
-@pytest.mark.integration
-def test_xonsh_hook_parses_and_runs_template_alias(qwik_store, git_repo, tmp_path):
-    if not _shell_available("xonsh"):
-        pytest.skip("xonsh not installed")
-    hook_path = tmp_path / "hook.xsh"
-    hook = subprocess.run(
-        ["qwik", "init", "xonsh"], capture_output=True, text=True, check=True, env=_qwik_env()
-    ).stdout
-    hook_path.write_text(hook, encoding="utf-8")
-    result = subprocess.run(
-        ["xonsh", "-c", f"execx(open(r'{hook_path}').read()); gco main"],
-        capture_output=True, text=True, env=_qwik_env(), cwd=git_repo,
-    )
-    assert "SyntaxError" not in result.stderr
-    assert "Switched to branch" in result.stdout or "Switched to branch" in result.stderr
+    assert "is not recognized" not in result.stdout
+    assert "On branch trunk" in result.stdout
+    assert "nothing to commit, working tree clean" in result.stdout
 
 
 @pytest.mark.integration
@@ -216,17 +293,3 @@ def test_run_pwsh_quoting_preserves_spaced_argument(tmp_path):
     result = subprocess.run(["qwik", "run", "argecho", "my branch"], env=env)
     assert result.returncode == 0
     assert marker.read_text(encoding="utf-8") == "['my branch']"
-
-
-@pytest.mark.integration
-def test_pwsh_hook_runs_alias(qwik_store, git_repo, tmp_path):
-    if not _shell_available("pwsh"):
-        pytest.skip("pwsh not installed")
-    hook = subprocess.run(
-        ["qwik", "init", "pwsh"], capture_output=True, text=True, check=True, env=_qwik_env()
-    ).stdout
-    result = subprocess.run(
-        ["pwsh", "-NoProfile", "-Command", f"{hook}; gco main"],
-        capture_output=True, text=True, env=_qwik_env(), cwd=git_repo,
-    )
-    assert "Switched to branch" in result.stdout or "Switched to branch" in result.stderr
