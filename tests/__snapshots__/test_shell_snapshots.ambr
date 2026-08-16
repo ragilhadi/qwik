@@ -73,8 +73,7 @@
   '''
   aliases["bsg"] = "echo hello\\"
   aliases["envg"] = "echo $HOME %USERPROFILE%"
-  def gco(*args):
-      qwik run("gco", *args)
+  aliases["gco"] = ["qwik", "run", "gco"]
   aliases["gs"] = "git status"
   aliases["lsg"] = "echo 'hello world'"
   '''

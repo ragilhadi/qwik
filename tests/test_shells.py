@@ -126,8 +126,19 @@ class TestRenderers:
     def test_xonsh_template_function(self) -> None:
         renderer = get_renderer("xonsh")
         out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
-        assert 'qwik run' in out
-        assert "gco" in out
+        assert out == 'aliases["gco"] = ["qwik", "run", "gco"]'
+        # Must be a list alias (xonsh appends CLI args to it), not a Python
+        # call expression like `qwik run(...)`, which is a SyntaxError.
+        compile(out, "<xonsh-hook>", "exec")
+
+    def test_xonsh_template_function_is_valid_python(self) -> None:
+        renderer = get_renderer("xonsh")
+        store = {
+            "gco": Alias(command="git checkout {1}"),
+            "gs": Alias(command="git status"),
+        }
+        rendered = renderer.render_all(store)
+        compile(rendered, "<xonsh-hook>", "exec")
 
     def test_xonsh_append_alias(self) -> None:
         renderer = get_renderer("xonsh")

@@ -124,6 +124,23 @@ def test_fish_hook_runs_append_mode_alias(qwik_store, tmp_path):
 
 
 @pytest.mark.integration
+def test_xonsh_hook_parses_and_runs_template_alias(qwik_store, git_repo, tmp_path):
+    if not _shell_available("xonsh"):
+        pytest.skip("xonsh not installed")
+    hook_path = tmp_path / "hook.xsh"
+    hook = subprocess.run(
+        ["qwik", "init", "xonsh"], capture_output=True, text=True, check=True, env=_qwik_env()
+    ).stdout
+    hook_path.write_text(hook, encoding="utf-8")
+    result = subprocess.run(
+        ["xonsh", "-c", f"execx(open(r'{hook_path}').read()); gco main"],
+        capture_output=True, text=True, env=_qwik_env(), cwd=git_repo,
+    )
+    assert "SyntaxError" not in result.stderr
+    assert "Switched to branch" in result.stdout or "Switched to branch" in result.stderr
+
+
+@pytest.mark.integration
 def test_pwsh_hook_runs_alias(qwik_store, git_repo, tmp_path):
     if not _shell_available("pwsh"):
         pytest.skip("pwsh not installed")
