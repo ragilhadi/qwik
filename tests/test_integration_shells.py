@@ -81,6 +81,21 @@ def test_fish_hook_runs_alias(qwik_store, tmp_path):
 
 
 @pytest.mark.integration
+def test_fish_hook_runs_append_mode_alias(qwik_store, tmp_path):
+    if not _shell_available("fish"):
+        pytest.skip("fish not installed")
+    hook = subprocess.run(
+        ["qwik", "init", "fish"], capture_output=True, text=True, check=True, env=_qwik_env()
+    ).stdout
+    result = subprocess.run(
+        ["fish", "-c", f"{hook}; gs"],
+        capture_output=True, text=True, env=_qwik_env(),
+    )
+    assert "Unknown command" not in result.stderr
+    assert result.returncode in (0, 1, 128)
+
+
+@pytest.mark.integration
 def test_pwsh_hook_runs_alias(qwik_store, tmp_path):
     if not _shell_available("pwsh"):
         pytest.skip("pwsh not installed")
