@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
@@ -26,7 +28,29 @@ from qwik.ui.theme import get_console
 if TYPE_CHECKING:
     from qwik.core.models import Alias, AliasStore
 
-__all__ = ["run_picker"]
+__all__ = ["run_picker", "PickerAction", "PickerResult"]
+
+
+class PickerAction(Enum):
+    """What the user asked the picker to do with the selected alias."""
+
+    RUN = "run"
+    EDIT = "edit"
+    DELETE = "delete"
+
+
+@dataclass(frozen=True)
+class PickerResult:
+    """The alias name and action chosen when the picker exits.
+
+    Replaces the previous ``"__edit__:name"`` / ``"__delete__:name"``
+    string-prefix protocol, which relied on ``:`` being forbidden in
+    alias names to disambiguate an action from a literal alias — fragile
+    to rely on, and impossible to express in the type system.
+    """
+
+    action: PickerAction
+    name: str
 
 
 def _build_style() -> PTStyle:
@@ -75,7 +99,7 @@ class _PickerState:
     def __init__(self) -> None:
         self.selected_index: int = 0
         self.results: list[tuple[str, Alias, float]] = []
-        self.selected_name: str | None = None
+        self.selected_result: PickerResult | None = None
         self.history_mode: bool = False
 
 
@@ -111,7 +135,8 @@ def _bind_keys(
     @kb.add("enter")
     def _enter(event) -> None:  # type: ignore[no-untyped-def]
         if state.results and state.selected_index < len(state.results):
-            state.selected_name = state.results[state.selected_index][0]
+            name = state.results[state.selected_index][0]
+            state.selected_result = PickerResult(PickerAction.RUN, name)
             event.app.exit()
 
     @kb.add("c-c")
@@ -122,13 +147,15 @@ def _bind_keys(
     @kb.add("c-e")
     def _edit(event) -> None:  # type: ignore[no-untyped-def]
         if state.results and state.selected_index < len(state.results):
-            state.selected_name = f"__edit__:{state.results[state.selected_index][0]}"
+            name = state.results[state.selected_index][0]
+            state.selected_result = PickerResult(PickerAction.EDIT, name)
             event.app.exit()
 
     @kb.add("c-d")
     def _delete(event) -> None:  # type: ignore[no-untyped-def]
         if state.results and state.selected_index < len(state.results):
-            state.selected_name = f"__delete__:{state.results[state.selected_index][0]}"
+            name = state.results[state.selected_index][0]
+            state.selected_result = PickerResult(PickerAction.DELETE, name)
             event.app.exit()
 
     @kb.add("c-r")
@@ -142,14 +169,15 @@ def run_picker(
     *,
     input_: Input | None = None,
     output: Output | None = None,
-) -> str | None:
-    """Run the interactive fuzzy picker and return the selected alias name.
+) -> PickerResult | None:
+    """Run the interactive fuzzy picker and return the chosen action.
 
     Args:
         store: The alias database.
 
     Returns:
-        The chosen alias name, or ``None`` if the user cancelled.
+        A :class:`PickerResult` naming the alias and the action the user
+        chose (run/edit/delete), or ``None`` if the user cancelled.
     """
     if not store.all_aliases():
         get_console().print(
@@ -228,7 +256,7 @@ def run_picker(
     _refresh(store, state, result_window, preview_window, "")
     app.run()
 
-    return state.selected_name
+    return state.selected_result
 
 
 def _refresh(
