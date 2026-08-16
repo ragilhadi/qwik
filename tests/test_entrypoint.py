@@ -10,7 +10,7 @@ class TestEntrypoint:
     def test_main_entrypoint(self) -> None:
         import qwik.__main__ as m
 
-        assert hasattr(m, "app")
+        assert hasattr(m, "main_entrypoint")
 
     def test_main_py_line_6(self) -> None:
         result = subprocess.run(
@@ -24,9 +24,9 @@ class TestEntrypoint:
     def test_main_executes(self) -> None:
         import qwik.__main__ as m
 
-        assert callable(m.app)
+        assert callable(m.main_entrypoint)
 
     def test_main_module_executes(self) -> None:
         import qwik.__main__ as m
 
-        assert callable(m.app)
+        assert callable(m.main_entrypoint)

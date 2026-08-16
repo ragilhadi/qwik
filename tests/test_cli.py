@@ -329,6 +329,25 @@ class TestRunCommand:
         result = runner.invoke(app, ["run", "echo2", "world"])
         assert result.exit_code == 0
 
+    def test_run_accepts_dash_prefixed_args(self, clean_store) -> None:
+        # Previously Click parsed `--short` as an unknown option of `qwik`
+        # itself and aborted with "No such option" before the alias ran.
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        result = runner.invoke(app, ["run", "gs", "--short"])
+        assert result.exit_code == 0
+        assert "No such option" not in result.output
+
+    def test_run_double_dash_marks_end_of_options(self, clean_store) -> None:
+        runner.invoke(app, ["add", "echo2", "echo", "{1}"])
+        result = runner.invoke(app, ["run", "echo2", "--", "--not-an-option"])
+        assert result.exit_code == 0
+        assert "No such option" not in result.output
+
+    def test_run_help_still_shows_run_help(self, clean_store) -> None:
+        result = runner.invoke(app, ["run", "--help"])
+        assert result.exit_code == 0
+        assert "run" in result.output.lower()
+
 
 class TestShortcutFlags:
     def test_version_flag(self, clean_store) -> None:
@@ -347,6 +366,73 @@ class TestShortcutFlags:
         # Subprocess execution inside CliRunner may fail due to pseudo-tty;
         # verify it at least parses and attempts to run.
         assert result.exit_code in (0, 1)
+
+
+class TestRunShortcutEntrypoint:
+    """`-r`/`--run` with trailing args must go through `main_entrypoint`.
+
+    Click's Group dispatch always claims the first leftover positional
+    token as a subcommand candidate, so `qwik -r gs --short` can never work
+    through plain `runner.invoke(app, [...])` — it has to be intercepted
+    from sys.argv before Click parses anything, which is what
+    `main_entrypoint` does.
+    """
+
+    def test_dash_r_with_extra_flag_runs_alias(self, clean_store, monkeypatch) -> None:
+        import sys
+
+        from qwik.cli import main_entrypoint
+
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        monkeypatch.setattr(sys, "argv", ["qwik", "-r", "gs", "--short"])
+        with pytest.raises(SystemExit) as exc:
+            main_entrypoint()
+        assert exc.value.code in (0, 1)
+
+    def test_dash_r_double_dash_strips_separator(self, clean_store, monkeypatch) -> None:
+        import sys
+
+        from qwik.cli import main_entrypoint
+
+        runner.invoke(app, ["add", "echo2", "echo", "{1}"])
+        monkeypatch.setattr(sys, "argv", ["qwik", "-r", "echo2", "--", "--not-an-option"])
+        with pytest.raises(SystemExit) as exc:
+            main_entrypoint()
+        assert exc.value.code == 0
+
+    def test_dash_r_without_name_errors(self, clean_store, monkeypatch) -> None:
+        import sys
+
+        from qwik.cli import main_entrypoint
+
+        monkeypatch.setattr(sys, "argv", ["qwik", "-r"])
+        with pytest.raises(SystemExit) as exc:
+            main_entrypoint()
+        assert exc.value.code == 1
+
+    def test_no_shortcut_falls_through_to_app(self, clean_store, monkeypatch) -> None:
+        import sys
+
+        from qwik.cli import main_entrypoint
+
+        monkeypatch.setattr(sys, "argv", ["qwik", "-v"])
+        with pytest.raises(SystemExit) as exc:
+            main_entrypoint()
+        assert exc.value.code == 0
+
+    def test_dash_r_only_intercepted_as_first_token(self, clean_store, monkeypatch) -> None:
+        # A literal "-r" passed *to* the `run` subcommand (not as the
+        # top-level shortcut) must not be hijacked by the entrypoint's
+        # sys.argv scan — only argv[1] == "-r"/"--run" triggers it.
+        import sys
+
+        from qwik.cli import main_entrypoint
+
+        runner.invoke(app, ["add", "echo2", "echo", "{1}"])
+        monkeypatch.setattr(sys, "argv", ["qwik", "run", "echo2", "-r"])
+        with pytest.raises(SystemExit) as exc:
+            main_entrypoint()
+        assert exc.value.code == 0
 
 
 class TestSubcommandDispatch:

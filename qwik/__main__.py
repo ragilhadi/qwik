@@ -1,6 +1,6 @@
 """Allow running ``python -m qwik``."""
 
-from qwik.cli import app
+from qwik.cli import main_entrypoint
 
 if __name__ == "__main__":
-    app()
+    main_entrypoint()
