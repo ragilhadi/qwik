@@ -195,7 +195,9 @@ on `add`, `list`, and `search` to filter by group.
 ```bash
 qwik export ~/aliases.toml             # share / backup
 qwik import ~/aliases.toml             # merge
-qwik import ~/aliases.toml --overwrite
+qwik import ~/aliases.toml --overwrite # replace the whole store — aliases
+                                        # not in the file are deleted; the
+                                        # preview lists them before you confirm
 ```
 
 ### `sync` — Dotfile sharing across machines

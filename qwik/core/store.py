@@ -212,18 +212,25 @@ class Store:
             if after != before:
                 self.save_with_backup(data)
 
-    def save_with_backup(self, store: AliasStore) -> None:
+    def save_with_backup(self, store: AliasStore) -> Path | None:
         """Persist *store* after creating a backup of the existing file.
 
         Args:
             store: The in-memory alias database to write.
+
+        Returns:
+            The path of the backup file created, or ``None`` if there was
+            no existing store to back up.
         """
         self._config.ensure_dirs()
+        backup_path: Path | None = None
         if self._path.exists():
             backup_name = f"aliases-{_now_stamp()}.toml"
-            shutil.copy2(self._path, self._backup_dir / backup_name)
+            backup_path = self._backup_dir / backup_name
+            shutil.copy2(self._path, backup_path)
             self._rotate_backups()
         self.save(store)
+        return backup_path
 
     def _rotate_backups(self) -> None:
         """Prune old backups so that at most :data:`_MAX_BACKUPS` remain."""
