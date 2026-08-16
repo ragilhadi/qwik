@@ -33,6 +33,9 @@ def _get_script(shell: str) -> str:
 
 
 def _marker(shell: str) -> str:
+    if shell == "zsh":
+        # See _ZSH_MARKER_V1 below for why zsh's marker is versioned.
+        return "# qwik completion (zsh) v2"
     return f"# qwik completion ({shell})"
 
 
@@ -112,10 +115,46 @@ def _install_bash(marker: str, console: Console) -> None:
         return
     if rc.exists():
         _backup(rc, console)
-    source_line = f"\n{marker}\nsource ~/.bash_completions/qwik.sh\n"
+    # Write the path this install actually resolved and wrote to, not a
+    # hardcoded `~/...` literal — the two only agree when rc.parent is
+    # $HOME, which isn't guaranteed (e.g. $QWIK_CONFIG_DIR-style overrides
+    # or a non-default rc location).
+    source_line = f"\n{marker}\nsource {script_path}\n"
     with rc.open("a", encoding="utf-8") as fh:
         fh.write(source_line)
     print_success(f"Added source line to {rc}", console=console)
+
+
+# v2: the v1 block appended a bare `compinit` with no `autoload -Uz
+# compinit` first — compinit is an autoloadable function, not a builtin,
+# so every new zsh session printed "command not found: compinit" and
+# completions never activated. The marker is versioned so a rerun of
+# `qwik completion zsh --install` detects and replaces a v1 block instead
+# of reporting "already installed" and leaving the broken one in place.
+_ZSH_MARKER_V1 = "# qwik completion (zsh)"
+
+
+def _strip_legacy_zsh_block(rc_content: str) -> str:
+    """Remove a v1 zsh completion block (marker + its 2 known lines)."""
+    lines = rc_content.splitlines(keepends=True)
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        if lines[i].strip() == _ZSH_MARKER_V1:
+            # v1 always wrote exactly: marker, fpath line, compinit line
+            # (see the pre-fix source), preceded by one blank line.
+            j = i + 1
+            while j < len(lines) and lines[j].strip() in (
+                "fpath=($HOME/.zfunc $fpath)", "compinit",
+            ):
+                j += 1
+            if out and out[-1].strip() == "":
+                out.pop()
+            i = j
+            continue
+        out.append(lines[i])
+        i += 1
+    return "".join(out)
 
 
 def _install_zsh(marker: str, console: Console) -> None:
@@ -131,12 +170,30 @@ def _install_zsh(marker: str, console: Console) -> None:
 
     rc.parent.mkdir(parents=True, exist_ok=True)
     rc_content = rc.read_text(encoding="utf-8") if rc.exists() else ""
-    if marker in rc_content:
+    # Line-exact match: `_ZSH_MARKER_V1` is a string-prefix of the v2
+    # marker, so a naive `in` check would misfire on a file that only has
+    # the v2 block.
+    has_legacy = any(
+        line.strip() == _ZSH_MARKER_V1 for line in rc_content.splitlines()
+    )
+    if marker in rc_content and not has_legacy:
         print_info("already installed", console=console)
         return
     if rc.exists():
         _backup(rc, console)
-    hook_line = f"\n{marker}\nfpath=($HOME/.zfunc $fpath)\ncompinit\n"
+    if has_legacy:
+        rc_content = _strip_legacy_zsh_block(rc_content)
+        rc.write_text(rc_content, encoding="utf-8")
+        print_info("Repaired a previously broken compinit block.", console=console)
+    # Guard against calling compinit a second time when the user's own
+    # framework (oh-my-zsh, prezto) or a later line in their rc already
+    # did — a second call is slow and can emit insecure-directory
+    # warnings. `compdef` is only ever defined by a completed compinit run.
+    hook_line = (
+        f"\n{marker}\n"
+        f"fpath=({script_path.parent} $fpath)\n"
+        f"(( $+functions[compdef] )) || {{ autoload -Uz compinit; compinit; }}\n"
+    )
     with rc.open("a", encoding="utf-8") as fh:
         fh.write(hook_line)
     print_success(f"Added fpath/compinit to {rc}", console=console)

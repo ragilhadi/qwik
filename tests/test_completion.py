@@ -93,6 +93,93 @@ class TestCompletionInstall:
         assert "compdef" in script.read_text()
         assert "# qwik completion (zsh)" in rc.read_text()
 
+    def test_install_zsh_includes_autoload(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Regression: the appended block called bare `compinit` with no
+        # `autoload -Uz compinit` first. compinit is an autoloadable
+        # function, not a builtin, so every new zsh session printed
+        # "command not found: compinit" and completions never activated.
+        rc = tmp_path / ".zshrc"
+        rc.write_text("# pre-existing\n")
+        result = self._run_install("zsh", rc, monkeypatch, tmp_path)
+        assert result.exit_code == 0
+        text = rc.read_text()
+        assert "autoload -Uz compinit" in text
+        # autoload must appear before the call that needs it.
+        assert text.index("autoload -Uz compinit") < text.index(
+            "compinit", text.index("autoload -Uz compinit") + 1
+        )
+
+    def test_install_zsh_writes_resolved_fpath(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Regression: the rc line hardcoded `$HOME/.zfunc`, which only
+        # matches the directory the script was actually written to
+        # (rc.parent / ".zfunc") when rc.parent == $HOME.
+        rc = tmp_path / "not-home" / ".zshrc"
+        rc.parent.mkdir()
+        rc.write_text("# pre-existing\n")
+        result = self._run_install("zsh", rc, monkeypatch, tmp_path)
+        assert result.exit_code == 0
+        text = rc.read_text()
+        assert str(tmp_path / "not-home" / ".zfunc") in text
+        assert "$HOME/.zfunc" not in text
+
+    def test_install_zsh_idempotent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        rc = tmp_path / ".zshrc"
+        rc.write_text("# pre-existing\n")
+        self._run_install("zsh", rc, monkeypatch, tmp_path)
+        result = self._run_install("zsh", rc, monkeypatch, tmp_path)
+        assert result.exit_code == 0
+        assert "already installed" in result.output
+        assert rc.read_text().count("qwik completion (zsh)") == 1
+
+    def test_install_zsh_repairs_legacy_broken_block(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        rc = tmp_path / ".zshrc"
+        rc.write_text(
+            "export FOO=bar\n"
+            "\n"
+            "# qwik completion (zsh)\n"
+            "fpath=($HOME/.zfunc $fpath)\n"
+            "compinit\n"
+            "\n"
+            "export BAZ=qux\n"
+        )
+        result = self._run_install("zsh", rc, monkeypatch, tmp_path)
+        assert result.exit_code == 0
+        assert "Repaired" in result.output
+        text = rc.read_text()
+        # The old block's bare, unguarded `compinit` line is gone
+        # entirely — not just shadowed by a corrected one appended after
+        # it, which would still hit "command not found: compinit" at
+        # shell startup before ever reaching the fix.
+        assert not any(line.strip() == "compinit" for line in text.splitlines())
+        assert "autoload -Uz compinit" in text
+        assert text.count("# qwik completion (zsh)") == 1  # substring of v2 marker too
+        # The user's own config, on both sides of the old block, survives.
+        assert "export FOO=bar" in text
+        assert "export BAZ=qux" in text
+
+    def test_install_zsh_repair_is_idempotent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        rc = tmp_path / ".zshrc"
+        rc.write_text(
+            "# qwik completion (zsh)\nfpath=($HOME/.zfunc $fpath)\ncompinit\n"
+        )
+        self._run_install("zsh", rc, monkeypatch, tmp_path)
+        result = self._run_install("zsh", rc, monkeypatch, tmp_path)
+        assert result.exit_code == 0
+        assert "already installed" in result.output
+        text = rc.read_text()
+        assert not any(line.strip() == "compinit" for line in text.splitlines())
+        assert text.count("# qwik completion (zsh)") == 1
+
     def test_install_fish(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -113,6 +200,22 @@ class TestCompletionInstall:
         text = rc.read_text()
         assert "# qwik completion (pwsh)" in text
         assert "_QWIK_COMPLETE" in text
+
+    def test_install_bash_writes_resolved_source_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Regression: the rc line hardcoded `~/.bash_completions/qwik.sh`,
+        # which only matches the directory the script was actually
+        # written to (rc.parent / ".bash_completions") when rc.parent is
+        # $HOME.
+        rc = tmp_path / "not-home" / ".bashrc"
+        rc.parent.mkdir()
+        rc.write_text("# pre-existing\n")
+        result = self._run_install("bash", rc, monkeypatch, tmp_path)
+        assert result.exit_code == 0
+        text = rc.read_text()
+        assert str(tmp_path / "not-home" / ".bash_completions" / "qwik.sh") in text
+        assert "~/.bash_completions" not in text
 
     def test_install_idempotent(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
