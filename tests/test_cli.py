@@ -348,6 +348,41 @@ class TestRunCommand:
         assert result.exit_code == 0
         assert "run" in result.output.lower()
 
+    def test_run_stdout_has_no_banner_when_not_a_tty(self, clean_store) -> None:
+        # Regression for the banner corrupting piped/captured alias output:
+        # a real subprocess with redirected (non-TTY) stdout must emit only
+        # the aliased command's own output.
+        import os
+        import subprocess
+        import sys
+
+        runner.invoke(app, ["add", "hi", "echo", "hello"])
+        env = dict(os.environ)
+        env["QWIK_CONFIG_DIR"] = str(clean_store)
+        result = subprocess.run(
+            [sys.executable, "-m", "qwik", "run", "hi"],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert result.stdout == "hello\n"
+        assert "Running" not in result.stdout
+
+    def test_run_bump_usage_runtime_error_does_not_mask_exit_code(
+        self, clean_store, monkeypatch
+    ) -> None:
+        import qwik.core.store as store_mod
+
+        runner.invoke(app, ["add", "hi", "echo", "hello"])
+
+        def _boom(self, name: str) -> None:
+            raise RuntimeError("store corrupt")
+
+        monkeypatch.setattr(store_mod.Store, "bump_usage", _boom)
+        result = runner.invoke(app, ["run", "hi"])
+        assert result.exit_code == 0
+        assert result.exception is None
+
 
 class TestShortcutFlags:
     def test_version_flag(self, clean_store) -> None:

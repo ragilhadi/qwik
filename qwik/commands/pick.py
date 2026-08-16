@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 
 import typer
 
@@ -65,7 +66,13 @@ def pick_command() -> None:
         print_error(str(exc), console=console)
         raise typer.Exit(1)
 
-    print_success(f'Running "{name}" → {expanded!r}', console=console)
+    # See qwik/commands/run.py for why this goes to stderr and is skipped
+    # when stdout isn't a TTY: the banner must never land in the child
+    # command's own output stream.
+    if sys.stdout.isatty():
+        print_success(
+            f'Running "{name}" → {expanded!r}', console=get_console(stderr=True)
+        )
     returncode = 1
     try:
         completed = subprocess.run(expanded, shell=True)
@@ -76,7 +83,7 @@ def pick_command() -> None:
     finally:
         try:
             store.bump_usage(name)
-        except OSError:
+        except (OSError, RuntimeError):
             # best-effort usage tracking; never mask the command's exit code
             pass
 
