@@ -25,10 +25,16 @@ class NuRenderer(ShellRenderer):
     def render_alias(self, name: str, alias: "Alias") -> str:
         """Return a nushell-compatible function definition.
 
-        Append-mode aliases become ``def name [...args] { ^command ...$args }``.
-        Template-mode aliases become a wrapper that delegates to
-        ``qwik run`` so that argument substitution is handled by the
-        Python engine.
+        Both append-mode and template-mode aliases delegate to
+        ``qwik run``. Nushell's ``^command`` syntax runs exactly one
+        external program with argument-list semantics — it has no
+        built-in way to safely hand it an arbitrary, possibly
+        shell-operator-laden command *string* the way POSIX shells or
+        PowerShell's ``[ScriptBlock]::Create`` do, so splicing the raw
+        command text into the function body (the previous approach) let
+        a stray ``}`` in the command close the function early. Routing
+        through ``qwik run`` reuses the shell-aware quoting/execution
+        that command already needs for template mode.
 
         Args:
             name: Alias identifier.
@@ -37,11 +43,7 @@ class NuRenderer(ShellRenderer):
         Returns:
             Nushell source snippet.
         """
-        from qwik.core.substitute import has_placeholders
-
-        if has_placeholders(alias.command):
-            return f'def {name} [...args] {{\n    qwik run "{name}" ...$args\n}}'
-        return f"def {name} [...args] {{\n    ^{alias.command} ...$args\n}}"
+        return f'def {name} [...args] {{\n    qwik run "{name}" ...$args\n}}'
 
     def rc_path(self) -> Path | None:
         """Return the nushell config path honoring env overrides."""
