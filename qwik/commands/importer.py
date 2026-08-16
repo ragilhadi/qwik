@@ -194,9 +194,20 @@ def import_command(
         else:
             print_error(f"Unknown format '{suffix}'. Use .toml or .json.", console=console)
             raise typer.Exit(1)
+        # Store.load() refuses a file whose version is newer than this
+        # qwik understands; import bypassed that guard entirely and would
+        # write an unvalidated `version` straight into the live store,
+        # bricking every later command with an unhandled RuntimeError.
+        # Route the incoming data through the same migration/version gate.
+        from qwik.core.migrations import migrate
+
+        parsed = migrate(parsed)
         incoming = AliasStore.model_validate(parsed)
     except typer.Exit:
         raise
+    except RuntimeError as exc:
+        print_error(str(exc), console=console)
+        raise typer.Exit(1)
     except Exception as exc:
         print_error(f"Could not parse {path}: {exc}", console=console)
         raise typer.Exit(1)
