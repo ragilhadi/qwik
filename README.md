@@ -324,7 +324,9 @@ qwik add gco "git checkout {1}"
 gco main                # → git checkout main
 ```
 
-> **Note:** `{1}`, `{@}`, and `{N:-default}` interpolations are `shlex.quote`d at runtime, so args containing shell metacharacters are passed safely. `{*}` is shell-quoted as a single string. For example, `qwik run gco '; rm -rf /'` expands to `git checkout '; rm -rf /'` — the `;` is quoted and treated as a literal argument, not a command separator.
+> **Note:** `{1}`, `{@}`, and `{N:-default}` interpolations are quoted at runtime, so args containing shell metacharacters are passed safely. `{*}` is shell-quoted as a single string. For example, `qwik run gco '; rm -rf /'` expands to `git checkout '; rm -rf /'` on a POSIX shell — the `;` is quoted and treated as a literal argument, not a command separator.
+>
+> The quoting rule depends on which shell will actually run the expanded command — chosen by `qwik run`'s shell detection, not by the host platform (a user can be running POSIX bash under Git Bash or WSL on a Windows host). `shlex.quote`'s POSIX single-quote syntax is used for bash/zsh/fish; cmd.exe gets caret-escaped metacharacters wrapped in doubled double quotes; PowerShell gets single-quoted strings with embedded `'` doubled, invoked via `pwsh`/`powershell` explicitly rather than through `cmd.exe`'s default `shell=True` interpreter. The guarantee above holds on all three; it does not extend to `nu` or `xonsh`, which currently fall back to POSIX quoting.
 
 **Multiple positionals:**
 

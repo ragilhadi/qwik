@@ -13,6 +13,8 @@ import sys
 
 import typer
 
+from qwik.core.shell_detect import detect_shell
+from qwik.core.shell_exec import build_invocation
 from qwik.core.store import get_store
 from qwik.core.substitute import expand
 from qwik.ui.prompts import print_error, print_success
@@ -44,8 +46,9 @@ def run_command(
         print_error(f'Alias "{name}" is disabled. Run `qwik enable {name}` first.')
         raise typer.Exit(1)
 
+    active_shell = detect_shell()
     try:
-        expanded = expand(alias.command, args or [])
+        expanded = expand(alias.command, args or [], shell=active_shell)
     except ValueError as exc:
         print_error(str(exc), console=console)
         raise typer.Exit(1)
@@ -61,7 +64,8 @@ def run_command(
         )
     returncode = 1
     try:
-        result = subprocess.run(expanded, shell=True)
+        cmd, use_shell = build_invocation(expanded, active_shell)
+        result = subprocess.run(cmd, shell=use_shell)
         returncode = result.returncode
     except KeyboardInterrupt:
         # Child received SIGINT (e.g. user hit Ctrl+C on docker stats).
