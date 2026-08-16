@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import typer
-from rich.console import Console
 
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success
+from qwik.ui.theme import get_console
 
 __all__ = ["enable_command", "disable_command"]
 
@@ -21,7 +21,7 @@ def _toggle(name: str, enabled: bool) -> None:
         enabled: Desired state.
     """
     store = get_store()
-    console = Console()
+    console = get_console()
 
     with store.mutate() as data:
         alias = data.get(name)

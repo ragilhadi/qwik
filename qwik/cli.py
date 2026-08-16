@@ -138,8 +138,11 @@ def main(
             level=logging.DEBUG,
             format="%(levelname)s %(name)s: %(message)s",
         )
-    import qwik.ui.theme as _theme
-    _theme._NO_COLOR_OVERRIDE = no_color
+    # Child contexts (every subcommand) inherit ctx.obj from this, the
+    # top-level group context, unless they set their own — so get_console()
+    # can read it back via the current Click context instead of a mutable
+    # module global.
+    ctx.obj = {"no_color": no_color}
     # If a subcommand is already being handled, do nothing.
     if ctx.invoked_subcommand is not None:
         return

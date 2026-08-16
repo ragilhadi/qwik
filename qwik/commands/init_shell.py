@@ -9,11 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
 from qwik.core.store import get_store
 from qwik.shells.base import get_renderer
 from qwik.ui.prompts import print_error, print_info, print_success
+from qwik.ui.theme import get_console
 
 __all__ = ["init_shell_command"]
 
@@ -81,7 +81,7 @@ def init_shell_command(
     """Print or install the shell hook snippet."""
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     try:
         renderer = get_renderer(shell)

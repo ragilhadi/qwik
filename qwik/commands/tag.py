@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import typer
-from rich.console import Console
 
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success
+from qwik.ui.theme import get_console
 
 __all__ = ["tag_command", "untag_command"]
 
@@ -19,7 +19,7 @@ def tag_command(
 ) -> None:
     """Attach a tag to an alias."""
     store = get_store()
-    console = Console()
+    console = get_console()
 
     with store.mutate() as data:
         alias = data.get(name)
@@ -40,7 +40,7 @@ def untag_command(
 ) -> None:
     """Remove a tag from an alias."""
     store = get_store()
-    console = Console()
+    console = get_console()
 
     with store.mutate() as data:
         alias = data.get(name)
