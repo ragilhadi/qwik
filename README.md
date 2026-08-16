@@ -457,8 +457,11 @@ The hook generates native aliases/functions for each shell:
 |---|---|---|
 | bash / zsh | `alias gs='git status'` | `gs() { git checkout "$1" ; }` |
 | fish | `alias gs 'git status'` | `function gs ; … ; end` |
-| PowerShell | `function gs { echo hi @args }` | `function gs { echo "{1}" $args[0] }` |
+| PowerShell | `function gs { & ([ScriptBlock]::Create('git status')) @args }` | `function gs { qwik run "gs" @args }` |
+| nu | `def gs [...args] { qwik run "gs" ...$args }` | `def gs [...args] { qwik run "gs" ...$args }` |
 | cmd | `doskey gs=git status $*` | (best-effort, no template) |
+
+PowerShell's append mode wraps the command as a string literal compiled into a script block at call time rather than splicing it into the function body as source, and cmd's `doskey` macros are `$`/metacharacter-escaped — both so a command containing `}`, `&`, `$`, or another shell's syntax can't break out of the generated definition. Nu has no equivalent to a compiled-string script block, so both modes delegate to `qwik run`. Supported characters in a command are documented per shell in [`docs/shell-quoting.md`](docs/shell-quoting.md).
 
 ### Variable expansion
 

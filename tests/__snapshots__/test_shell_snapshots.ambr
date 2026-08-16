@@ -14,7 +14,7 @@
   '''
   REM qwik cmd hook (best-effort; template aliases omitted)
   doskey bsg=echo hello\ $*
-  doskey envg=echo $HOME %USERPROFILE% $*
+  doskey envg=echo $$HOME ^%USERPROFILE^% $*
   REM omitted gco: template mode unsupported in cmd
   doskey gs=git status $*
   doskey lsg=echo 'hello world' $*
@@ -34,38 +34,38 @@
 # name: test_render_all_snapshot[nu]
   '''
   def bsg [...args] {
-      ^echo hello\ ...$args
+      qwik run "bsg" ...$args
   }
   def envg [...args] {
-      ^echo $HOME %USERPROFILE% ...$args
+      qwik run "envg" ...$args
   }
   def gco [...args] {
       qwik run "gco" ...$args
   }
   def gs [...args] {
-      ^git status ...$args
+      qwik run "gs" ...$args
   }
   def lsg [...args] {
-      ^echo 'hello world' ...$args
+      qwik run "lsg" ...$args
   }
   '''
 # ---
 # name: test_render_all_snapshot[pwsh]
   '''
   function bsg {
-      echo hello\ @args
+      & ([ScriptBlock]::Create('echo hello\')) @args
   }
   function envg {
-      echo $HOME %USERPROFILE% @args
+      & ([ScriptBlock]::Create('echo $HOME %USERPROFILE%')) @args
   }
   function gco {
       qwik run "gco" @args
   }
   function gs {
-      git status @args
+      & ([ScriptBlock]::Create('git status')) @args
   }
   function lsg {
-      echo 'hello world' @args
+      & ([ScriptBlock]::Create('echo ''hello world''')) @args
   }
   '''
 # ---
