@@ -9,7 +9,10 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import tomlkit
 import typer
+from pydantic import ValidationError
+from tomlkit.exceptions import ParseError as TOMLDecodeError
 
 from qwik.core.models import Alias
 from qwik.core.store import get_store
@@ -18,36 +21,12 @@ from qwik.ui.theme import get_console
 
 __all__ = ["edit_command"]
 
-
-def _strip_inline_comment(line: str) -> str:
-    """Remove a \"#\" comment that is not inside quotes."""
-    comment_idx = -1
-    in_quote: str | None = None
-    for i, ch in enumerate(line):
-        if ch in ('"', "'") and (i == 0 or line[i - 1] != "\\"):
-            if in_quote == ch:
-                in_quote = None
-            elif in_quote is None:
-                in_quote = ch
-        elif ch == "#" and in_quote is None:
-            comment_idx = i
-            break
-    if comment_idx >= 0:
-        line = line[:comment_idx].rstrip()
-    return line
-
-
-def _parse_value(raw_val: str) -> object:
-    """Parse a simple TOML-like value from an edited snippet."""
-    low = raw_val.lower()
-    if low == "true":
-        return True
-    if low == "false":
-        return False
-    if raw_val.startswith("[") and raw_val.endswith("]"):
-        inner = raw_val[1:-1]
-        return [v.strip().strip("'\"").strip() for v in inner.split(",") if v.strip()]
-    return raw_val.strip("'\"").strip()
+# Fields the user may edit through the snippet. Everything else on `Alias`
+# (created_at, updated_at, last_used, run_count) is preserved structurally
+# from the freshly loaded alias rather than round-tripped through the
+# editor, since a future field added to the model must stay safe by
+# default without this command needing to know about it.
+_EDITABLE_FIELDS = ("command", "tag", "group", "description", "enabled")
 
 
 def edit_command(
@@ -78,13 +57,14 @@ def edit_command(
         or default_editor
     )
 
-    snippet = (
-        f'# Edit the fields below and save/quit to apply changes to "{name}"\n'
-        f"command = {alias.command!r}\n"
-        f"tag = {alias.tag!r}\n"
-        f"description = {alias.description!r}\n"
-        f"enabled = {alias.enabled!r}\n"
-    )
+    doc = tomlkit.document()
+    doc.add(tomlkit.comment(f'Edit the fields below and save/quit to apply changes to "{name}"'))
+    doc.add("command", alias.command)
+    doc.add("tag", list(alias.tag))
+    doc.add("group", alias.group or "")
+    doc.add("description", alias.description)
+    doc.add("enabled", alias.enabled)
+    snippet = tomlkit.dumps(doc)
 
     with tempfile.NamedTemporaryFile(
         mode="w+", suffix=".toml", delete=False, encoding="utf-8"
@@ -95,18 +75,18 @@ def edit_command(
     try:
         subprocess.run([editor, str(tmp_path)], check=True)
         edited_text = tmp_path.read_text(encoding="utf-8")
-        # Very simple parser: extract key = value lines
-        new_fields: dict[str, object] = {}
-        for line in edited_text.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            line = _strip_inline_comment(line)
-            if " = " not in line:
-                continue
-            key, raw_val = line.split(" = ", 1)
-            key = key.strip()
-            new_fields[key] = _parse_value(raw_val)
+        try:
+            parsed = tomlkit.parse(edited_text).unwrap()
+        except TOMLDecodeError as exc:
+            print_error(f"Could not parse edited snippet: {exc}", console=console)
+            raise typer.Exit(1)
+
+        update: dict[str, object] = {
+            key: parsed[key] for key in _EDITABLE_FIELDS if key in parsed
+        }
+        if "group" in update and not str(update["group"]).strip():
+            update["group"] = None
+        update["updated_at"] = datetime.now(timezone.utc)
 
         # $EDITOR already ran (a blocking, potentially long, external
         # process) above, outside any lock. Re-acquire the lock and reload
@@ -117,16 +97,13 @@ def edit_command(
             if fresh_alias is None:
                 print_error(f'Alias "{name}" no longer exists.', console=console)
                 raise typer.Exit(1)
-            fresh_data.aliases[name] = Alias(
-                command=str(new_fields.get("command", fresh_alias.command)),
-                tag=list(new_fields.get("tag", fresh_alias.tag)) or [],  # type: ignore[call-overload]
-                description=str(new_fields.get("description", fresh_alias.description)),
-                enabled=bool(new_fields.get("enabled", fresh_alias.enabled)),
-                created_at=fresh_alias.created_at,
-                updated_at=datetime.now(timezone.utc),
-                last_used=fresh_alias.last_used,
-                run_count=fresh_alias.run_count,
-            )
+            merged = fresh_alias.model_dump()
+            merged.update(update)
+            try:
+                fresh_data.aliases[name] = Alias.model_validate(merged)
+            except ValidationError as exc:
+                print_error(f"Invalid edit: {exc}", console=console)
+                raise typer.Exit(1)
         print_success(f'Updated "{name}".', console=console)
     except subprocess.CalledProcessError as exc:
         print_error(f"Editor exited with code {exc.returncode}.", console=console)
