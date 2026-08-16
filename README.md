@@ -225,9 +225,11 @@ qwik overlay copy --name gs # copy an overlay alias to your user store
 qwik overlay remove         # remove the overlay
 ```
 
-Overlay aliases appear in search, `qwik init`, and the picker, but cannot be
-edited or removed (they're read-only). Running an overlay alias copies it to
-your user store for usage tracking.
+Overlay aliases appear in `qwik list`, `qwik search`, `qwik init`, and the
+picker — marked `(overlay)` in `list`/`search` — but cannot be edited or
+removed (they're read-only). A user alias with the same name shadows the
+overlay one. Running an overlay alias copies it to your user store for
+usage tracking.
 
 ### `doctor` — Health check
 

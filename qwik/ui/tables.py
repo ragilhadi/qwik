@@ -53,8 +53,13 @@ def render_list_table(
     table.add_column("Used", justify="right")
     table.add_column("Last")
 
-    for name in sorted(store.aliases):
-        alias = store.aliases[name]
+    # all_aliases() merges the overlay in, with the user's own store
+    # taking precedence for any name defined in both — the same view
+    # `qwik init`, `qwik pick`, and `qwik search` already use, and the
+    # one the shell hook actually renders from.
+    merged = store.all_aliases()
+    for name in sorted(merged):
+        alias = merged[name]
         if tag_filter is not None and tag_filter not in alias.tag:
             continue
         if group_filter is not None and alias.group != group_filter:
@@ -64,8 +69,10 @@ def render_list_table(
             if search_query.lower() not in haystack.lower():
                 continue
         style = "dim" if not alias.enabled else ""
+        is_overlay = name not in store.aliases
+        display_name = f"{name} [dim](overlay)[/dim]" if is_overlay else name
         table.add_row(
-            name,
+            display_name,
             alias.command,
             alias.group or "—",
             ", ".join(alias.tag),
