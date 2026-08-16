@@ -21,7 +21,7 @@ class BashRenderer(ShellRenderer):
         """Return ``'bash'``."""
         return "bash"
 
-    def render_alias(self, name: str, alias: "Alias") -> str:
+    def render_alias(self, name: str, alias: Alias) -> str:
         """Return a bash-compatible alias or function.
 
         Append-mode aliases become ``alias name='command'``.

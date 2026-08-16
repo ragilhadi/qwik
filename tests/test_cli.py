@@ -364,6 +364,7 @@ class TestRunCommand:
             capture_output=True,
             text=True,
             env=env,
+            check=False,
         )
         assert result.stdout == "hello\n"
         assert "Running" not in result.stdout

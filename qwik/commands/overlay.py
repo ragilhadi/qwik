@@ -15,9 +15,17 @@ from qwik.commands.importer import preview_import
 from qwik.config import Config, get_config
 from qwik.core.git import (
     clone as git_clone,
+)
+from qwik.core.git import (
     fetch as git_fetch,
+)
+from qwik.core.git import (
     git_available,
+)
+from qwik.core.git import (
     reset_hard as git_reset_hard,
+)
+from qwik.core.git import (
     show_file as git_show_file,
 )
 from qwik.core.models import AliasStore
@@ -34,7 +42,7 @@ from qwik.ui.theme import get_console
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from rich.console import Console  # noqa: F401
+    from rich.console import Console
 
 __all__ = ["overlay_command"]
 
@@ -96,14 +104,10 @@ def _read_overlay_aliases(overlay_file: Path) -> AliasStore:
 
 def overlay_command(
     action: str = typer.Argument(..., help="add|remove|update|list|copy"),
-    name: str | None = typer.Argument(
-        None, help="Alias name (for copy)."
-    ),
+    name: str | None = typer.Argument(None, help="Alias name (for copy)."),
     url: str | None = typer.Option(None, "--url", help="Overlay repo URL (for add)."),
     branch: str = typer.Option(_DEFAULT_BRANCH, "--branch", help="Overlay repo branch."),
-    yes: bool = typer.Option(
-        False, "--yes", "-y", help="Skip confirmation (for add/update)."
-    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation (for add/update)."),
 ) -> None:
     """Manage the team/shared read-only overlay store."""
     console = get_console()
@@ -138,7 +142,7 @@ def _do_add(
     branch: str,
     *,
     yes: bool,
-    console: "Console",
+    console: Console,
 ) -> None:
     if url is None:
         print_error("Usage: qwik overlay add --url <git-url>", console=console)
@@ -156,8 +160,7 @@ def _do_add(
     if overlay_repo.exists():
         print_error(
             "Overlay already configured.",
-            suggestion="Run `qwik overlay remove` first, or "
-            "`qwik overlay update` to refresh.",
+            suggestion="Run `qwik overlay remove` first, or " "`qwik overlay update` to refresh.",
             console=console,
         )
         raise typer.Exit(1)
@@ -172,7 +175,7 @@ def _do_add(
     except RuntimeError as exc:
         print_error(f"Failed to clone overlay: {exc}", console=console)
         _force_rmtree(overlay_repo)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     overlay_file = config.overlay_aliases_file
     if not overlay_file.exists():
@@ -189,7 +192,7 @@ def _do_add(
     except Exception as exc:
         print_error(f"Could not read overlay aliases: {exc}", console=console)
         _force_rmtree(overlay_repo)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     store = get_store()
     user_data = store.load()
@@ -210,7 +213,7 @@ def _do_add(
     print_info("Run `qwik overlay update` to refresh.", console=console)
 
 
-def _do_remove(config: Config, *, console: "Console") -> None:
+def _do_remove(config: Config, *, console: Console) -> None:
     config_file = config.overlay_config_file
     overlay_repo = config.overlay_repo_dir
     if not config_file.exists() and not overlay_repo.exists():
@@ -224,7 +227,7 @@ def _do_remove(config: Config, *, console: "Console") -> None:
     print_success("Overlay removed.", console=console)
 
 
-def _do_update(config: Config, *, yes: bool, console: "Console") -> None:
+def _do_update(config: Config, *, yes: bool, console: Console) -> None:
     config_file = config.overlay_config_file
     overlay_repo = config.overlay_repo_dir
 
@@ -242,7 +245,7 @@ def _do_update(config: Config, *, yes: bool, console: "Console") -> None:
         git_fetch(overlay_repo, "origin", branch)
     except RuntimeError as exc:
         print_error(f"Failed to fetch overlay: {exc}", console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     incoming = _read_incoming_at_ref(overlay_repo, f"origin/{branch}")
     current = (
@@ -266,21 +269,15 @@ def _do_update(config: Config, *, yes: bool, console: "Console") -> None:
     # Same trust-boundary preview qwik import/sync pull show, plus the
     # removal set (an update that only lists additions would hide that
     # an alias is disappearing from every member's shell hook).
-    console.print(
-        f"[qwik.warning]Overlay changes from {url} ({branch}):[/qwik.warning]"
-    )
+    console.print(f"[qwik.warning]Overlay changes from {url} ({branch}):[/qwik.warning]")
     if added:
-        console.print(
-            f"[qwik.success]Added ({len(added)}):[/qwik.success] {', '.join(added)}"
-        )
+        console.print(f"[qwik.success]Added ({len(added)}):[/qwik.success] {', '.join(added)}")
     if changed:
         console.print(
             f"[qwik.warning]Changed ({len(changed)}):[/qwik.warning] {', '.join(changed)}"
         )
     if removed:
-        console.print(
-            f"[qwik.error]Removed ({len(removed)}):[/qwik.error] {', '.join(removed)}"
-        )
+        console.print(f"[qwik.error]Removed ({len(removed)}):[/qwik.error] {', '.join(removed)}")
     console.print(
         "[qwik.warning]Overlay aliases are a trust boundary — stored commands "
         "will run under `shell=True` once rendered into your shell hook.[/qwik.warning]"
@@ -317,9 +314,8 @@ def _read_incoming_at_ref(overlay_repo: Path, ref: str) -> AliasStore:
     return AliasStore.model_validate(data)
 
 
-def _do_list(config: Config, *, console: "Console") -> None:
+def _do_list(config: Config, *, console: Console) -> None:
     config_file = config.overlay_config_file
-    overlay_repo = config.overlay_repo_dir
 
     if not config_file.exists():
         print_info("No overlay configured.", console=console)
@@ -346,14 +342,14 @@ def _do_list(config: Config, *, console: "Console") -> None:
         console.print(f"  Aliases: [qwik.warning]unreadable ({exc})[/qwik.warning]")
 
 
-def _do_copy(config: Config, name: str, *, console: "Console") -> None:
+def _do_copy(config: Config, name: str, *, console: Console) -> None:
     overlay_file = config.overlay_aliases_file
     if overlay_file.exists():
         try:
             incoming = _read_overlay_aliases(overlay_file)
         except Exception as exc:
             print_error(f"Could not read overlay: {exc}", console=console)
-            raise typer.Exit(1)
+            raise typer.Exit(1) from exc
     else:
         incoming = AliasStore()
 

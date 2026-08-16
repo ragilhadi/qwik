@@ -5,6 +5,7 @@ import shlex
 import pytest
 
 from qwik.core.substitute import (
+    _named_placeholder_index_map,
     expand,
     find_unrecognized_braces,
     has_placeholders,
@@ -53,9 +54,7 @@ class TestExpand:
         )
 
     def test_default_present(self) -> None:
-        assert (
-            expand("git push origin {1:-main}", ["feat/x"]) == "git push origin feat/x"
-        )
+        assert expand("git push origin {1:-main}", ["feat/x"]) == "git push origin feat/x"
 
     def test_default_missing(self) -> None:
         assert expand("git push origin {1:-main}", []) == "git push origin main"
@@ -87,7 +86,9 @@ class TestExpand:
 
 class TestQuoting:
     def test_positional_metachar_is_quoted(self) -> None:
-        assert expand("git checkout {1}", ["; rm -rf /"]) == f"git checkout {shlex.quote('; rm -rf /')}"
+        assert expand("git checkout {1}", ["; rm -rf /"]) == (
+            f"git checkout {shlex.quote('; rm -rf /')}"
+        )
 
     def test_default_metachar_is_quoted(self) -> None:
         assert expand("echo {1:-x}", []) == "echo x"
@@ -184,9 +185,6 @@ class TestQuoteForShell:
         assert expand("echo", ["a b"], shell="pwsh") == "echo 'a b'"
 
 
-from qwik.core.substitute import _named_placeholder_index_map
-
-
 class TestNamedIndexMap:
     def test_single_name(self) -> None:
         assert _named_placeholder_index_map("git checkout {branch}") == {"branch": 1}
@@ -223,8 +221,10 @@ class TestNamedExpand:
         assert expand("git checkout {branch}", ["main"]) == "git checkout main"
 
     def test_two_names_substitute_in_order(self) -> None:
-        assert expand('git commit -m "{type}: {scope}"', ["feat", "login"]) == \
-            'git commit -m "feat: login"'
+        assert (
+            expand('git commit -m "{type}: {scope}"', ["feat", "login"])
+            == 'git commit -m "feat: login"'
+        )
 
     def test_repeated_name_reuses_same_arg(self) -> None:
         assert expand("echo {a} and {a}", ["x", "y"]) == "echo x and x y"
@@ -321,13 +321,11 @@ class TestMalformedPlaceholders:
         assert find_unrecognized_braces("echo {{1}}") == []
 
     @pytest.mark.parametrize("command", REJECT_CASES)
-    def test_add_rejects_malformed_cli(
-        self, tmp_path, monkeypatch, command: str
-    ) -> None:
-        from qwik.config import _reset_config
+    def test_add_rejects_malformed_cli(self, tmp_path, monkeypatch, command: str) -> None:
         from typer.testing import CliRunner
 
         from qwik.cli import app
+        from qwik.config import _reset_config
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
@@ -341,13 +339,11 @@ class TestMalformedPlaceholders:
                 break
 
     @pytest.mark.parametrize("command", ACCEPT_LITERAL_CASES)
-    def test_add_accepts_literal_cli(
-        self, tmp_path, monkeypatch, command: str
-    ) -> None:
-        from qwik.config import _reset_config
+    def test_add_accepts_literal_cli(self, tmp_path, monkeypatch, command: str) -> None:
         from typer.testing import CliRunner
 
         from qwik.cli import app
+        from qwik.config import _reset_config
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()

@@ -10,8 +10,8 @@ from rich.style import Style
 from rich.theme import Theme
 
 __all__ = [
-    "get_console",
     "THEME",
+    "get_console",
     "style",
 ]
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import typer
 
 from qwik.core.conflicts import ConflictChecker
@@ -18,10 +16,8 @@ __all__ = ["rename_command"]
 def rename_command(
     old: str = typer.Argument(..., help="Current alias name."),
     new: str = typer.Argument(..., help="New alias name."),
-    force: bool = typer.Option(
-        False, "--force", "-f", help="Overwrite if target exists."
-    ),
-    shell: Optional[str] = typer.Option(
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite if target exists."),
+    shell: str | None = typer.Option(
         None, "--shell", hidden=True, help="Override shell detection for conflict checks."
     ),
 ) -> None:
@@ -51,15 +47,11 @@ def rename_command(
         raise typer.Exit(1)
 
     if result.existing_alias and not force:
-        print_error(
-            f'Alias "{new}" already exists.', suggestion="Use --force to overwrite."
-        )
+        print_error(f'Alias "{new}" already exists.', suggestion="Use --force to overwrite.")
         raise typer.Exit(1)
 
     if result.is_builtin and not force:
-        print_error(
-            f'"{new}" is a shell builtin.', suggestion="Use --force to override."
-        )
+        print_error(f'"{new}" is a shell builtin.', suggestion="Use --force to override.")
         raise typer.Exit(1)
 
     try:
@@ -67,5 +59,5 @@ def rename_command(
             fresh_data.rename(old, new)
     except KeyError as exc:
         print_error(str(exc), console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     print_success(f'Renamed "{old}" → "{new}".', console=console)

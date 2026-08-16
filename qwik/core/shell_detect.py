@@ -16,11 +16,11 @@ import sys
 from pathlib import Path
 
 __all__ = [
-    "shell_name_from_override",
-    "shell_name_from_version_env",
-    "shell_name_from_env",
-    "shell_name_from_proc",
     "detect_shell",
+    "shell_name_from_env",
+    "shell_name_from_override",
+    "shell_name_from_proc",
+    "shell_name_from_version_env",
 ]
 
 # Every shell qwik has a renderer for (qwik/shells/*.py), and therefore the
@@ -150,6 +150,7 @@ def _shell_name_from_ps() -> str | None:
             capture_output=True,
             text=True,
             timeout=1,
+            check=False,
         )
         if result.returncode == 0 and result.stdout.strip():
             return _classify_exe_name(Path(result.stdout.strip()).name)

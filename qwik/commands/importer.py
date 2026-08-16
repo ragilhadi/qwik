@@ -14,7 +14,7 @@ from qwik.core.store import Store, get_store
 from qwik.ui.prompts import print_error, print_success, prompt_confirm
 from qwik.ui.theme import get_console
 
-__all__ = ["import_command", "preview_and_merge", "preview_import", "merge_into"]
+__all__ = ["import_command", "merge_into", "preview_and_merge", "preview_import"]
 
 _PREVIEW_CAP = 20
 
@@ -81,16 +81,13 @@ def preview_import(
             f"{', '.join(sorted(new_names))}"
         )
     if mode == "replace" and removed_names:
-        con.print(
-            f"[qwik.error]Will be REMOVED ({len(removed_names)}):[/qwik.error]"
-        )
+        con.print(f"[qwik.error]Will be REMOVED ({len(removed_names)}):[/qwik.error]")
         _print_capped(con, removed_names)
 
     if not yes:
         if mode == "replace":
             prompt = (
-                f"Replace store — {len(removed_names)} alias(es) will be deleted. "
-                "Continue?"
+                f"Replace store — {len(removed_names)} alias(es) will be deleted. " "Continue?"
                 if removed_names
                 else "Replace store? Continue?"
             )
@@ -165,9 +162,7 @@ def preview_and_merge(
 
 def import_command(
     path: Path = typer.Argument(..., help="Source file path."),
-    overwrite: bool = typer.Option(
-        False, "--overwrite", "-o", help="Replace entire store."
-    ),
+    overwrite: bool = typer.Option(False, "--overwrite", "-o", help="Replace entire store."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
 ) -> None:
     """Import aliases from a TOML or JSON file."""
@@ -207,10 +202,10 @@ def import_command(
         raise
     except RuntimeError as exc:
         print_error(str(exc), console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     except Exception as exc:
         print_error(f"Could not parse {path}: {exc}", console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     if overwrite:
         if not preview_import(incoming, data, yes=yes, console=console, mode="replace"):

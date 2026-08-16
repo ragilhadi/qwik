@@ -13,16 +13,16 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 __all__ = [
-    "prompt_confirm",
-    "prompt_text",
     "print_error",
+    "print_info",
     "print_success",
     "print_warning",
-    "print_info",
+    "prompt_confirm",
+    "prompt_text",
 ]
 
 
-def _get_console(console: "Console" | None) -> "Console":
+def _get_console(console: Console | None) -> Console:
     """Return the provided console or the default one."""
     return console if console is not None else get_console()
 
@@ -31,7 +31,7 @@ def prompt_confirm(
     message: str,
     *,
     default: bool = False,
-    console: "Console" | None = None,
+    console: Console | None = None,
 ) -> bool:
     """Ask the user a yes/no question.
 
@@ -51,7 +51,7 @@ def prompt_text(
     message: str,
     *,
     default: str = "",
-    console: "Console" | None = None,
+    console: Console | None = None,
     allow_empty: bool = True,
 ) -> str:
     """Prompt for free-text input.
@@ -74,7 +74,7 @@ def prompt_text(
 
 
 def print_error(
-    message: str, *, suggestion: str | None = None, console: "Console" | None = None
+    message: str, *, suggestion: str | None = None, console: Console | None = None
 ) -> None:
     """Render a red error panel with an optional suggestion line.
 
@@ -90,7 +90,7 @@ def print_error(
     con.print(Panel(text, border_style="red"))
 
 
-def print_success(message: str, *, console: "Console" | None = None) -> None:
+def print_success(message: str, *, console: Console | None = None) -> None:
     """Render a green success indicator.
 
     Args:
@@ -101,7 +101,7 @@ def print_success(message: str, *, console: "Console" | None = None) -> None:
     con.print(f"[qwik.success]✓ {message}[/qwik.success]")
 
 
-def print_warning(message: str, *, console: "Console" | None = None) -> None:
+def print_warning(message: str, *, console: Console | None = None) -> None:
     """Render a yellow warning indicator.
 
     Args:
@@ -112,7 +112,7 @@ def print_warning(message: str, *, console: "Console" | None = None) -> None:
     con.print(f"[qwik.warning]⚠ {message}[/qwik.warning]")
 
 
-def print_info(message: str, *, console: "Console" | None = None) -> None:
+def print_info(message: str, *, console: Console | None = None) -> None:
     """Render a dim informational indicator.
 
     Args:
@@ -120,4 +120,4 @@ def print_info(message: str, *, console: "Console" | None = None) -> None:
         console: Optional Rich console.
     """
     con = _get_console(console)
-    con.print(f"[qwik.info]ℹ {message}[/qwik.info]")
+    con.print(f"[qwik.info]ℹ {message}[/qwik.info]")  # noqa: RUF001 — intentional info glyph

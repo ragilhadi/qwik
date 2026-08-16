@@ -17,6 +17,7 @@ class TestEntrypoint:
             [sys.executable, "-m", "qwik", "--version"],
             capture_output=True,
             text=True,
+            check=False,
         )
         assert result.returncode == 0
         assert "qwik" in result.stdout

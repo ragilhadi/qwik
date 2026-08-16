@@ -3,6 +3,7 @@
 import sys
 from typing import Any
 
+
 # On Windows the default stdio encoding is the OEM codepage (cp1252 on
 # en-US hosts), which cannot represent the Unicode glyphs Rich emits
 # (✓ U+2713, → U+2192, ⚠ U+26A0). When output is piped (no TTY) Rich still

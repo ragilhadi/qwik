@@ -8,7 +8,7 @@ import shutil
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -49,10 +49,7 @@ def _now_stamp() -> str:
     gets picked as "latest". 10 digits (10 billion writes) makes that
     overflow unreachable in practice.
     """
-    return (
-        f"{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')}"
-        f"-{next(_backup_counter):010d}"
-    )
+    return f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S-%f')}-{next(_backup_counter):010d}"
 
 
 class Store:
@@ -153,9 +150,7 @@ class Store:
         # are not unique across containers or network-mounted config dirs.
         # mkstemp in the destination directory guarantees a unique name and
         # keeps the final os.replace() on the same filesystem (atomic).
-        fd, temp_name = tempfile.mkstemp(
-            prefix=f"{self._path.name}.tmp-", dir=self._path.parent
-        )
+        fd, temp_name = tempfile.mkstemp(prefix=f"{self._path.name}.tmp-", dir=self._path.parent)
         temp = Path(temp_name)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:

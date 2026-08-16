@@ -8,18 +8,17 @@ from rich.box import SIMPLE_HEAVY
 from rich.console import Console
 from rich.table import Table
 
-
 if TYPE_CHECKING:
     from qwik.core.models import Alias, AliasStore
 
 __all__ = [
-    "render_list_table",
     "render_alias_detail",
+    "render_list_table",
 ]
 
 
 def render_list_table(
-    store: "AliasStore",
+    store: AliasStore,
     *,
     tag_filter: str | None = None,
     group_filter: str | None = None,
@@ -84,7 +83,7 @@ def render_list_table(
     return table
 
 
-def render_alias_detail(name: str, alias: "Alias") -> Table:
+def render_alias_detail(name: str, alias: Alias) -> Table:
     """Build a Rich table showing a single alias in detail.
 
     Args:

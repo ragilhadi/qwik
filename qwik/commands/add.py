@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import typer
 
@@ -30,21 +29,15 @@ _PWSH_VAR_RE: re.Pattern[str] = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*")
 
 
 def add_command(
-    name: Optional[str] = typer.Argument(None, help="Alias name."),
+    name: str | None = typer.Argument(None, help="Alias name."),
     command: list[str] = typer.Argument(None, help="Command the alias expands to."),
-    tag: Optional[str] = typer.Option(
-        None, "--tag", "-t", help="Comma-separated tags."
-    ),
-    description: Optional[str] = typer.Option(
+    tag: str | None = typer.Option(None, "--tag", "-t", help="Comma-separated tags."),
+    description: str | None = typer.Option(
         None, "--description", "-d", help="Optional description."
     ),
-    force: bool = typer.Option(
-        False, "--force", "-f", help="Overwrite if alias already exists."
-    ),
-    group: Optional[str] = typer.Option(
-        None, "--group", "-g", help="Primary group for the alias."
-    ),
-    shell: Optional[str] = typer.Option(
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite if alias already exists."),
+    group: str | None = typer.Option(None, "--group", "-g", help="Primary group for the alias."),
+    shell: str | None = typer.Option(
         None, "--shell", hidden=True, help="Override shell detection for conflict checks."
     ),
 ) -> None:
@@ -71,7 +64,7 @@ def add_command(
         validate_placeholders_static(full_command)
     except ValueError as exc:
         print_error(str(exc), console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     # Conflict checks
     checker = ConflictChecker(store_data)
@@ -79,9 +72,7 @@ def add_command(
     result = checker.check(name, shell=active_shell)
 
     if not result.valid_syntax:
-        print_error(
-            result.name, suggestion="Names must match ^[A-Za-z_][A-Za-z0-9_-]*$"
-        )
+        print_error(result.name, suggestion="Names must match ^[A-Za-z_][A-Za-z0-9_-]*$")
         raise typer.Exit(1)
 
     if result.existing_alias and not force:
@@ -113,7 +104,7 @@ def add_command(
             validate_alias_name(group)
         except ValueError as exc:
             print_error(f'Invalid group "{group}": {exc}', console=console)
-            raise typer.Exit(1)
+            raise typer.Exit(1) from exc
 
     if active_shell is not None:
         if active_shell == "cmd" and has_placeholders(full_command):
@@ -143,8 +134,8 @@ def add_command(
         tag=tag or [],  # type: ignore[arg-type]
         group=group,
         description=description or "",
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
     try:
@@ -152,7 +143,7 @@ def add_command(
             fresh_data.add(name, alias, force=force)
     except KeyError as exc:
         print_error(str(exc))
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     print_success(f'Added "{name}" → {full_command!r}', console=console)
     print_info("Run `source <rc>` or open a new terminal to use it.", console=console)

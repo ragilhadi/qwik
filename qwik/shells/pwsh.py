@@ -23,7 +23,7 @@ class PwshRenderer(ShellRenderer):
         """Return ``'pwsh'``."""
         return "pwsh"
 
-    def render_alias(self, name: str, alias: "Alias") -> str:
+    def render_alias(self, name: str, alias: Alias) -> str:
         """Return a PowerShell function definition.
 
         All aliases are rendered as functions because PowerShell does not
@@ -46,11 +46,7 @@ class PwshRenderer(ShellRenderer):
         if has_placeholders(alias.command):
             return f'function {name} {{\n    qwik run "{name}" @args\n}}'
         escaped = alias.command.replace("'", "''")
-        return (
-            f"function {name} {{\n"
-            f"    & ([ScriptBlock]::Create('{escaped}')) @args\n"
-            f"}}"
-        )
+        return f"function {name} {{\n" f"    & ([ScriptBlock]::Create('{escaped}')) @args\n" f"}}"
 
     def rc_path(self) -> Path | None:
         """Return the PowerShell profile path, Windows-aware."""
@@ -62,9 +58,7 @@ class PwshRenderer(ShellRenderer):
 
                 csidl_personal = 5
                 buf = ctypes.create_unicode_buffer(260)
-                ctypes.windll.shell32.SHGetFolderPathW(
-                    None, csidl_personal, None, 0, buf
-                )
+                ctypes.windll.shell32.SHGetFolderPathW(None, csidl_personal, None, 0, buf)
                 pwsh_dir = Path(buf.value) / "PowerShell"
             except Exception:
                 pwsh_dir = docs / "Documents" / "PowerShell"

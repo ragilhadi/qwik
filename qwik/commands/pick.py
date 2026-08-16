@@ -64,19 +64,17 @@ def pick_command() -> None:
         expanded = expand(alias.command, [], shell=active_shell)
     except ValueError as exc:
         print_error(str(exc), console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     # See qwik/commands/run.py for why this goes to stderr and is skipped
     # when stdout isn't a TTY: the banner must never land in the child
     # command's own output stream.
     if sys.stdout.isatty():
-        print_success(
-            f'Running "{name}" → {expanded!r}', console=get_console(stderr=True)
-        )
+        print_success(f'Running "{name}" → {expanded!r}', console=get_console(stderr=True))
     returncode = 1
     try:
         cmd, use_shell = build_invocation(expanded, active_shell)
-        completed = subprocess.run(cmd, shell=use_shell)
+        completed = subprocess.run(cmd, shell=use_shell, check=False)
         returncode = completed.returncode
     except KeyboardInterrupt:
         # Child received SIGINT (e.g. user hit Ctrl+C on a long-running command).

@@ -13,21 +13,21 @@ import subprocess
 from pathlib import Path
 
 __all__ = [
+    "add_all_and_commit",
+    "add_remote",
+    "behind_ahead",
+    "clone",
+    "current_branch",
+    "fetch",
+    "get_remote_url",
     "git_available",
+    "has_remote",
     "init_repo",
     "is_dirty",
-    "current_branch",
-    "add_all_and_commit",
-    "has_remote",
-    "add_remote",
-    "push",
     "pull",
-    "clone",
-    "fetch",
+    "push",
     "reset_hard",
     "status_short",
-    "behind_ahead",
-    "get_remote_url",
 ]
 
 
@@ -58,13 +58,9 @@ def _run_git(args: list[str], cwd: Path) -> str:
             check=True,
         )
     except FileNotFoundError as exc:
-        raise RuntimeError(
-            "git not found on PATH. Install git or run 'qwik doctor'."
-        ) from exc
+        raise RuntimeError("git not found on PATH. Install git or run 'qwik doctor'.") from exc
     except subprocess.CalledProcessError as exc:
-        raise RuntimeError(
-            f"git {' '.join(args)} failed: {exc.stderr}"
-        ) from exc
+        raise RuntimeError(f"git {' '.join(args)} failed: {exc.stderr}") from exc
     return result.stdout.strip()
 
 

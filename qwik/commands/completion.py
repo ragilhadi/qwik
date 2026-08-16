@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
@@ -40,16 +40,14 @@ def _marker(shell: str) -> str:
 
 
 def _backup(rc: Path, console: Console) -> None:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     backup = rc.parent / f"{rc.name}.qwik-backup-{stamp}"
     shutil.copy2(rc, backup)
     print_success(f"Backed up {rc} to {backup}", console=console)
 
 
 def completion_command(
-    shell: str = typer.Argument(
-        ..., help="Target shell: bash|zsh|fish|pwsh|powershell"
-    ),
+    shell: str = typer.Argument(..., help="Target shell: bash|zsh|fish|pwsh|powershell"),
     install: bool = typer.Option(
         False,
         "--install",
@@ -87,9 +85,7 @@ def completion_command(
 
     if canonical == "fish":
         _install_fish(console)
-        print_info(
-            "fish auto-loads completions on next shell start", console=console
-        )
+        print_info("fish auto-loads completions on next shell start", console=console)
         raise typer.Exit(0)
 
     _install_pwsh(marker, console)
@@ -145,7 +141,8 @@ def _strip_legacy_zsh_block(rc_content: str) -> str:
             # (see the pre-fix source), preceded by one blank line.
             j = i + 1
             while j < len(lines) and lines[j].strip() in (
-                "fpath=($HOME/.zfunc $fpath)", "compinit",
+                "fpath=($HOME/.zfunc $fpath)",
+                "compinit",
             ):
                 j += 1
             if out and out[-1].strip() == "":
@@ -173,9 +170,7 @@ def _install_zsh(marker: str, console: Console) -> None:
     # Line-exact match: `_ZSH_MARKER_V1` is a string-prefix of the v2
     # marker, so a naive `in` check would misfire on a file that only has
     # the v2 block.
-    has_legacy = any(
-        line.strip() == _ZSH_MARKER_V1 for line in rc_content.splitlines()
-    )
+    has_legacy = any(line.strip() == _ZSH_MARKER_V1 for line in rc_content.splitlines())
     if marker in rc_content and not has_legacy:
         print_info("already installed", console=console)
         return

@@ -22,7 +22,7 @@ class NuRenderer(ShellRenderer):
         """Return ``'nu'``."""
         return "nu"
 
-    def render_alias(self, name: str, alias: "Alias") -> str:
+    def render_alias(self, name: str, alias: Alias) -> str:
         """Return a nushell-compatible function definition.
 
         Both append-mode and template-mode aliases delegate to

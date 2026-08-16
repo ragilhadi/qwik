@@ -9,13 +9,14 @@ from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from pathlib import Path
+
     from qwik.core.models import Alias
 
 __all__ = [
+    "SUPPORTED_SHELLS",  # noqa: F822 — provided lazily by module __getattr__ below
     "ShellRenderer",
     "get_renderer",
     "supported_shells",
-    "SUPPORTED_SHELLS",
 ]
 
 _ENTRY_POINT_GROUP = "qwik.shell_renderers"
@@ -38,10 +39,7 @@ def supported_shells() -> tuple[str, ...]:
 @functools.cache
 def _renderer_registry() -> dict[str, type]:
     """Return ``{shell_name: renderer_class}``, loaded and cached once."""
-    return {
-        ep.name: ep.load()
-        for ep in importlib.metadata.entry_points(group=_ENTRY_POINT_GROUP)
-    }
+    return {ep.name: ep.load() for ep in importlib.metadata.entry_points(group=_ENTRY_POINT_GROUP)}
 
 
 def __getattr__(name: str) -> Any:
@@ -71,7 +69,7 @@ class ShellRenderer(ABC):
         ...
 
     @abstractmethod
-    def render_alias(self, name: str, alias: "Alias") -> str:
+    def render_alias(self, name: str, alias: Alias) -> str:
         """Return a single alias/function definition for *name*.
 
         Args:
@@ -91,7 +89,7 @@ class ShellRenderer(ABC):
         """Return an optional footer emitted after alias definitions."""
         return ""
 
-    def rc_path(self) -> "Path | None":
+    def rc_path(self) -> Path | None:
         """Return the RC file path for this shell, or ``None`` if unsupported."""
         return None
 
@@ -99,7 +97,7 @@ class ShellRenderer(ABC):
         """Return the hook line to append to the RC file, or ``None``."""
         return None
 
-    def render_all(self, aliases: dict[str, "Alias"]) -> str:
+    def render_all(self, aliases: dict[str, Alias]) -> str:
         """Render a complete hook snippet for the given alias map.
 
         Only **enabled** aliases are included.  Output is sorted by name
@@ -132,7 +130,5 @@ def get_renderer(shell: str) -> ShellRenderer:
     shell = shell.lower().strip()
     cls = _renderer_registry().get(shell)
     if cls is None:
-        raise ValueError(
-            f"Unsupported shell: {shell}. Choose from {supported_shells()}."
-        )
+        raise ValueError(f"Unsupported shell: {shell}. Choose from {supported_shells()}.")
     return cast("ShellRenderer", cls())

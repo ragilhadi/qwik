@@ -51,7 +51,7 @@ def run_command(
         expanded = expand(alias.command, args or [], shell=active_shell)
     except ValueError as exc:
         print_error(str(exc), console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     # The banner must never touch stdout: `qwik run` is meant to be
     # composable in pipes and `$(...)` captures, and a decorated status
@@ -59,13 +59,11 @@ def run_command(
     # is also only useful to a human watching the terminal, so it is
     # skipped entirely when stdout isn't a TTY (e.g. piped or captured).
     if sys.stdout.isatty():
-        print_success(
-            f'Running "{name}" → {expanded!r}', console=get_console(stderr=True)
-        )
+        print_success(f'Running "{name}" → {expanded!r}', console=get_console(stderr=True))
     returncode = 1
     try:
         cmd, use_shell = build_invocation(expanded, active_shell)
-        result = subprocess.run(cmd, shell=use_shell)
+        result = subprocess.run(cmd, shell=use_shell, check=False)
         returncode = result.returncode
     except KeyboardInterrupt:
         # Child received SIGINT (e.g. user hit Ctrl+C on docker stats).

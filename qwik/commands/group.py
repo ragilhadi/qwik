@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import typer
 
@@ -30,7 +30,7 @@ def group_command(
             f'Invalid group "{group}": {exc}',
             console=console,
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     with store.mutate() as data:
         alias = data.get(name)
@@ -43,7 +43,7 @@ def group_command(
             raise typer.Exit(0)
 
         alias.group = validated
-        alias.updated_at = datetime.now(timezone.utc)
+        alias.updated_at = datetime.now(UTC)
 
     print_success(f'Grouped "{name}" under "{validated}".', console=console)
 
@@ -66,6 +66,6 @@ def ungroup_command(
             raise typer.Exit(0)
 
         alias.group = None
-        alias.updated_at = datetime.now(timezone.utc)
+        alias.updated_at = datetime.now(UTC)
 
     print_success(f'Removed group from "{name}".', console=console)

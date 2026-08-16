@@ -156,24 +156,18 @@ class TestPwshHookDetection:
     def test_pwsh_hook_present(self, tmp_path, monkeypatch) -> None:
         rc = tmp_path / "Microsoft.PowerShell_profile.ps1"
         rc.write_text("# qwik shell hook (pwsh)\nInvoke-Expression (qwik init pwsh)\n")
-        monkeypatch.setattr(
-            "qwik.shells.pwsh.PwshRenderer.rc_path", lambda self: rc
-        )
+        monkeypatch.setattr("qwik.shells.pwsh.PwshRenderer.rc_path", lambda self: rc)
         assert _hook_installed("pwsh") is True
 
     def test_pwsh_hook_absent_empty(self, tmp_path, monkeypatch) -> None:
         rc = tmp_path / "Microsoft.PowerShell_profile.ps1"
         rc.write_text("")
-        monkeypatch.setattr(
-            "qwik.shells.pwsh.PwshRenderer.rc_path", lambda self: rc
-        )
+        monkeypatch.setattr("qwik.shells.pwsh.PwshRenderer.rc_path", lambda self: rc)
         assert _hook_installed("pwsh") is False
 
     def test_pwsh_hook_absent_missing(self, tmp_path, monkeypatch) -> None:
         rc = tmp_path / "missing_profile.ps1"
-        monkeypatch.setattr(
-            "qwik.shells.pwsh.PwshRenderer.rc_path", lambda self: rc
-        )
+        monkeypatch.setattr("qwik.shells.pwsh.PwshRenderer.rc_path", lambda self: rc)
         assert _hook_installed("pwsh") is False
 
 
@@ -212,9 +206,7 @@ class TestRestoreFromBackup:
         """Overwrite the live store with invalid TOML."""
         (tmp_path / "aliases.toml").write_text("not-valid", encoding="utf-8")
 
-    def test_doctor_offers_restore_on_corrupt_store(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
+    def test_doctor_offers_restore_on_corrupt_store(self, tmp_path: Path, monkeypatch) -> None:
         from qwik.config import _reset_config
         from qwik.core.store import get_store
 
@@ -230,9 +222,7 @@ class TestRestoreFromBackup:
         assert "gs" in data.aliases
         assert "gp" in data.aliases
 
-    def test_doctor_decline_keeps_corrupt_store(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
+    def test_doctor_decline_keeps_corrupt_store(self, tmp_path: Path, monkeypatch) -> None:
         from qwik.config import _reset_config
         from qwik.core.store import get_store
 
@@ -263,9 +253,7 @@ class TestRestoreFromBackup:
         assert result.exit_code == 1
         assert "manual" in result.output.lower() or "backup" in result.output.lower()
 
-    def test_doctor_skips_invalid_backups(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
+    def test_doctor_skips_invalid_backups(self, tmp_path: Path, monkeypatch) -> None:
         from qwik.config import _reset_config
         from qwik.core.store import get_store
 
@@ -298,9 +286,7 @@ class TestLatestValidBackupHelper:
             'version = 1\n[aliases.a]\ncommand = "x"\n', encoding="utf-8"
         )
         newest = backups / "aliases-20260719-120000-000002-0002.toml"
-        newest.write_text(
-            'version = 1\n[aliases.b]\ncommand = "y"\n', encoding="utf-8"
-        )
+        newest.write_text('version = 1\n[aliases.b]\ncommand = "y"\n', encoding="utf-8")
         result = _latest_valid_backup(backups)
         assert result is not None
         assert result.name == "aliases-20260719-120000-000002-0002.toml"
@@ -312,7 +298,5 @@ class TestLatestValidBackupHelper:
             "not-valid", encoding="utf-8"
         )
         good = backups / "aliases-20260719-120000-000002-0002.toml"
-        good.write_text(
-            'version = 1\n[aliases.a]\ncommand = "x"\n', encoding="utf-8"
-        )
+        good.write_text('version = 1\n[aliases.a]\ncommand = "x"\n', encoding="utf-8")
         assert _latest_valid_backup(backups) == good

@@ -7,8 +7,8 @@ from rapidfuzz import fuzz
 from qwik.core.models import Alias, AliasStore
 
 __all__ = [
-    "search_aliases",
     "score_alias",
+    "search_aliases",
 ]
 
 # Fields to scan during a search, in order of relevance.
@@ -37,20 +37,11 @@ def score_alias(alias: Alias, name: str, query: str) -> float:
         (fuzz.ratio(t.lower(), query.lower()) for t in alias.tag),
         default=0,
     )
-    group_score = (
-        fuzz.ratio(alias.group.lower(), query.lower()) if alias.group else 0
-    )
-    field_text = " ".join(
-        getattr(alias, f, "") for f in _SEARCH_FIELDS if getattr(alias, f, "")
-    )
+    group_score = fuzz.ratio(alias.group.lower(), query.lower()) if alias.group else 0
+    field_text = " ".join(getattr(alias, f, "") for f in _SEARCH_FIELDS if getattr(alias, f, ""))
     field_score = fuzz.ratio(field_text.lower(), query.lower())
 
-    return (
-        name_score * 0.5
-        + tag_score * 0.2
-        + group_score * 0.05
-        + field_score * 0.25
-    )
+    return name_score * 0.5 + tag_score * 0.2 + group_score * 0.05 + field_score * 0.25
 
 
 def search_aliases(

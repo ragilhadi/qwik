@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import typer
 
@@ -29,7 +29,7 @@ def tag_command(
 
         if tag not in alias.tag:
             alias.tag.append(tag)
-            alias.updated_at = datetime.now(timezone.utc)
+            alias.updated_at = datetime.now(UTC)
 
     print_success(f'Tagged "{name}" with "{tag}".', console=console)
 
@@ -50,6 +50,6 @@ def untag_command(
 
         if tag in alias.tag:
             alias.tag.remove(tag)
-            alias.updated_at = datetime.now(timezone.utc)
+            alias.updated_at = datetime.now(UTC)
 
     print_success(f'Removed tag "{tag}" from "{name}".', console=console)

@@ -8,7 +8,8 @@ allowing older files to be loaded.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 __all__ = [
     "LATEST_VERSION",
@@ -18,19 +19,20 @@ __all__ = [
 
 LATEST_VERSION: int = 1
 
-_MIGRATORS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {}
+_Migration = Callable[[dict[str, Any]], dict[str, Any]]
+
+_MIGRATORS: dict[int, _Migration] = {}
 
 
-def migrator(from_version: int) -> Callable[[Callable[[dict[str, Any]], dict[str, Any]]], Callable[[dict[str, Any]], dict[str, Any]]]:
+def migrator(from_version: int) -> Callable[[_Migration], _Migration]:
     """Register a migration from *from_version* to ``from_version + 1``.
 
     The decorated callable receives a dict in the *from_version* shape and
     must return a dict in the *from_version + 1* shape, setting
     ``data["version"] = from_version + 1``.
     """
-    def decorator(
-        fn: Callable[[dict[str, Any]], dict[str, Any]],
-    ) -> Callable[[dict[str, Any]], dict[str, Any]]:
+
+    def decorator(fn: _Migration) -> _Migration:
         _MIGRATORS[from_version] = fn
         return fn
 
@@ -44,7 +46,12 @@ def migrate(data: dict[str, Any]) -> dict[str, Any]:
     :data:`LATEST_VERSION` raises :class:`RuntimeError` with an
     actionable message.
     """
-    v: int = data.get("version", 0)
+    v = data.get("version", 0)
+    if not isinstance(v, int):
+        raise RuntimeError(
+            f"Store version {v!r} is not a valid integer. "
+            f"Run `qwik doctor` to diagnose or restore from backup."
+        )
     if v > LATEST_VERSION:
         raise RuntimeError(
             f"Store version {v} is newer than supported (max {LATEST_VERSION}). "

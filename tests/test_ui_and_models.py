@@ -1,13 +1,13 @@
 """Tests for theme, tables, prompts, and search coverage gaps."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from qwik.core.models import Alias, AliasStore
 from qwik.core.search import search_aliases
-from qwik.ui.theme import style, get_console
 from qwik.ui.tables import render_list_table
+from qwik.ui.theme import get_console, style
 
 
 class TestTheme:
@@ -129,13 +129,13 @@ class TestModelsCoverage:
     def test_format_last_used_hours(self) -> None:
         """Cover format_last_used 'hour(s) ago' branch (line 108)."""
         alias = Alias(command="echo hi")
-        alias.last_used = datetime.now(timezone.utc) - timedelta(hours=2)
+        alias.last_used = datetime.now(UTC) - timedelta(hours=2)
         assert "hour" in alias.format_last_used()
 
     def test_format_last_used_days(self) -> None:
         """Cover format_last_used 'day(s) ago' branch (line 106)."""
         alias = Alias(command="echo hi")
-        alias.last_used = datetime.now(timezone.utc) - timedelta(days=3)
+        alias.last_used = datetime.now(UTC) - timedelta(days=3)
         assert "day" in alias.format_last_used()
 
     def test_format_last_used_just_now(self) -> None:

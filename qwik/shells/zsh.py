@@ -21,7 +21,7 @@ class ZshRenderer(ShellRenderer):
         """Return ``'zsh'``."""
         return "zsh"
 
-    def render_alias(self, name: str, alias: "Alias") -> str:
+    def render_alias(self, name: str, alias: Alias) -> str:
         """Return a zsh-compatible alias or function.
 
         Logic is identical to :class:`~qwik.shells.bash.BashRenderer`.

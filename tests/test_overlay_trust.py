@@ -26,9 +26,7 @@ from qwik.cli import app
 
 runner = CliRunner()
 
-pytestmark = pytest.mark.skipif(
-    shutil.which("git") is None, reason="git not installed"
-)
+pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
 
 def _git(args: list[str], cwd: Path) -> None:
@@ -96,9 +94,7 @@ class TestOverlayAddPreview:
         _setup(tmp_path, monkeypatch)
         remote = _make_remote(tmp_path, {"teamalias": "echo team"})
         with patch("qwik.commands.importer.prompt_confirm", return_value=False):
-            runner.invoke(
-                app, ["overlay", "add", "--url", str(remote), "--branch", "main"]
-            )
+            runner.invoke(app, ["overlay", "add", "--url", str(remote), "--branch", "main"])
         assert not (tmp_path / "overlay.toml").exists()
         assert not (tmp_path / "overlay-repo").exists()
 
@@ -121,13 +117,14 @@ class TestOverlayAddPreview:
         # init` + `remote add` + `pull` (the old approach) does not.
         _setup(tmp_path, monkeypatch)
         remote = _make_remote(tmp_path, {"teamalias": "echo team"})
-        runner.invoke(
-            app, ["overlay", "add", "--url", str(remote), "--branch", "main", "--yes"]
-        )
+        runner.invoke(app, ["overlay", "add", "--url", str(remote), "--branch", "main", "--yes"])
         overlay_repo = tmp_path / "overlay-repo"
         result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "main@{upstream}"],
-            cwd=overlay_repo, capture_output=True, text=True,
+            cwd=overlay_repo,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         assert result.returncode == 0
         assert result.stdout.strip() == "origin/main"
@@ -135,9 +132,7 @@ class TestOverlayAddPreview:
     def test_add_when_already_configured_errors(self, tmp_path, monkeypatch):
         _setup(tmp_path, monkeypatch)
         remote = _make_remote(tmp_path, {"teamalias": "echo team"})
-        runner.invoke(
-            app, ["overlay", "add", "--url", str(remote), "--branch", "main", "--yes"]
-        )
+        runner.invoke(app, ["overlay", "add", "--url", str(remote), "--branch", "main", "--yes"])
         result = runner.invoke(
             app, ["overlay", "add", "--url", str(remote), "--branch", "main", "--yes"]
         )
@@ -151,9 +146,7 @@ class TestOverlayUpdatePreview:
             app, ["overlay", "add", "--url", str(remote), "--branch", "main", "--yes"]
         )
 
-    def test_no_changes_reports_up_to_date_without_prompting(
-        self, tmp_path, monkeypatch
-    ):
+    def test_no_changes_reports_up_to_date_without_prompting(self, tmp_path, monkeypatch):
         _setup(tmp_path, monkeypatch)
         remote = _make_remote(tmp_path, {"a": "echo a"})
         self._add(tmp_path, remote)
@@ -164,9 +157,7 @@ class TestOverlayUpdatePreview:
         assert result.exit_code == 0
         assert "up to date" in result.output.lower()
 
-    def test_update_shows_added_changed_removed_and_prompts(
-        self, tmp_path, monkeypatch
-    ):
+    def test_update_shows_added_changed_removed_and_prompts(self, tmp_path, monkeypatch):
         _setup(tmp_path, monkeypatch)
         remote = _make_remote(tmp_path, {"a": "echo a", "b": "echo b"})
         self._add(tmp_path, remote)

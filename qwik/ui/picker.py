@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from qwik.core.models import Alias, AliasStore
 
-__all__ = ["run_picker", "PickerAction", "PickerResult"]
+__all__ = ["PickerAction", "PickerResult", "run_picker"]
 
 
 class PickerAction(Enum):
@@ -52,7 +52,7 @@ class PickerResult:
     name: str
 
 
-def _build_style() -> "PTStyle":
+def _build_style() -> PTStyle:
     from prompt_toolkit.styles import Style as PTStyle
 
     from qwik.ui.theme import _no_color_active
@@ -105,11 +105,11 @@ class _PickerState:
 
 
 def _bind_keys(
-    kb: "KeyBindings",
-    store: "AliasStore",
+    kb: KeyBindings,
+    store: AliasStore,
     state: _PickerState,
-    result_window: "Window",
-    preview_window: "Window",
+    result_window: Window,
+    preview_window: Window,
 ) -> None:
     from prompt_toolkit.layout.controls import FormattedTextControl
 
@@ -168,10 +168,10 @@ def _bind_keys(
 
 
 def run_picker(
-    store: "AliasStore",
+    store: AliasStore,
     *,
-    input_: "Input | None" = None,
-    output: "Output | None" = None,
+    input_: Input | None = None,
+    output: Output | None = None,
 ) -> PickerResult | None:
     """Run the interactive fuzzy picker and return the chosen action.
 
@@ -183,9 +183,7 @@ def run_picker(
         chose (run/edit/delete), or ``None`` if the user cancelled.
     """
     if not store.all_aliases():
-        get_console().print(
-            "[qwik.error]No aliases found. Run `qwik add` first.[/qwik.error]"
-        )
+        get_console().print("[qwik.error]No aliases found. Run `qwik add` first.[/qwik.error]")
         return None
 
     # Deferred until an interactive session is actually needed (see the
@@ -218,9 +216,7 @@ def run_picker(
     _bind_keys(kb, store, state, result_window, preview_window)
 
     input_buffer = Buffer(
-        on_text_changed=lambda buf: _refresh(
-            store, state, result_window, preview_window, buf.text
-        ),
+        on_text_changed=lambda buf: _refresh(store, state, result_window, preview_window, buf.text),
         multiline=False,
     )
 
@@ -229,9 +225,7 @@ def run_picker(
             [
                 Window(
                     height=1,
-                    content=FormattedTextControl(
-                        [("bold", "qwik pick — type to filter")]
-                    ),
+                    content=FormattedTextControl([("bold", "qwik pick — type to filter")]),
                 ),
                 Window(height=1, char="─"),
                 Window(height=1, content=BufferControl(buffer=input_buffer)),
@@ -246,7 +240,8 @@ def run_picker(
                         [
                             (
                                 "dim",
-                                "↑↓ navigate  Enter run  Ctrl-E edit  Ctrl-D delete  Ctrl-R history  Esc cancel",
+                                "↑↓ navigate  Enter run  Ctrl-E edit  Ctrl-D delete  "
+                                "Ctrl-R history  Esc cancel",
                             )
                         ]
                     ),
@@ -272,10 +267,10 @@ def run_picker(
 
 
 def _refresh(
-    store: "AliasStore",
+    store: AliasStore,
     state: _PickerState,
-    result_window: "Window",
-    preview_window: "Window",
+    result_window: Window,
+    preview_window: Window,
     query: str,
 ) -> None:
     from prompt_toolkit.layout.controls import FormattedTextControl
@@ -288,7 +283,7 @@ def _refresh(
 
     if state.history_mode:
         state.results.sort(
-            key=lambda t: t[1].last_used or datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda t: t[1].last_used or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
 

@@ -19,9 +19,7 @@ def _setup_with_overlay(tmp_path, monkeypatch, overlay_aliases: dict[str, str]):
 
     config = tmp_path / "overlay.toml"
     config.write_text(
-        tomlkit.dumps(
-            {"url": "https://example.com", "branch": "main", "auto_update": False}
-        )
+        tomlkit.dumps({"url": "https://example.com", "branch": "main", "auto_update": False})
     )
 
     overlay_repo = tmp_path / "overlay-repo"
@@ -133,9 +131,7 @@ def test_list_overlay_only_store_no_user_aliases(tmp_path, monkeypatch):
     import tomlkit
 
     config.write_text(
-        tomlkit.dumps(
-            {"url": "https://example.com", "branch": "main", "auto_update": False}
-        )
+        tomlkit.dumps({"url": "https://example.com", "branch": "main", "auto_update": False})
     )
     overlay_repo = tmp_path / "overlay-repo"
     overlay_repo.mkdir(parents=True)
@@ -188,9 +184,7 @@ def test_list_tag_filter_applies_to_overlay_aliases(tmp_path, monkeypatch):
     import tomlkit
 
     config.write_text(
-        tomlkit.dumps(
-            {"url": "https://example.com", "branch": "main", "auto_update": False}
-        )
+        tomlkit.dumps({"url": "https://example.com", "branch": "main", "auto_update": False})
     )
     overlay_repo = tmp_path / "overlay-repo"
     overlay_repo.mkdir(parents=True)

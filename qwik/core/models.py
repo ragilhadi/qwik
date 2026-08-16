@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -38,9 +38,7 @@ def validate_alias_name(name: str) -> str:
             or otherwise fails the syntax check.
     """
     if not _ALIAS_NAME_RE.match(name):
-        raise ValueError(
-            f'Invalid name "{name}": names must match ' r"^[A-Za-z_][A-Za-z0-9_-]*$"
-        )
+        raise ValueError(f'Invalid name "{name}": names must match ' r"^[A-Za-z_][A-Za-z0-9_-]*$")
     return name
 
 
@@ -72,8 +70,8 @@ class Alias(BaseModel):
     group: str | None = None
     description: str = ""
     enabled: bool = True
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_used: datetime | None = None
     run_count: int = 0
 
@@ -105,13 +103,12 @@ class Alias(BaseModel):
             return None
         if not _GROUP_NAME_RE.match(cleaned):
             raise ValueError(
-                f'Invalid group "{cleaned}": groups must match '
-                r"^[A-Za-z_][A-Za-z0-9_-]*$"
+                f'Invalid group "{cleaned}": groups must match ' r"^[A-Za-z_][A-Za-z0-9_-]*$"
             )
         return cleaned
 
     @model_validator(mode="after")
-    def _check_updated(self) -> "Alias":
+    def _check_updated(self) -> Alias:
         """Ensure ``updated_at`` is not earlier than ``created_at``."""
         if self.updated_at < self.created_at:
             raise ValueError("updated_at cannot be earlier than created_at")
@@ -119,7 +116,7 @@ class Alias(BaseModel):
 
     def bump_usage(self) -> None:
         """Update ``last_used`` and increment ``run_count``."""
-        self.last_used = datetime.now(timezone.utc)
+        self.last_used = datetime.now(UTC)
         self.run_count += 1
 
     def format_last_used(self) -> str:
@@ -130,7 +127,7 @@ class Alias(BaseModel):
         """
         if self.last_used is None:
             return "never"
-        delta = datetime.now(timezone.utc) - self.last_used
+        delta = datetime.now(UTC) - self.last_used
         if delta.days > 0:
             return f"{delta.days} day{'s' if delta.days > 1 else ''} ago"
         hours = delta.seconds // 3600
@@ -157,7 +154,7 @@ class AliasStore(BaseModel):
     version: int = 1
 
     @model_validator(mode="after")
-    def _validate_names(self) -> "AliasStore":
+    def _validate_names(self) -> AliasStore:
         """Run every alias key through the name validator."""
         for name in self.aliases:
             validate_alias_name(name)
@@ -232,4 +229,4 @@ class AliasStore(BaseModel):
         if new in self.aliases:
             raise KeyError(f'Alias "{new}" already exists.')
         self.aliases[new] = self.aliases.pop(old)
-        self.aliases[new].updated_at = datetime.now(timezone.utc)
+        self.aliases[new].updated_at = datetime.now(UTC)
