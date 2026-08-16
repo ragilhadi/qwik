@@ -232,12 +232,10 @@ def _do_copy(config: Config, name: str, *, console: "Console") -> None:
         raise typer.Exit(1)
 
     store = get_store()
-    data = store.load()
+    with store.mutate() as data:
+        if name in data.aliases:
+            print_warning(f"'{name}' already exists in user store.", console=console)
+            raise typer.Exit(0)
 
-    if name in data.aliases:
-        print_warning(f"'{name}' already exists in user store.", console=console)
-        raise typer.Exit(0)
-
-    data.add(name, incoming.aliases[name])
-    store.save_with_backup(data)
+        data.add(name, incoming.aliases[name])
     print_success(f"Copied '{name}' from overlay to user store.", console=console)

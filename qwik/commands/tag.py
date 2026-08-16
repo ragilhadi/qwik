@@ -19,18 +19,17 @@ def tag_command(
 ) -> None:
     """Attach a tag to an alias."""
     store = get_store()
-    data = store.load()
     console = Console()
 
-    alias = data.get(name)
-    if alias is None:
-        print_error(f'Alias "{name}" does not exist.', console=console)
-        raise typer.Exit(1)
+    with store.mutate() as data:
+        alias = data.get(name)
+        if alias is None:
+            print_error(f'Alias "{name}" does not exist.', console=console)
+            raise typer.Exit(1)
 
-    if tag not in alias.tag:
-        alias.tag.append(tag)
-        alias.updated_at = datetime.now(timezone.utc)
-        store.save_with_backup(data)
+        if tag not in alias.tag:
+            alias.tag.append(tag)
+            alias.updated_at = datetime.now(timezone.utc)
 
     print_success(f'Tagged "{name}" with "{tag}".', console=console)
 
@@ -41,17 +40,16 @@ def untag_command(
 ) -> None:
     """Remove a tag from an alias."""
     store = get_store()
-    data = store.load()
     console = Console()
 
-    alias = data.get(name)
-    if alias is None:
-        print_error(f'Alias "{name}" does not exist.', console=console)
-        raise typer.Exit(1)
+    with store.mutate() as data:
+        alias = data.get(name)
+        if alias is None:
+            print_error(f'Alias "{name}" does not exist.', console=console)
+            raise typer.Exit(1)
 
-    if tag in alias.tag:
-        alias.tag.remove(tag)
-        alias.updated_at = datetime.now(timezone.utc)
-        store.save_with_backup(data)
+        if tag in alias.tag:
+            alias.tag.remove(tag)
+            alias.updated_at = datetime.now(timezone.utc)
 
     print_success(f'Removed tag "{tag}" from "{name}".', console=console)

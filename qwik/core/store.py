@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import itertools
-import shutil
 import os
+import shutil
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -136,9 +139,21 @@ class Store:
         """
         self._config.ensure_dirs()
         doc = self._store_to_document(store)
-        temp = self._path.with_suffix(f".tmp-{os.getpid()}")
-        temp.write_text(tomlkit.dumps(doc), encoding="utf-8")
-        temp.replace(self._path)
+        # A PID-suffixed name is not unique enough: PIDs are recycled and
+        # are not unique across containers or network-mounted config dirs.
+        # mkstemp in the destination directory guarantees a unique name and
+        # keeps the final os.replace() on the same filesystem (atomic).
+        fd, temp_name = tempfile.mkstemp(
+            prefix=f"{self._path.name}.tmp-", dir=self._path.parent
+        )
+        temp = Path(temp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(tomlkit.dumps(doc))
+            temp.replace(self._path)
+        except BaseException:
+            temp.unlink(missing_ok=True)
+            raise
 
     def bump_usage(self, name: str) -> None:
         """Increment ``run_count`` / update ``last_used`` for *name* only.
@@ -156,6 +171,46 @@ class Store:
                 return
             alias.bump_usage()
             self.save(data)
+
+    @contextmanager
+    def mutate(self, *, include_overlay: bool = True) -> Iterator[AliasStore]:
+        """Load the freshest on-disk state under the store lock, mutate, save.
+
+        Acquires the store's file lock, (re)loads the current on-disk
+        state, and yields it for in-place mutation. If the ``with`` block
+        exits normally, the store is saved (with backup) before the lock
+        is released — but only if the yielded store actually changed, so
+        a no-op mutation does not create a needless backup. If the block
+        raises (including ``typer.Exit``), nothing is saved.
+
+        This exists so that no command can perform an unlocked
+        read-modify-write: two concurrent commands that both read the
+        store before either writes back would otherwise silently lose
+        whichever write lost the race.
+
+        Any interactive prompt (confirmation, ``$EDITOR``, ...) must
+        happen *before* entering this context manager — holding the lock
+        across a blocking prompt would stall every other qwik process for
+        the lock's timeout. Re-validate against the freshly loaded store
+        yielded here rather than trusting an earlier unlocked read, since
+        another process may have mutated the store in the meantime.
+
+        Args:
+            include_overlay: Forwarded to :meth:`load`.
+
+        Yields:
+            The freshly loaded :class:`AliasStore`, safe to mutate in place.
+        """
+        from qwik.core.locking import FileLock
+
+        lock = FileLock(self._path.with_suffix(".toml.lock"))
+        with lock:
+            data = self.load(include_overlay=include_overlay)
+            before = data.model_dump(exclude={"overlay_aliases"})
+            yield data
+            after = data.model_dump(exclude={"overlay_aliases"})
+            if after != before:
+                self.save_with_backup(data)
 
     def save_with_backup(self, store: AliasStore) -> None:
         """Persist *store* after creating a backup of the existing file.

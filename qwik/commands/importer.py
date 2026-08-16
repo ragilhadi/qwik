@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from qwik.core.locking import FileLock
 from qwik.core.models import AliasStore
 from qwik.core.store import Store, get_store
 from qwik.ui.prompts import print_error, print_success, prompt_confirm
@@ -122,8 +123,12 @@ def preview_and_merge(
     """
     if not preview_import(incoming, data, yes=yes, console=console):
         return None
-    counts = merge_into(incoming, data)
-    store.save_with_backup(data)
+    # The preview above ran against an unlocked, possibly-stale `data` so
+    # a confirmation prompt never holds the store lock. Merge against a
+    # freshly reloaded store instead, so a concurrent mutation made while
+    # the user was reading the preview isn't clobbered by this write.
+    with store.mutate() as fresh_data:
+        counts = merge_into(incoming, fresh_data)
     return counts
 
 
@@ -168,7 +173,13 @@ def import_command(
     if overwrite:
         if not preview_import(incoming, data, yes=yes, console=console):
             raise typer.Exit(0)
-        store.save_with_backup(incoming)
+        # Not a mutate() read-modify-write: --overwrite deliberately
+        # replaces the whole store regardless of concurrent changes. Still
+        # take the lock so this write can't interleave with another
+        # process's write and corrupt the file.
+        lock = FileLock(store.path.with_suffix(".toml.lock"))
+        with lock:
+            store.save_with_backup(incoming)
         print_success(f"Imported {len(incoming.aliases)} aliases.", console=console)
         return
 
