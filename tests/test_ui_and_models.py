@@ -84,6 +84,46 @@ class TestSearch:
         assert len(results) == 1
         assert results[0][0] == "gs"
 
+    def test_search_empty_query_respects_limit(self) -> None:
+        # Regression: the empty-query early return skipped the limit
+        # slice entirely, so a caller asking for e.g. 20 results could
+        # get back every alias in the store — on the picker's hot path,
+        # called on every keystroke including the initial empty render.
+        store = AliasStore()
+        for i in range(500):
+            store.add(f"a{i}", Alias(command="x"))
+        results = search_aliases(store, "", limit=20)
+        assert len(results) == 20
+
+    def test_search_whitespace_query_respects_limit(self) -> None:
+        store = AliasStore()
+        for i in range(500):
+            store.add(f"a{i}", Alias(command="x"))
+        results = search_aliases(store, "   ", limit=20)
+        assert len(results) == 20
+
+    def test_search_non_matching_query_respects_limit(self) -> None:
+        store = AliasStore()
+        for i in range(500):
+            store.add(f"a{i}", Alias(command="x"))
+        results = search_aliases(store, "zzz-does-not-match-anything", limit=20)
+        assert len(results) == 20
+
+    def test_search_empty_query_alphabetical_order_preserved(self) -> None:
+        # The limit fix must not disturb the empty-query path's
+        # alphabetical sort.
+        store = AliasStore()
+        for name in ["charlie", "alpha", "bravo"]:
+            store.add(name, Alias(command="x"))
+        results = search_aliases(store, "", limit=10)
+        assert [name for name, _, _ in results] == ["alpha", "bravo", "charlie"]
+
+    def test_search_empty_query_limit_larger_than_store(self) -> None:
+        store = AliasStore()
+        store.add("a", Alias(command="x"))
+        results = search_aliases(store, "", limit=50)
+        assert len(results) == 1
+
 
 class TestModelsCoverage:
     def test_format_last_used_hours(self) -> None:
