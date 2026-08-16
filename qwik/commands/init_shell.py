@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
@@ -55,9 +55,7 @@ def _rc_path(shell: str) -> Path | None:
 
                 csidl_personal = 5
                 buf = ctypes.create_unicode_buffer(260)
-                ctypes.windll.shell32.SHGetFolderPathW(
-                    None, csidl_personal, None, 0, buf
-                )
+                ctypes.windll.shell32.SHGetFolderPathW(None, csidl_personal, None, 0, buf)
                 pwsh_dir = Path(buf.value) / "PowerShell"
             except Exception:
                 pwsh_dir = docs / "Documents" / "PowerShell"
@@ -71,9 +69,7 @@ def _rc_path(shell: str) -> Path | None:
 
 
 def init_shell_command(
-    shell: str = typer.Argument(
-        "bash", help="Target shell (e.g. bash, zsh, fish, pwsh, cmd)."
-    ),
+    shell: str = typer.Argument("bash", help="Target shell (e.g. bash, zsh, fish, pwsh, cmd)."),
     install: bool = typer.Option(
         False, "--install", "-i", help="Append hook to rc file with backup."
     ),
@@ -87,7 +83,7 @@ def init_shell_command(
         renderer = get_renderer(shell)
     except ValueError as exc:
         print_error(str(exc), console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     snippet = renderer.render_all(data.all_aliases())
 
@@ -111,7 +107,7 @@ def init_shell_command(
         raise typer.Exit(0)
 
     if rc.exists():
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         backup = rc.parent / f"{rc.name}.qwik-backup-{stamp}"
         shutil.copy2(rc, backup)
         print_success(f"Backed up {rc} to {backup}", console=console)

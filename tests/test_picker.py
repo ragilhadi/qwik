@@ -3,7 +3,7 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 
 from qwik.core.models import Alias, AliasStore
-from qwik.ui.picker import PickerAction, PickerResult, run_picker, _build_style
+from qwik.ui.picker import PickerAction, PickerResult, _build_style, run_picker
 
 
 @pytest.fixture
@@ -63,18 +63,18 @@ def test_picker_style_respects_no_color(monkeypatch):
 
 
 def test_picker_result_lines_snapshot(store_with_aliases, snapshot):
-    from qwik.ui.picker import _get_result_lines
     from qwik.core.search import search_aliases
+    from qwik.ui.picker import _get_result_lines
+
     results = search_aliases(store_with_aliases, "", limit=50)
     lines = _get_result_lines(results, 0)
     assert lines == snapshot
 
 
 def test_picker_ctrl_r_toggles_history(store_with_aliases):
-    from qwik.core.models import Alias
     import datetime as dt
 
-    store_with_aliases.aliases["gs"].last_used = dt.datetime.now(dt.timezone.utc)
+    store_with_aliases.aliases["gs"].last_used = dt.datetime.now(dt.UTC)
     with create_pipe_input() as inp:
         inp.send_text("\x12\r")
         result = run_picker(store_with_aliases, input_=inp, output=DummyOutput())
@@ -85,12 +85,15 @@ def test_preview_shows_all_fields(store_with_aliases):
     from qwik.core.models import Alias
     from qwik.ui.picker import _get_preview_lines
 
-    store_with_aliases.add("full", Alias(
-        command="git status",
-        tag=["vcs"],
-        group="git",
-        description="Show working tree status",
-    ))
+    store_with_aliases.add(
+        "full",
+        Alias(
+            command="git status",
+            tag=["vcs"],
+            group="git",
+            description="Show working tree status",
+        ),
+    )
     results = [("full", store_with_aliases.aliases["full"], 1.0)]
     lines = _get_preview_lines(results, 0)
     text = "".join(s for _, s in lines)
@@ -140,12 +143,11 @@ class TestPickCommandEditDelete:
         from qwik.ui.picker import PickerAction, PickerResult
 
         monkeypatch.setattr(
-            pick_mod, "run_picker",
+            pick_mod,
+            "run_picker",
             lambda data: PickerResult(PickerAction.DELETE, "doomed"),
         )
-        monkeypatch.setattr(
-            "qwik.commands.remove.prompt_confirm", lambda *a, **k: True
-        )
+        monkeypatch.setattr("qwik.commands.remove.prompt_confirm", lambda *a, **k: True)
 
         import typer
 
@@ -163,12 +165,11 @@ class TestPickCommandEditDelete:
         from qwik.ui.picker import PickerAction, PickerResult
 
         monkeypatch.setattr(
-            pick_mod, "run_picker",
+            pick_mod,
+            "run_picker",
             lambda data: PickerResult(PickerAction.DELETE, "doomed"),
         )
-        monkeypatch.setattr(
-            "qwik.commands.remove.prompt_confirm", lambda *a, **k: False
-        )
+        monkeypatch.setattr("qwik.commands.remove.prompt_confirm", lambda *a, **k: False)
 
         import typer
 
@@ -184,7 +185,9 @@ class TestPickCommandEditDelete:
         import os
         import sys
 
-        snippet = 'command = "echo edited"\ntag = []\ngroup = ""\ndescription = ""\nenabled = true\n'
+        snippet = (
+            'command = "echo edited"\ntag = []\ngroup = ""\ndescription = ""\nenabled = true\n'
+        )
         if sys.platform == "win32":
             editor = tmp_path / "editor.bat"
             payload = tmp_path / "payload.txt"
@@ -210,7 +213,8 @@ class TestPickCommandEditDelete:
         from qwik.ui.picker import PickerAction, PickerResult
 
         monkeypatch.setattr(
-            pick_mod, "run_picker",
+            pick_mod,
+            "run_picker",
             lambda data: PickerResult(PickerAction.EDIT, "doomed"),
         )
 

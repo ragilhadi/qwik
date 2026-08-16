@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-
 import typer
 
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success, prompt_confirm
 from qwik.ui.theme import get_console
 
-__all__ = ["remove_command", "remove_alias"]
+__all__ = ["remove_alias", "remove_command"]
 
 
 def remove_command(
@@ -59,5 +58,5 @@ def remove_alias(name: str, *, yes: bool) -> None:
             fresh_data.remove(name)
     except KeyError as exc:
         print_error(str(exc), console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     print_success(f'Removed "{name}".', console=console)

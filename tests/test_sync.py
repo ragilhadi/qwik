@@ -119,9 +119,7 @@ class TestSyncInit:
         assert "add" in subcommands
         assert "commit" in subcommands
 
-    def test_sync_init_with_remote(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sync_init_with_remote(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         fake = _setup_env(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
         url = "https://example.com/dotfiles.git"
@@ -140,7 +138,7 @@ class TestSyncInit:
     def test_sync_init_remote_mismatch_errors(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        fake = _setup_env(tmp_path, monkeypatch)
+        _setup_env(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
         url_a = "https://example.com/a.git"
         runner.invoke(app, ["sync", "init", "--remote", url_a])
@@ -199,9 +197,7 @@ class TestSyncPush:
         assert "commit" not in subcommands
         assert "push" not in subcommands
 
-    def test_sync_no_remote(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sync_no_remote(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _setup_env(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
         # init without remote
@@ -212,9 +208,7 @@ class TestSyncPush:
 
 
 class TestSyncPull:
-    def test_sync_pull(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sync_pull(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         fake = _setup_env(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
         runner.invoke(app, ["sync", "init", "--remote", "https://example.com/d.git"])
@@ -250,7 +244,7 @@ class TestSyncPull:
     def test_sync_pull_reuses_import_merge(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        fake = _setup_env(tmp_path, monkeypatch)
+        _setup_env(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
         runner.invoke(app, ["sync", "init", "--remote", "https://example.com/d.git"])
         # simulate remote change that CONFLICTS: same name, different command
@@ -274,7 +268,7 @@ class TestSyncPull:
 
 class TestSyncStatus:
     def test_sync_status(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        fake = _setup_env(tmp_path, monkeypatch)
+        _setup_env(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
         runner.invoke(app, ["sync", "init", "--remote", "https://example.com/d.git"])
         result = runner.invoke(app, ["sync", "status"])
@@ -293,9 +287,7 @@ class TestSyncStatus:
 
 
 class TestSyncNoGit:
-    def test_sync_no_git(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sync_no_git(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from qwik.config import _reset_config
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
@@ -349,35 +341,27 @@ class TestSyncStatusDirty:
 
 
 class TestSyncErrorPaths:
-    def test_sync_unknown_action(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sync_unknown_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _setup_env(tmp_path, monkeypatch)
         result = runner.invoke(app, ["sync", "bogus"])
         assert result.exit_code == 1
         assert "Unknown sync action" in result.output
 
-    def test_sync_push_without_init(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sync_push_without_init(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _setup_env(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
         result = runner.invoke(app, ["sync", "push"])
         assert result.exit_code == 1
         assert "not initialized" in result.output.lower()
 
-    def test_sync_pull_without_init(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sync_pull_without_init(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _setup_env(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
         result = runner.invoke(app, ["sync", "pull", "--yes"])
         assert result.exit_code == 1
         assert "not initialized" in result.output.lower()
 
-    def test_sync_pull_no_remote(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sync_pull_no_remote(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _setup_env(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gs", "git", "status"])
         runner.invoke(app, ["sync", "init"])
@@ -396,8 +380,12 @@ class TestSyncErrorPaths:
         def failing_run(args, *, cwd=None, capture_output=False, text=False, check=False, **kwargs):
             sub = args[1] if len(args) > 1 else ""
             if sub == "pull":
-                raise subprocess.CalledProcessError(returncode=1, cmd=args, stderr="git pull failed: network", output="")
-            return fake.run(args, cwd=cwd, capture_output=capture_output, text=text, check=check, **kwargs)
+                raise subprocess.CalledProcessError(
+                    returncode=1, cmd=args, stderr="git pull failed: network", output=""
+                )
+            return fake.run(
+                args, cwd=cwd, capture_output=capture_output, text=text, check=check, **kwargs
+            )
 
         monkeypatch.setattr("qwik.core.git.subprocess.run", failing_run)
         result = runner.invoke(app, ["sync", "pull", "--yes"])

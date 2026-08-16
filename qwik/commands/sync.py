@@ -17,8 +17,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import typer
 import tomlkit
+import typer
 
 from qwik.commands.importer import merge_into, preview_import
 from qwik.config import get_config
@@ -32,9 +32,13 @@ from qwik.core.git import (
     has_remote,
     init_repo,
     is_dirty,
-    pull as git_pull,
-    push as git_push,
     status_short,
+)
+from qwik.core.git import (
+    pull as git_pull,
+)
+from qwik.core.git import (
+    push as git_push,
 )
 from qwik.core.locking import FileLock
 from qwik.core.models import AliasStore
@@ -135,7 +139,7 @@ def _do_init(
     remote: str | None,
     message: str,
     *,
-    console: "Console | None" = None,
+    console: Console | None = None,
 ) -> None:
     con = console if console is not None else get_console()
     config = get_config()
@@ -180,7 +184,7 @@ def _do_push(
     sync_repo: Path,
     message: str,
     *,
-    console: "Console | None" = None,
+    console: Console | None = None,
 ) -> None:
     con = console if console is not None else get_console()
     if not sync_repo.exists() or not (sync_repo / ".git").exists():
@@ -218,7 +222,7 @@ def _do_pull(
     sync_repo: Path,
     yes: bool,
     *,
-    console: "Console | None" = None,
+    console: Console | None = None,
 ) -> None:
     con = console if console is not None else get_console()
     if not sync_repo.exists() or not (sync_repo / ".git").exists():
@@ -243,7 +247,7 @@ def _do_pull(
         incoming = _read_sync_aliases(sync_repo)
     except RuntimeError as exc:
         print_error(str(exc), console=con)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     store = get_store()
     # Load without the lock for the preview/confirm so a user sitting at the
@@ -269,7 +273,7 @@ def _do_pull(
 def _do_status(
     sync_repo: Path,
     *,
-    console: "Console | None" = None,
+    console: Console | None = None,
 ) -> None:
     con = console if console is not None else get_console()
     if not sync_repo.exists() or not (sync_repo / ".git").exists():

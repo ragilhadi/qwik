@@ -100,6 +100,7 @@ class TestRunTemplates:
 class TestRunBackupChurn:
     def test_run_does_not_create_backup(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         runner.invoke(app, ["add", "hi", "echo", "hello"])
@@ -112,11 +113,13 @@ class TestRunBackupChurn:
 
     def test_run_count_increments(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         runner.invoke(app, ["add", "hi", "echo", "hello"])
         runner.invoke(app, ["run", "hi"])
         runner.invoke(app, ["run", "hi"])
         from qwik.core.store import get_store
+
         alias = get_store().load().get("hi")
         assert alias.run_count == 2

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import shlex
-from typing import Sequence
+from collections.abc import Sequence
 
 __all__ = [
     "expand",
@@ -89,6 +89,7 @@ def quote_for_shell(value: str, shell: str | None) -> str:
     if shell == "pwsh":
         return _quote_pwsh(value)
     return shlex.quote(value)
+
 
 _NAMED_RE = r"[A-Za-z_][A-Za-z0-9_-]*"
 _PLACEHOLDER_RE: re.Pattern[str] = re.compile(
@@ -205,9 +206,7 @@ def find_unrecognized_braces(command: str) -> list[str]:
         appearance. Empty when the command has no malformed placeholder
         attempts.
     """
-    valid_spans = [
-        (m.start(), m.end()) for m in _PLACEHOLDER_RE.finditer(command)
-    ]
+    valid_spans = [(m.start(), m.end()) for m in _PLACEHOLDER_RE.finditer(command)]
 
     def _overlaps_valid(start: int, end: int) -> bool:
         for vs, ve in valid_spans:
@@ -269,7 +268,7 @@ def validate_placeholders(command: str, args: Sequence[str]) -> None:
             idx = name_map[name]
             if idx > len(args):
                 raise ValueError(
-                    f'Missing argument for placeholder {{{name}}} '
+                    f"Missing argument for placeholder {{{name}}} "
                     f'(position {idx}) in alias: "{command}" '
                     f"(received {len(args)} argument(s))"
                 )
@@ -391,9 +390,7 @@ def expand(command: str, args: Sequence[str], *, shell: str | None = None) -> st
     validate_placeholders(command, args)
     name_map = _named_placeholder_index_map(command)
 
-    expanded = _PLACEHOLDER_RE.sub(
-        lambda m: _replacer(m, args, command, name_map, shell), command
-    )
+    expanded = _PLACEHOLDER_RE.sub(lambda m: _replacer(m, args, command, name_map, shell), command)
 
     surplus = _extract_surplus(command, args)
     if surplus:

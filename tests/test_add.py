@@ -67,6 +67,7 @@ class TestAddInteractive:
 class TestPlaceholderValidation:
     def test_add_rejects_zero_placeholder(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "bad", "echo {0}"])
@@ -75,6 +76,7 @@ class TestPlaceholderValidation:
 
     def test_add_accepts_valid_positional(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "gco", "git checkout {1}"])
@@ -84,6 +86,7 @@ class TestPlaceholderValidation:
 class TestMalformedPlaceholderCLI:
     def test_add_rejects_malformed_placeholder(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "foo", "echo {bad name}"])
@@ -93,6 +96,7 @@ class TestMalformedPlaceholderCLI:
 
     def test_add_accepts_literal_braces(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "zz_lit", "echo {}"])
@@ -103,6 +107,7 @@ class TestMalformedPlaceholderCLI:
 class TestGroupFlag:
     def test_group_flag_documented(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "--help"])
@@ -113,6 +118,7 @@ class TestGroupFlag:
 
     def test_add_with_group(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "gs", "git", "status", "-g", "git"])
@@ -121,6 +127,7 @@ class TestGroupFlag:
 
     def test_add_global_now_rejected(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "gs", "git", "status", "--global"])
@@ -128,6 +135,7 @@ class TestGroupFlag:
 
     def test_add_invalid_group_name_errors(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "gs", "git", "status", "--group", "1bad"])
@@ -139,6 +147,7 @@ class TestGroupFlag:
 class TestAddBuiltinDetection:
     def test_add_rejects_zsh_builtin_when_detected_zsh(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "zsh")
@@ -148,6 +157,7 @@ class TestAddBuiltinDetection:
 
     def test_add_rejects_fish_builtin_when_detected_fish(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "fish")
@@ -157,6 +167,7 @@ class TestAddBuiltinDetection:
 
     def test_add_allows_zsh_builtin_when_shell_override_bash(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "zsh")
@@ -166,6 +177,7 @@ class TestAddBuiltinDetection:
 
     def test_add_rejects_bash_builtin_with_shell_override_bash(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "fish")
@@ -175,6 +187,7 @@ class TestAddBuiltinDetection:
 
     def test_add_allows_bash_builtin_with_shell_override_fish(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "bash")
@@ -184,6 +197,7 @@ class TestAddBuiltinDetection:
 
     def test_add_shell_flag_hidden_from_help(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         result = runner.invoke(app, ["add", "--help"])
@@ -194,6 +208,7 @@ class TestAddBuiltinDetection:
 class TestCmdTemplateWarning:
     def test_cmd_template_warns(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "cmd")
@@ -202,10 +217,13 @@ class TestCmdTemplateWarning:
         assert "Added" in result.output
         out = _strip_ansi(result.output)
         assert "cmd" in out.lower() or "doskey" in out.lower()
-        assert "template" in out.lower() or "parameter" in out.lower() or "placeholder" in out.lower()
+        assert (
+            "template" in out.lower() or "parameter" in out.lower() or "placeholder" in out.lower()
+        )
 
     def test_cmd_non_template_does_not_warn(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "cmd")
@@ -217,6 +235,7 @@ class TestCmdTemplateWarning:
 
     def test_bash_template_does_not_warn(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "bash")
@@ -227,6 +246,7 @@ class TestCmdTemplateWarning:
 
     def test_no_shell_no_template_warning(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: None)
@@ -239,6 +259,7 @@ class TestCmdTemplateWarning:
 class TestVarExpansionWarning:
     def test_cmd_percent_var_warns(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "cmd")
@@ -250,6 +271,7 @@ class TestVarExpansionWarning:
 
     def test_pwsh_dollar_var_warns(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "pwsh")
@@ -261,6 +283,7 @@ class TestVarExpansionWarning:
 
     def test_bash_dollar_var_does_not_warn(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "bash")
@@ -271,6 +294,7 @@ class TestVarExpansionWarning:
 
     def test_pwsh_dollar_syntax_not_warned(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: "pwsh")
@@ -281,6 +305,7 @@ class TestVarExpansionWarning:
 
     def test_no_shell_no_var_warning(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         monkeypatch.setattr("qwik.commands.add._detect_shell", lambda: None)

@@ -2,7 +2,7 @@
 
 import pytest
 
-from qwik.core.conflicts import ConflictChecker, SHELL_BUILTINS, is_builtin
+from qwik.core.conflicts import SHELL_BUILTINS, ConflictChecker, is_builtin
 from qwik.core.models import Alias, AliasStore
 
 
@@ -122,15 +122,30 @@ class TestCaseSensitivity:
     @pytest.mark.parametrize(
         "shell,name",
         [
-            ("cmd", "cd"), ("cmd", "CD"), ("cmd", "Cd"), ("cmd", "cD"),
-            ("cmd", "echo"), ("cmd", "ECHO"),
-            ("cmd", "dir"), ("cmd", "DIR"), ("cmd", "Dir"),
-            ("pwsh", "ls"), ("pwsh", "LS"), ("pwsh", "Ls"),
-            ("pwsh", "cd"), ("pwsh", "CD"),
-            ("pwsh", "cat"), ("pwsh", "CAT"),
-            ("pwsh", "rm"), ("pwsh", "RM"),
-            ("pwsh", "cp"), ("pwsh", "mv"), ("pwsh", "pwd"),
-            ("pwsh", "echo"), ("pwsh", "select"), ("pwsh", "where"),
+            ("cmd", "cd"),
+            ("cmd", "CD"),
+            ("cmd", "Cd"),
+            ("cmd", "cD"),
+            ("cmd", "echo"),
+            ("cmd", "ECHO"),
+            ("cmd", "dir"),
+            ("cmd", "DIR"),
+            ("cmd", "Dir"),
+            ("pwsh", "ls"),
+            ("pwsh", "LS"),
+            ("pwsh", "Ls"),
+            ("pwsh", "cd"),
+            ("pwsh", "CD"),
+            ("pwsh", "cat"),
+            ("pwsh", "CAT"),
+            ("pwsh", "rm"),
+            ("pwsh", "RM"),
+            ("pwsh", "cp"),
+            ("pwsh", "mv"),
+            ("pwsh", "pwd"),
+            ("pwsh", "echo"),
+            ("pwsh", "select"),
+            ("pwsh", "where"),
         ],
     )
     def test_case_insensitive_shells_match_any_case(self, shell, name) -> None:

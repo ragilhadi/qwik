@@ -8,6 +8,7 @@ from qwik.shells.base import ShellRenderer
 
 if TYPE_CHECKING:
     from pathlib import Path
+
     from qwik.core.models import Alias
 
 __all__ = ["CmdRenderer"]
@@ -29,9 +30,7 @@ def _escape_doskey_body(command: str) -> str:
     can't act as a command separator/redirect/pipe once expanded.
     """
     escaped = command.replace("$", "$$")
-    return "".join(
-        "^" + ch if ch in _CMD_METACHARACTERS else ch for ch in escaped
-    )
+    return "".join("^" + ch if ch in _CMD_METACHARACTERS else ch for ch in escaped)
 
 
 class CmdRenderer(ShellRenderer):
@@ -53,7 +52,7 @@ class CmdRenderer(ShellRenderer):
         """Return a comment warning about doskey limitations."""
         return "REM qwik cmd hook (best-effort; template aliases omitted)"
 
-    def render_alias(self, name: str, alias: "Alias") -> str:
+    def render_alias(self, name: str, alias: Alias) -> str:
         """Return a ``doskey`` macro definition.
 
         Template aliases are skipped because ``doskey`` cannot interpolate
@@ -79,7 +78,7 @@ class CmdRenderer(ShellRenderer):
         escaped = _escape_doskey_body(alias.command)
         return f"doskey {name}={escaped} $*"
 
-    def rc_path(self) -> "Path | None":
+    def rc_path(self) -> Path | None:
         """Return ``None``; cmd has no rc file."""
         return None
 

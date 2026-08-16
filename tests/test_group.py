@@ -5,7 +5,6 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from qwik.cli import app
-from qwik.core.models import AliasStore
 from qwik.core.store import get_store
 
 runner = CliRunner()
@@ -174,6 +173,7 @@ class TestAliasStoreGroupField:
 
     def test_group_invalid_name_rejected(self) -> None:
         import pytest
+
         from qwik.core.models import Alias
 
         with pytest.raises(ValueError):

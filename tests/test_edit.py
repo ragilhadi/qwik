@@ -23,7 +23,8 @@ def _create_editor_script(path: Path, contents: str) -> Path:
         writer.write_text(
             f'@echo off\r\n"{sys.executable}" -c "'
             "import sys; "
-            f"open(sys.argv[1], 'w', encoding='utf-8').write(open(sys.argv[2], encoding='utf-8').read())"
+            "open(sys.argv[1], 'w', encoding='utf-8')"
+            ".write(open(sys.argv[2], encoding='utf-8').read())"
             f'" "%~1" "{payload}"\r\n',
             encoding="utf-8",
         )
@@ -92,9 +93,7 @@ class TestEditCommand:
 
     def test_edit_boolean_lowercase(self, tmp_path, monkeypatch) -> None:
         self._setup(tmp_path, monkeypatch)
-        snippet = (
-            'command = "git log"\ntag = ["git"]\ndescription = ""\nenabled = false\n'
-        )
+        snippet = 'command = "git log"\ntag = ["git"]\ndescription = ""\nenabled = false\n'
         editor = _create_editor_script(tmp_path, snippet)
         monkeypatch.setenv("EDITOR", str(editor))
         result = runner.invoke(app, ["edit", "gs"])
@@ -103,7 +102,10 @@ class TestEditCommand:
 
     def test_edit_inline_comments(self, tmp_path, monkeypatch) -> None:
         self._setup(tmp_path, monkeypatch)
-        snippet = 'command = "git log" # my comment\ntag = ["git"]\ndescription = "desc"\nenabled = true\n'
+        snippet = (
+            'command = "git log" # my comment\ntag = ["git"]\n'
+            'description = "desc"\nenabled = true\n'
+        )
         editor = _create_editor_script(tmp_path, snippet)
         monkeypatch.setenv("EDITOR", str(editor))
         result = runner.invoke(app, ["edit", "gs"])
@@ -128,9 +130,7 @@ class TestEditCommand:
     def test_edit_template_alias(self, tmp_path, monkeypatch) -> None:
         self._setup(tmp_path, monkeypatch)
         runner.invoke(app, ["add", "gco", "git checkout {1}"])
-        snippet = (
-            'command = "git branch {1}"\ntag = []\ndescription = ""\nenabled = true\n'
-        )
+        snippet = 'command = "git branch {1}"\ntag = []\ndescription = ""\nenabled = true\n'
         editor = _create_editor_script(tmp_path, snippet)
         monkeypatch.setenv("EDITOR", str(editor))
         result = runner.invoke(app, ["edit", "gco"])
@@ -165,8 +165,7 @@ class TestEditCommand:
     def test_edit_can_change_group(self, tmp_path, monkeypatch) -> None:
         self._setup(tmp_path, monkeypatch)
         snippet = (
-            'command = "git status"\ntag = []\ngroup = "vcs"\n'
-            'description = ""\nenabled = true\n'
+            'command = "git status"\ntag = []\ngroup = "vcs"\n' 'description = ""\nenabled = true\n'
         )
         editor = _create_editor_script(tmp_path, snippet)
         monkeypatch.setenv("EDITOR", str(editor))
@@ -181,8 +180,7 @@ class TestEditCommand:
         self._setup(tmp_path, monkeypatch)
         runner.invoke(app, ["group", "gs", "git"])
         snippet = (
-            'command = "git status"\ntag = []\ngroup = ""\n'
-            'description = ""\nenabled = true\n'
+            'command = "git status"\ntag = []\ngroup = ""\n' 'description = ""\nenabled = true\n'
         )
         editor = _create_editor_script(tmp_path, snippet)
         monkeypatch.setenv("EDITOR", str(editor))
@@ -202,8 +200,17 @@ class TestEditCommand:
         self._setup(tmp_path, monkeypatch)
         runner.invoke(
             app,
-            ["add", "gco", "git checkout {1}", "--tag", "git,vcs", "--group", "git",
-             "--description", "checkout a branch"],
+            [
+                "add",
+                "gco",
+                "git checkout {1}",
+                "--tag",
+                "git,vcs",
+                "--group",
+                "git",
+                "--description",
+                "checkout a branch",
+            ],
         )
         runner.invoke(app, ["run", "gco", "main"])  # bump run_count / last_used
 
@@ -280,6 +287,7 @@ class TestEditCommand:
 class TestEditorSelection:
     def test_editor_missing_filenotfound(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         monkeypatch.setenv("EDITOR", "definitely-not-a-real-editor-xyz")
         monkeypatch.delenv("VISUAL", raising=False)
@@ -293,10 +301,13 @@ class TestEditorSelection:
         if sys.platform == "win32":
             pytest.skip("POSIX-only editor script test")
         from qwik.config import _reset_config
+
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         runner.invoke(app, ["add", "gs", "git", "status"])
-        editor = _create_editor_script(tmp_path, 'command = "git log"\ntag = []\ndescription = ""\nenabled = true')
+        editor = _create_editor_script(
+            tmp_path, 'command = "git log"\ntag = []\ndescription = ""\nenabled = true'
+        )
         monkeypatch.setenv("EDITOR", "")
         monkeypatch.setenv("VISUAL", str(editor))
         result = runner.invoke(app, ["edit", "gs"])

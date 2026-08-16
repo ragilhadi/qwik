@@ -66,9 +66,7 @@ class TestCompletionInstall:
                 monkeypatch.setattr(renderer_cls, "rc_path", lambda self: rc)
         return runner.invoke(app, ["completion", shell, "--install"])
 
-    def test_install_bash(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_install_bash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         rc = tmp_path / ".bashrc"
         rc.write_text("# pre-existing\n")
         result = self._run_install("bash", rc, monkeypatch, tmp_path)
@@ -81,9 +79,7 @@ class TestCompletionInstall:
         backups = list(tmp_path.glob(".bashrc.qwik-backup-*"))
         assert len(backups) >= 1
 
-    def test_install_zsh(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_install_zsh(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         rc = tmp_path / ".zshrc"
         rc.write_text("# pre-existing\n")
         result = self._run_install("zsh", rc, monkeypatch, tmp_path)
@@ -126,9 +122,7 @@ class TestCompletionInstall:
         assert str(tmp_path / "not-home" / ".zfunc") in text
         assert "$HOME/.zfunc" not in text
 
-    def test_install_zsh_idempotent(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_install_zsh_idempotent(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         rc = tmp_path / ".zshrc"
         rc.write_text("# pre-existing\n")
         self._run_install("zsh", rc, monkeypatch, tmp_path)
@@ -169,9 +163,7 @@ class TestCompletionInstall:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         rc = tmp_path / ".zshrc"
-        rc.write_text(
-            "# qwik completion (zsh)\nfpath=($HOME/.zfunc $fpath)\ncompinit\n"
-        )
+        rc.write_text("# qwik completion (zsh)\nfpath=($HOME/.zfunc $fpath)\ncompinit\n")
         self._run_install("zsh", rc, monkeypatch, tmp_path)
         result = self._run_install("zsh", rc, monkeypatch, tmp_path)
         assert result.exit_code == 0
@@ -180,9 +172,7 @@ class TestCompletionInstall:
         assert not any(line.strip() == "compinit" for line in text.splitlines())
         assert text.count("# qwik completion (zsh)") == 1
 
-    def test_install_fish(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_install_fish(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         result = self._run_install("fish", None, monkeypatch, tmp_path)
         assert result.exit_code == 0
         script = tmp_path / "fish" / "completions" / "qwik.fish"
@@ -190,9 +180,7 @@ class TestCompletionInstall:
         assert "qwik" in script.read_text()
         assert "auto-load" in result.output or "next shell" in result.output
 
-    def test_install_pwsh(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_install_pwsh(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         rc = tmp_path / "profile.ps1"
         rc.write_text("# pre-existing\n")
         result = self._run_install("pwsh", rc, monkeypatch, tmp_path)
@@ -217,9 +205,7 @@ class TestCompletionInstall:
         assert str(tmp_path / "not-home" / ".bash_completions" / "qwik.sh") in text
         assert "~/.bash_completions" not in text
 
-    def test_install_idempotent(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_install_idempotent(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         rc = tmp_path / ".bashrc"
         rc.write_text("# pre-existing\n")
         self._run_install("bash", rc, monkeypatch, tmp_path)
@@ -244,11 +230,7 @@ class TestCompletionInstall:
         assert "already installed" in r2.output
         assert rc.read_text().count("# qwik completion (pwsh)") == 1
 
-    def test_install_fish_xdg(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from qwik.shells.fish import FishRenderer
-
+    def test_install_fish_xdg(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         xdg = tmp_path / "xdg"
         xdg.mkdir()
         monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))

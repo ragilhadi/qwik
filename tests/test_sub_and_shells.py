@@ -136,7 +136,7 @@ class TestConfigEnvOverride:
     """Cover config.py env-var branch (lines 40-41, 50, 77, 103)."""
 
     def test_env_override(self, tmp_path, monkeypatch) -> None:
-        from qwik.config import get_config, _reset_config
+        from qwik.config import _reset_config, get_config
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
@@ -144,7 +144,7 @@ class TestConfigEnvOverride:
         assert cfg.config_dir == tmp_path
 
     def test_default_config(self, monkeypatch) -> None:
-        from qwik.config import get_config, _reset_config
+        from qwik.config import _reset_config, get_config
 
         monkeypatch.delenv("QWIK_CONFIG_DIR", raising=False)
         _reset_config()
@@ -162,9 +162,9 @@ class TestInitShellInstall:
         rc = tmp_path / ".bashrc"
         rc.write_text("# existing\n")
 
+        from qwik.cli import app
         from qwik.config import _reset_config
         from qwik.shells.bash import BashRenderer
-        from qwik.cli import app
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
@@ -180,9 +180,7 @@ class TestInitShellInstall:
             BashRenderer.rc_path = orig
 
         assert (
-            "already present" in r2.output
-            or "Backed up" in r1.output
-            or "Added hook" in r1.output
+            "already present" in r2.output or "Backed up" in r1.output or "Added hook" in r1.output
         )
 
 
@@ -244,9 +242,7 @@ class TestDoctorShellDetection:
         # Falls back to a parent-process inspection, so the result depends
         # on whatever shell/runner is actually hosting the test process.
         result = _detect_shell()
-        assert result is None or result in (
-            "bash", "zsh", "fish", "pwsh", "cmd", "nu", "xonsh"
-        )
+        assert result is None or result in ("bash", "zsh", "fish", "pwsh", "cmd", "nu", "xonsh")
 
 
 class TestPromptText:
@@ -254,12 +250,12 @@ class TestPromptText:
 
     def test_prompt_text_empty_not_allowed(self, monkeypatch) -> None:
         """Cover lines 69-74: reprompt on empty input."""
-        from qwik.ui.prompts import prompt_text
-
         # Can't easily mock stdin, verify function compiles
         # At minimum verify calling with allow_empty=False doesn't crash on a real stdin
         # We can monkeypatch Prompt.ask to simulate input
         import rich.prompt as rp_mod
+
+        from qwik.ui.prompts import prompt_text
 
         orig_ask = rp_mod.Prompt.ask
 
@@ -303,56 +299,56 @@ class TestShellRenderersCoverage:
     """Cover template/append branches in bash/zsh/fish/pwsh."""
 
     def test_bash_template(self) -> None:
-        from qwik.shells.bash import BashRenderer
         from qwik.core.models import Alias
+        from qwik.shells.bash import BashRenderer
 
         r = BashRenderer()
         out = r.render_alias("gco", Alias(command="git checkout {1}"))
         assert "qwik run" in out
 
     def test_zsh_append_quotes(self) -> None:
-        from qwik.shells.zsh import ZshRenderer
         from qwik.core.models import Alias
+        from qwik.shells.zsh import ZshRenderer
 
         r = ZshRenderer()
         out = r.render_alias("e", Alias(command="echo 'hello'"))
         assert "'\"'\"'" in out
 
     def test_fish_template(self) -> None:
-        from qwik.shells.fish import FishRenderer
         from qwik.core.models import Alias
+        from qwik.shells.fish import FishRenderer
 
         r = FishRenderer()
         out = r.render_alias("gco", Alias(command="git checkout {1}"))
         assert "qwik run" in out
 
     def test_fish_append_quotes(self) -> None:
-        from qwik.shells.fish import FishRenderer
         from qwik.core.models import Alias
+        from qwik.shells.fish import FishRenderer
 
         r = FishRenderer()
         out = r.render_alias("e", Alias(command="echo 'hello'"))
         assert "\\'" in out
 
     def test_pwsh_template(self) -> None:
-        from qwik.shells.pwsh import PwshRenderer
         from qwik.core.models import Alias
+        from qwik.shells.pwsh import PwshRenderer
 
         r = PwshRenderer()
         out = r.render_alias("gco", Alias(command="git checkout {1}"))
         assert "qwik run" in out
 
     def test_pwsh_append(self) -> None:
-        from qwik.shells.pwsh import PwshRenderer
         from qwik.core.models import Alias
+        from qwik.shells.pwsh import PwshRenderer
 
         r = PwshRenderer()
         out = r.render_alias("gs", Alias(command="git status"))
         assert "@args" in out
 
     def test_cmd_header(self) -> None:
-        from qwik.shells.cmd import CmdRenderer
         from qwik.core.models import Alias
+        from qwik.shells.cmd import CmdRenderer
 
         r = CmdRenderer()
         out = r.render_alias("gs", Alias(command="git status"))

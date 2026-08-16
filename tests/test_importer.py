@@ -234,9 +234,7 @@ class TestImportOverwritePreview:
         assert "2 removed" in result.output
         assert "Backup" in result.output
 
-    def test_import_overwrite_no_deletions_no_removed_section(
-        self, tmp_path, monkeypatch
-    ) -> None:
+    def test_import_overwrite_no_deletions_no_removed_section(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))

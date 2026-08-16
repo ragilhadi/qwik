@@ -22,7 +22,7 @@ class FishRenderer(ShellRenderer):
         """Return ``'fish'``."""
         return "fish"
 
-    def render_alias(self, name: str, alias: "Alias") -> str:
+    def render_alias(self, name: str, alias: Alias) -> str:
         """Return a fish-compatible alias or function.
 
         Append-mode aliases become ``alias name 'command'``.

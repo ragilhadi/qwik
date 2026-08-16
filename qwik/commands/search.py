@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import typer
+
 from qwik.core.search import search_aliases
 from qwik.core.store import get_store
 from qwik.ui.tables import render_list_table
@@ -13,10 +12,8 @@ from qwik.ui.theme import get_console
 
 def search_command(
     query: str = typer.Argument(..., help="Search string."),
-    tag: Optional[str] = typer.Option(None, "--tag", "-t", help="Restrict to a tag."),
-    group: Optional[str] = typer.Option(
-        None, "--group", "-g", help="Restrict to a group."
-    ),
+    tag: str | None = typer.Option(None, "--tag", "-t", help="Restrict to a tag."),
+    group: str | None = typer.Option(None, "--group", "-g", help="Restrict to a group."),
 ) -> None:
     """Search aliases by name, command, tag, group, or description."""
     store = get_store()

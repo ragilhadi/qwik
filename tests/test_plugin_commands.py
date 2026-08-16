@@ -13,7 +13,20 @@ def test_builtin_commands_registered() -> None:
     """All built-in commands should be present in the app."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for cmd in ["add", "list", "show", "edit", "rename", "rm", "run", "search", "pick", "init", "doctor"]:
+    commands = [
+        "add",
+        "list",
+        "show",
+        "edit",
+        "rename",
+        "rm",
+        "run",
+        "search",
+        "pick",
+        "init",
+        "doctor",
+    ]
+    for cmd in commands:
         assert cmd in result.output
 
 

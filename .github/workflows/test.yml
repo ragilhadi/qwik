@@ -35,6 +35,12 @@ jobs:
       - name: Type check
         run: mypy qwik
 
+      - name: Lint
+        run: ruff check qwik tests
+
+      - name: Format check
+        run: ruff format --check qwik tests
+
       # One leg installs every POSIX/xonsh/nu shell the integration suite
       # targets and turns on QWIK_REQUIRE_SHELLS, so a shell silently
       # missing from this image fails the build instead of the suite

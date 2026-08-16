@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -16,7 +15,7 @@ __all__ = ["export_command"]
 
 def export_command(
     path: Path = typer.Argument(..., help="Destination file path."),
-    format: Optional[str] = typer.Option(
+    format: str | None = typer.Option(
         None,
         "--format",
         "-f",

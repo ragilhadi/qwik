@@ -46,6 +46,7 @@ def test_prompt_toolkit_not_imported_by_cli_module() -> None:
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert result.returncode == 0, result.stderr
 
@@ -59,6 +60,7 @@ def test_init_command_startup_under_threshold() -> None:
         subprocess.run(
             [sys.executable, "-m", "qwik", "init", "bash"],
             capture_output=True,
+            check=False,
         )
         times.append((time.perf_counter() - start) * 1000)
     times.sort()

@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import tomlkit
@@ -19,7 +19,7 @@ from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success
 from qwik.ui.theme import get_console
 
-__all__ = ["edit_command", "edit_alias"]
+__all__ = ["edit_alias", "edit_command"]
 
 # Fields the user may edit through the snippet. Everything else on `Alias`
 # (created_at, updated_at, last_used, run_count) is preserved structurally
@@ -64,11 +64,7 @@ def edit_alias(name: str) -> None:
         raise typer.Exit(1)
 
     default_editor = "notepad" if sys.platform == "win32" else "vi"
-    editor = (
-        os.environ.get("EDITOR")
-        or os.environ.get("VISUAL")
-        or default_editor
-    )
+    editor = os.environ.get("EDITOR") or os.environ.get("VISUAL") or default_editor
 
     doc = tomlkit.document()
     doc.add(tomlkit.comment(f'Edit the fields below and save/quit to apply changes to "{name}"'))
@@ -92,14 +88,12 @@ def edit_alias(name: str) -> None:
             parsed = tomlkit.parse(edited_text).unwrap()
         except TOMLDecodeError as exc:
             print_error(f"Could not parse edited snippet: {exc}", console=console)
-            raise typer.Exit(1)
+            raise typer.Exit(1) from exc
 
-        update: dict[str, object] = {
-            key: parsed[key] for key in _EDITABLE_FIELDS if key in parsed
-        }
+        update: dict[str, object] = {key: parsed[key] for key in _EDITABLE_FIELDS if key in parsed}
         if "group" in update and not str(update["group"]).strip():
             update["group"] = None
-        update["updated_at"] = datetime.now(timezone.utc)
+        update["updated_at"] = datetime.now(UTC)
 
         # $EDITOR already ran (a blocking, potentially long, external
         # process) above, outside any lock. Re-acquire the lock and reload
@@ -116,20 +110,20 @@ def edit_alias(name: str) -> None:
                 fresh_data.aliases[name] = Alias.model_validate(merged)
             except ValidationError as exc:
                 print_error(f"Invalid edit: {exc}", console=console)
-                raise typer.Exit(1)
+                raise typer.Exit(1) from exc
         print_success(f'Updated "{name}".', console=console)
     except subprocess.CalledProcessError as exc:
         print_error(f"Editor exited with code {exc.returncode}.", console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     except FileNotFoundError:
         print_error(
             f"Editor {editor!r} not found.",
             suggestion="Set $EDITOR or $VISUAL to an installed editor.",
             console=console,
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except OSError as exc:
         print_error(f"Could not launch editor {editor!r}: {exc}", console=console)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     finally:
         tmp_path.unlink(missing_ok=True)

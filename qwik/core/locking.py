@@ -67,9 +67,11 @@ class FileLock:
             self._fh.close()
             self._fh = None
 
-    def __enter__(self) -> "FileLock":
+    def __enter__(self) -> FileLock:
         self.acquire()
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: Any) -> None:
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: Any
+    ) -> None:
         self.release()

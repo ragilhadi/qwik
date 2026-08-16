@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import typer
 
@@ -10,7 +10,7 @@ from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success
 from qwik.ui.theme import get_console
 
-__all__ = ["enable_command", "disable_command"]
+__all__ = ["disable_command", "enable_command"]
 
 
 def _toggle(name: str, enabled: bool) -> None:
@@ -30,7 +30,7 @@ def _toggle(name: str, enabled: bool) -> None:
             raise typer.Exit(1)
 
         alias.enabled = enabled
-        alias.updated_at = datetime.now(timezone.utc)
+        alias.updated_at = datetime.now(UTC)
 
     state = "enabled" if enabled else "disabled"
     print_success(f'"{name}" is now {state}.', console=console)

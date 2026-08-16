@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from unittest.mock import patch
 
-import tomlkit
 from typer.testing import CliRunner
 
 from qwik.cli import app

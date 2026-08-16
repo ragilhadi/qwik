@@ -22,7 +22,7 @@ class XonshRenderer(ShellRenderer):
         """Return ``'xonsh'``."""
         return "xonsh"
 
-    def render_alias(self, name: str, alias: "Alias") -> str:
+    def render_alias(self, name: str, alias: Alias) -> str:
         """Return a xonsh-compatible alias definition.
 
         Append-mode aliases become ``aliases["name"] = "command"``.

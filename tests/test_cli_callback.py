@@ -109,9 +109,7 @@ class TestCallbackCoverage:
 
 
 class TestNoColorFlag:
-    def test_every_previously_broken_command_honors_no_color(
-        self, tmp_path, monkeypatch
-    ) -> None:
+    def test_every_previously_broken_command_honors_no_color(self, tmp_path, monkeypatch) -> None:
         # Regression: rm, rename, tag, untag, export, and init built their
         # console with a bare rich.console.Console() instead of
         # get_console(), bypassing --no-color/$NO_COLOR entirely (and
@@ -124,6 +122,7 @@ class TestNoColorFlag:
         # qwik.ui.theme actually received and asserts every one of the
         # previously-broken commands passed None for it.
         import rich.console
+
         from qwik.config import _reset_config
 
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
@@ -178,9 +177,7 @@ class TestNoColorFlag:
         result = runner.invoke(app, ["list"])
         assert "\x1b[" not in result.output
 
-    def test_no_color_state_is_context_scoped_not_a_leaking_global(
-        self, monkeypatch
-    ) -> None:
+    def test_no_color_state_is_context_scoped_not_a_leaking_global(self, monkeypatch) -> None:
         # Regression: a module-level `_NO_COLOR_OVERRIDE` global was
         # reassigned imperatively by the callback on every invocation —
         # correct only as long as every invocation goes through that

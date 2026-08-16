@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from qwik.core.models import Alias, AliasStore
-from qwik.shells.base import supported_shells, get_renderer
+from qwik.shells.base import get_renderer, supported_shells
 
 
 def _build_store() -> AliasStore:

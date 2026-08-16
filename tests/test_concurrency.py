@@ -33,7 +33,10 @@ def test_concurrent_add_does_not_lose_aliases(tmp_path) -> None:
 
     seed = subprocess.run(
         [sys.executable, "-m", "qwik", "add", "seed", "echo", "seed"],
-        capture_output=True, text=True, env=env,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
     )
     assert seed.returncode == 0, seed.stderr
 
@@ -41,7 +44,9 @@ def test_concurrent_add_does_not_lose_aliases(tmp_path) -> None:
     procs = [
         subprocess.Popen(
             [sys.executable, "-m", "qwik", "add", f"race{i}", "echo", str(i)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=env,
         )
         for i in range(n)
     ]

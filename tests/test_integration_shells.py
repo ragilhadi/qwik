@@ -138,6 +138,7 @@ def _run_hook_script(
         capture_output=True,
         text=True,
         env=_qwik_env(),
+        check=False,
     )
 
 
@@ -229,13 +230,19 @@ def test_zsh_completion_install_clean_startup(qwik_store, tmp_path):
     env["ZDOTDIR"] = str(tmp_path)
     result = subprocess.run(
         ["qwik", "completion", "zsh", "--install"],
-        capture_output=True, text=True, env=env,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
     )
     assert result.returncode == 0, result.stderr
 
     startup = subprocess.run(
         ["zsh", "-i", "-c", "true"],
-        capture_output=True, text=True, env=env,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
     )
     # The exact regression signature — a CI runner with no controlling
     # terminal can still legitimately print its own unrelated "not
@@ -269,13 +276,12 @@ def test_run_cmd_quoting_preserves_spaced_argument(tmp_path):
     marker = tmp_path / "argv.txt"
     script = tmp_path / "argecho.py"
     script.write_text(
-        "import sys, pathlib\n"
-        f"pathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
+        "import sys, pathlib\n" f"pathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
         encoding="utf-8",
     )
     alias_cmd = f'{sys.executable} "{script}" {{1}}'
     subprocess.run(["qwik", "add", "argecho", alias_cmd], check=True, env=env)
-    result = subprocess.run(["qwik", "run", "argecho", "my branch"], env=env)
+    result = subprocess.run(["qwik", "run", "argecho", "my branch"], env=env, check=False)
     assert result.returncode == 0
     assert marker.read_text(encoding="utf-8") == "['my branch']"
 
@@ -295,12 +301,11 @@ def test_run_pwsh_quoting_preserves_spaced_argument(tmp_path):
     marker = tmp_path / "argv.txt"
     script = tmp_path / "argecho.py"
     script.write_text(
-        "import sys, pathlib\n"
-        f"pathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
+        "import sys, pathlib\n" f"pathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
         encoding="utf-8",
     )
     alias_cmd = f'{sys.executable} "{script}" {{1}}'
     subprocess.run(["qwik", "add", "argecho", alias_cmd], check=True, env=env)
-    result = subprocess.run(["qwik", "run", "argecho", "my branch"], env=env)
+    result = subprocess.run(["qwik", "run", "argecho", "my branch"], env=env, check=False)
     assert result.returncode == 0
     assert marker.read_text(encoding="utf-8") == "['my branch']"

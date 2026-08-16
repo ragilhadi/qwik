@@ -22,12 +22,15 @@ def _write_raw(store: Store, text: str) -> None:
     store.path.write_text(text, encoding="utf-8")
 
 
+_GS_ALIAS_TOML = (
+    '[aliases.gs]\ncommand = "git status"\n'
+    'created_at = "2026-05-10T10:00:00Z"\nupdated_at = "2026-05-10T10:00:00Z"\n'
+)
+
+
 class TestMigrations:
     def test_migrates_v0_to_v1(self, temp_store: Store) -> None:
-        _write_raw(
-            temp_store,
-            "[aliases.gs]\ncommand = \"git status\"\ncreated_at = \"2026-05-10T10:00:00Z\"\nupdated_at = \"2026-05-10T10:00:00Z\"\n",
-        )
+        _write_raw(temp_store, _GS_ALIAS_TOML)
         loaded = temp_store.load()
         assert loaded.version == 1
         assert loaded.get("gs").command == "git status"
@@ -35,10 +38,7 @@ class TestMigrations:
         assert "version = 1" in on_disk
 
     def test_migrates_creates_backup(self, temp_store: Store) -> None:
-        _write_raw(
-            temp_store,
-            "[aliases.gs]\ncommand = \"git status\"\ncreated_at = \"2026-05-10T10:00:00Z\"\nupdated_at = \"2026-05-10T10:00:00Z\"\n",
-        )
+        _write_raw(temp_store, _GS_ALIAS_TOML)
         temp_store.load()
         backups = list(temp_store._backup_dir.glob("aliases-*.toml"))
         assert len(backups) == 1
@@ -52,10 +52,7 @@ class TestMigrations:
         assert "doctor" in msg.lower()
 
     def test_identity_when_already_latest(self, temp_store: Store) -> None:
-        _write_raw(
-            temp_store,
-            "version = 1\n\n[aliases.gs]\ncommand = \"git status\"\ncreated_at = \"2026-05-10T10:00:00Z\"\nupdated_at = \"2026-05-10T10:00:00Z\"\n",
-        )
+        _write_raw(temp_store, "version = 1\n\n" + _GS_ALIAS_TOML)
         loaded = temp_store.load()
         assert loaded.version == 1
         backups = list(temp_store._backup_dir.glob("aliases-*.toml"))
@@ -70,10 +67,7 @@ class TestMigrations:
 
         monkeypatch.setattr(migrations, "LATEST_VERSION", 2)
         try:
-            _write_raw(
-                temp_store,
-                "version = 1\n\n[aliases.gs]\ncommand = \"git status\"\ncreated_at = \"2026-05-10T10:00:00Z\"\nupdated_at = \"2026-05-10T10:00:00Z\"\n",
-            )
+            _write_raw(temp_store, "version = 1\n\n" + _GS_ALIAS_TOML)
             loaded = temp_store.load()
             assert loaded.version == 2
             assert loaded.get("gs").description == "migrated"
