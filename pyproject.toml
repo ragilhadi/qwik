@@ -35,7 +35,7 @@ dependencies = [
 ]
 
 [project.scripts]
-qwik = "qwik.cli:app"
+qwik = "qwik.cli:main_entrypoint"
 
 [project.entry-points."qwik.shell_renderers"]
 bash = "qwik.shells.bash:BashRenderer"
