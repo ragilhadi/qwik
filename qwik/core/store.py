@@ -40,9 +40,19 @@ def _now_stamp() -> str:
 
     The counter suffix guarantees filename uniqueness across rapid writes
     on platforms where ``datetime.now()`` resolution is coarser than the
-    call interval.
+    call interval — but backup selection (:func:`qwik.commands.doctor.
+    _latest_valid_backup`) picks the newest backup by *sorting these
+    filenames as strings*, so a fixed width the counter can exceed within
+    a single process's lifetime silently breaks that ordering: on a
+    timestamp tie, ``"...-9999"`` sorts *after* ``"...-10000"``
+    lexicographically, the reverse of numeric order, so the stale backup
+    gets picked as "latest". 10 digits (10 billion writes) makes that
+    overflow unreachable in practice.
     """
-    return f"{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')}-{next(_backup_counter):04d}"
+    return (
+        f"{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')}"
+        f"-{next(_backup_counter):010d}"
+    )
 
 
 class Store:

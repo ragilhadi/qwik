@@ -37,6 +37,22 @@ def _create_editor_script(path: Path, contents: str) -> Path:
     return writer
 
 
+def _no_op_editor_script(path: Path) -> Path:
+    """An ``$EDITOR`` that opens the file and changes nothing.
+
+    A bare ``.sh`` script isn't a Windows executable, so this needs the
+    same ``.bat``-vs-``.sh`` split as :func:`_create_editor_script`.
+    """
+    if sys.platform == "win32":
+        writer = path / "noop.bat"
+        writer.write_text("@echo off\r\n", encoding="utf-8")
+        return writer
+    writer = path / "noop.sh"
+    writer.write_text("#!/usr/bin/env bash\ntrue\n", encoding="utf-8")
+    os.chmod(writer, 0o700)
+    return writer
+
+
 class TestEditCommand:
     @staticmethod
     def _setup(tmp_path, monkeypatch):
@@ -135,9 +151,7 @@ class TestEditCommand:
         self._setup(tmp_path, monkeypatch)
         runner.invoke(app, ["group", "gs", "git"])
 
-        no_op_editor = tmp_path / "noop.sh"
-        no_op_editor.write_text("#!/usr/bin/env bash\ntrue\n", encoding="utf-8")
-        os.chmod(no_op_editor, 0o700)
+        no_op_editor = _no_op_editor_script(tmp_path)
         monkeypatch.setenv("EDITOR", str(no_op_editor))
 
         result = runner.invoke(app, ["edit", "gs"])
@@ -200,9 +214,7 @@ class TestEditCommand:
         assert before.run_count > 0
         assert before.last_used is not None
 
-        no_op_editor = tmp_path / "noop.sh"
-        no_op_editor.write_text("#!/usr/bin/env bash\ntrue\n", encoding="utf-8")
-        os.chmod(no_op_editor, 0o700)
+        no_op_editor = _no_op_editor_script(tmp_path)
         monkeypatch.setenv("EDITOR", str(no_op_editor))
 
         result = runner.invoke(app, ["edit", "gco"])

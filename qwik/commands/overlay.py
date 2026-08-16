@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import stat
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -30,11 +32,36 @@ from qwik.ui.prompts import (
 from qwik.ui.theme import get_console
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from rich.console import Console  # noqa: F401
 
 __all__ = ["overlay_command"]
 
 _DEFAULT_BRANCH = "main"
+
+
+def _force_rmtree(path: Path) -> None:
+    """Best-effort recursive delete that also clears Windows' read-only bit.
+
+    git marks objects under ``.git/objects/pack`` (and sometimes more)
+    read-only on Windows after a clone. A bare ``shutil.rmtree`` fails on
+    those with ``PermissionError`` there — never on POSIX, where mode
+    bits don't block unlink the same way — so pairing it with
+    ``ignore_errors=True`` silently left the clone on disk while every
+    caller believed cleanup had succeeded.
+    """
+
+    def _clear_readonly_and_retry(
+        func: Callable[[str], object], target: str, _exc_info: BaseException
+    ) -> None:
+        try:
+            os.chmod(target, stat.S_IWRITE)
+            func(target)
+        except OSError:
+            pass
+
+    shutil.rmtree(path, onexc=_clear_readonly_and_retry)
 
 
 def _load_overlay_config(config_file: Path) -> tuple[str | None, str, bool]:
@@ -144,7 +171,7 @@ def _do_add(
         git_clone(url, overlay_repo, branch)
     except RuntimeError as exc:
         print_error(f"Failed to clone overlay: {exc}", console=console)
-        shutil.rmtree(overlay_repo, ignore_errors=True)
+        _force_rmtree(overlay_repo)
         raise typer.Exit(1)
 
     overlay_file = config.overlay_aliases_file
@@ -161,7 +188,7 @@ def _do_add(
         incoming = _read_overlay_aliases(overlay_file)
     except Exception as exc:
         print_error(f"Could not read overlay aliases: {exc}", console=console)
-        shutil.rmtree(overlay_repo, ignore_errors=True)
+        _force_rmtree(overlay_repo)
         raise typer.Exit(1)
 
     store = get_store()
@@ -172,7 +199,7 @@ def _do_add(
     # and was previously the only one without a gate. Declining leaves
     # nothing configured, matching import's "no partial state" behavior.
     if not preview_import(incoming, user_data, yes=yes, console=console):
-        shutil.rmtree(overlay_repo, ignore_errors=True)
+        _force_rmtree(overlay_repo)
         raise typer.Exit(0)
 
     _save_overlay_config(config.overlay_config_file, url, branch)
@@ -190,12 +217,10 @@ def _do_remove(config: Config, *, console: "Console") -> None:
         print_error("No overlay configured.", console=console)
         raise typer.Exit(1)
 
-    import shutil
-
     if config_file.exists():
         config_file.unlink()
     if overlay_repo.exists():
-        shutil.rmtree(overlay_repo, ignore_errors=True)
+        _force_rmtree(overlay_repo)
     print_success("Overlay removed.", console=console)
 
 
