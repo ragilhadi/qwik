@@ -40,6 +40,72 @@ class TestImportPaths:
 
 
 class TestImportSafety:
+    def test_import_future_version_rejected(self, tmp_path, monkeypatch):
+        # Regression: qwik import bypassed the version guard Store.load()
+        # enforces, so an incoming file with an unsupported version could
+        # be written straight into the live store — bricking every later
+        # qwik command with an unhandled RuntimeError.
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "keep1", "echo", "keep1"])
+
+        future = tmp_path / "future.toml"
+        future.write_text(
+            'version = 99\n[aliases.onlyone]\ncommand = "echo onlyone"\n',
+            encoding="utf-8",
+        )
+        result = runner.invoke(app, ["import", str(future), "--overwrite", "-y"])
+        assert result.exit_code == 1
+        assert "newer than supported" in result.output
+
+        # The store must be untouched, and every later command must keep
+        # working rather than crash on the next load().
+        import tomlkit
+
+        live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
+        assert live["version"] == 1
+        assert "keep1" in live["aliases"].unwrap()  # type: ignore[attr-defined]
+
+        result = runner.invoke(app, ["list"])
+        assert result.exit_code == 0
+        assert "keep1" in result.output
+
+    def test_import_merge_future_version_rejected(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "keep1", "echo", "keep1"])
+
+        future = tmp_path / "future.toml"
+        future.write_text(
+            'version = 99\n[aliases.onlyone]\ncommand = "echo onlyone"\n',
+            encoding="utf-8",
+        )
+        result = runner.invoke(app, ["import", str(future), "-y"])
+        assert result.exit_code == 1
+        assert "newer than supported" in result.output
+
+    def test_import_old_version_still_migrates(self, tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "keep1", "echo", "keep1"])
+
+        legacy = tmp_path / "legacy.toml"
+        legacy.write_text('[aliases.old]\ncommand = "echo old"\n', encoding="utf-8")
+        result = runner.invoke(app, ["import", str(legacy), "-y"])
+        assert result.exit_code == 0, result.output
+
+        import tomlkit
+
+        live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
+        assert live["version"] == 1
+        assert "old" in live["aliases"].unwrap()  # type: ignore[attr-defined]
+
     def test_import_malformed_toml_friendly_error(self, tmp_path, monkeypatch):
         from qwik.config import _reset_config
 
