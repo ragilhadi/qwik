@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import typer
 from rich.console import Console
@@ -15,6 +16,15 @@ from qwik.ui.theme import get_console
 
 __all__ = ["import_command", "preview_and_merge", "preview_import", "merge_into"]
 
+_PREVIEW_CAP = 20
+
+
+def _print_capped(con: Console, names: set[str]) -> None:
+    for name in sorted(names)[:_PREVIEW_CAP]:
+        con.print(f"  [bold]{name}[/bold]")
+    if len(names) > _PREVIEW_CAP:
+        con.print(f"  ... and {len(names) - _PREVIEW_CAP} more")
+
 
 def preview_import(
     incoming: AliasStore,
@@ -22,6 +32,7 @@ def preview_import(
     *,
     yes: bool,
     console: Console | None = None,
+    mode: Literal["merge", "replace"] = "merge",
 ) -> bool:
     """Show a trust-boundary preview and prompt for confirmation.
 
@@ -31,6 +42,11 @@ def preview_import(
         yes: If ``True``, skip the confirmation prompt (the warning is
             still shown).
         console: Optional Rich console for output.
+        mode: ``"merge"`` (the default) adds/updates aliases without
+            removing anything. ``"replace"`` (``--overwrite``) discards
+            every alias not present in *incoming* — the preview and
+            prompt make that deletion explicit instead of only showing
+            what's being added.
 
     Returns:
         ``True`` if the user confirmed (or ``yes`` was set), ``False`` if
@@ -39,10 +55,10 @@ def preview_import(
     con = console if console is not None else get_console()
 
     con.print("[qwik.warning]Commands to be imported:[/qwik.warning]")
-    for name, alias in list(incoming.aliases.items())[:20]:
+    for name, alias in list(incoming.aliases.items())[:_PREVIEW_CAP]:
         con.print(f"  [bold]{name}[/bold] → {alias.command}")
-    if len(incoming.aliases) > 20:
-        con.print(f"  ... and {len(incoming.aliases) - 20} more")
+    if len(incoming.aliases) > _PREVIEW_CAP:
+        con.print(f"  ... and {len(incoming.aliases) - _PREVIEW_CAP} more")
     con.print(
         "[qwik.warning]Importing aliases is a trust boundary — "
         "stored commands will run under `shell=True`.[/qwik.warning]"
@@ -52,6 +68,7 @@ def preview_import(
     incoming_names = set(incoming.aliases)
     new_names = incoming_names - existing_names
     conflict_names = incoming_names & existing_names
+    removed_names = existing_names - incoming_names if mode == "replace" else set()
 
     if conflict_names:
         con.print(
@@ -63,9 +80,23 @@ def preview_import(
             f"[qwik.success]New aliases ({len(new_names)}):[/qwik.success] "
             f"{', '.join(sorted(new_names))}"
         )
+    if mode == "replace" and removed_names:
+        con.print(
+            f"[qwik.error]Will be REMOVED ({len(removed_names)}):[/qwik.error]"
+        )
+        _print_capped(con, removed_names)
 
     if not yes:
-        if not prompt_confirm("Apply import?", default=False, console=con):
+        if mode == "replace":
+            prompt = (
+                f"Replace store — {len(removed_names)} alias(es) will be deleted. "
+                "Continue?"
+                if removed_names
+                else "Replace store? Continue?"
+            )
+        else:
+            prompt = "Apply import?"
+        if not prompt_confirm(prompt, default=False, console=con):
             return False
     return True
 
@@ -171,16 +202,23 @@ def import_command(
         raise typer.Exit(1)
 
     if overwrite:
-        if not preview_import(incoming, data, yes=yes, console=console):
+        if not preview_import(incoming, data, yes=yes, console=console, mode="replace"):
             raise typer.Exit(0)
         # Not a mutate() read-modify-write: --overwrite deliberately
         # replaces the whole store regardless of concurrent changes. Still
         # take the lock so this write can't interleave with another
         # process's write and corrupt the file.
+        existing_names = set(data.aliases)
+        incoming_names = set(incoming.aliases)
+        added = len(incoming_names - existing_names)
+        removed = len(existing_names - incoming_names)
         lock = FileLock(store.path.with_suffix(".toml.lock"))
         with lock:
-            store.save_with_backup(incoming)
-        print_success(f"Imported {len(incoming.aliases)} aliases.", console=console)
+            backup_path = store.save_with_backup(incoming)
+        summary = f"Imported {len(incoming.aliases)} aliases: {added} added, {removed} removed."
+        if backup_path is not None:
+            summary += f" Backup: {backup_path}"
+        print_success(summary, console=console)
         return
 
     result = preview_and_merge(incoming, data, store, yes=yes, console=console)

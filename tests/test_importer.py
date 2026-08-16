@@ -105,6 +105,93 @@ class TestImportOverwritePreview:
             assert "danger" in live["aliases"].unwrap()  # type: ignore[attr-defined]
             assert "keep" not in live["aliases"].unwrap()  # type: ignore[attr-defined]
 
+    def test_import_overwrite_preview_lists_deletions(self, tmp_path, monkeypatch) -> None:
+        # Regression: the overwrite preview used to only ever list
+        # additions ("New aliases (1): onlyone"), giving no indication
+        # that the other 40 aliases in the store were about to be erased.
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "keep1", "echo", "keep1"])
+        runner.invoke(app, ["add", "keep2", "echo", "keep2"])
+        runner.invoke(app, ["add", "keep3", "echo", "keep3"])
+
+        import tomlkit
+
+        onlyone = tmp_path / "onlyone.toml"
+        doc = tomlkit.document()
+        doc.add("version", 1)
+        aliases = tomlkit.table()
+        t = tomlkit.table()
+        t.add("command", "echo onlyone")
+        aliases.add("onlyone", t)
+        doc.add("aliases", aliases)
+        onlyone.write_text(tomlkit.dumps(doc), encoding="utf-8")
+
+        with patch("qwik.commands.importer.prompt_confirm", return_value=False) as confirm:
+            result = runner.invoke(app, ["import", str(onlyone), "--overwrite"])
+            assert result.exit_code == 0
+            assert "REMOVED" in result.output
+            assert "keep1" in result.output
+            assert "keep2" in result.output
+            assert "keep3" in result.output
+            # The prompt text itself must name the deletion, not just list it.
+            prompt_text = confirm.call_args[0][0]
+            assert "delete" in prompt_text.lower() or "replace" in prompt_text.lower()
+
+    def test_import_overwrite_summary_reports_added_and_removed(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "keep1", "echo", "keep1"])
+        runner.invoke(app, ["add", "keep2", "echo", "keep2"])
+
+        import tomlkit
+
+        onlyone = tmp_path / "onlyone.toml"
+        doc = tomlkit.document()
+        doc.add("version", 1)
+        aliases = tomlkit.table()
+        t = tomlkit.table()
+        t.add("command", "echo onlyone")
+        aliases.add("onlyone", t)
+        doc.add("aliases", aliases)
+        onlyone.write_text(tomlkit.dumps(doc), encoding="utf-8")
+
+        result = runner.invoke(app, ["import", str(onlyone), "--overwrite", "--yes"])
+        assert result.exit_code == 0, result.output
+        assert "1 added" in result.output
+        assert "2 removed" in result.output
+        assert "Backup" in result.output
+
+    def test_import_overwrite_no_deletions_no_removed_section(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "keep1", "echo", "keep1"])
+
+        out = tmp_path / "superset.toml"
+        runner.invoke(app, ["export", str(out)])
+        import tomlkit
+
+        doc = tomlkit.parse(out.read_text(encoding="utf-8"))
+        t = tomlkit.table()
+        t.add("command", "echo extra")
+        doc["aliases"]["extra"] = t  # type: ignore[index]
+        out.write_text(tomlkit.dumps(doc), encoding="utf-8")
+
+        result = runner.invoke(app, ["import", str(out), "--overwrite", "--yes"])
+        assert result.exit_code == 0, result.output
+        assert "REMOVED" not in result.output
+        assert "0 removed" in result.output
+
     def test_import_overwrite_yes_shows_warning(self, tmp_path, monkeypatch) -> None:
         from qwik.config import _reset_config
 
