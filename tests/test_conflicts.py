@@ -1,6 +1,8 @@
 """Unit tests for conflict detection."""
 
-from qwik.core.conflicts import ConflictChecker, SHELL_BUILTINS
+import pytest
+
+from qwik.core.conflicts import ConflictChecker, SHELL_BUILTINS, is_builtin
 from qwik.core.models import Alias, AliasStore
 
 
@@ -71,7 +73,12 @@ class TestShellSpecificBuiltins:
     def test_pwsh_write_output(self) -> None:
         from qwik.core.conflicts import is_builtin
 
-        assert is_builtin("Write-Output", "pwsh") is True
+        # The long-form cmdlet name is not a realistic alias-name
+        # collision (nobody names an alias "Write-Output"); the set is
+        # built from the short default aliases users actually type.
+        assert is_builtin("Write-Output", "pwsh") is False
+        assert is_builtin("echo", "pwsh") is True
+        assert is_builtin("write", "pwsh") is True
 
     def test_cmd_dir(self) -> None:
         from qwik.core.conflicts import is_builtin
@@ -105,3 +112,69 @@ def test_is_builtin_defaults_to_bash():
 
     assert is_builtin("cd") is True
     assert is_builtin("nope-not-real") is False
+
+
+class TestCaseSensitivity:
+    """cmd.exe and PowerShell resolve names case-insensitively; bash, zsh,
+    and fish do not — `CD` and `cd` are genuinely different commands
+    there."""
+
+    @pytest.mark.parametrize(
+        "shell,name",
+        [
+            ("cmd", "cd"), ("cmd", "CD"), ("cmd", "Cd"), ("cmd", "cD"),
+            ("cmd", "echo"), ("cmd", "ECHO"),
+            ("cmd", "dir"), ("cmd", "DIR"), ("cmd", "Dir"),
+            ("pwsh", "ls"), ("pwsh", "LS"), ("pwsh", "Ls"),
+            ("pwsh", "cd"), ("pwsh", "CD"),
+            ("pwsh", "cat"), ("pwsh", "CAT"),
+            ("pwsh", "rm"), ("pwsh", "RM"),
+            ("pwsh", "cp"), ("pwsh", "mv"), ("pwsh", "pwd"),
+            ("pwsh", "echo"), ("pwsh", "select"), ("pwsh", "where"),
+        ],
+    )
+    def test_case_insensitive_shells_match_any_case(self, shell, name) -> None:
+        assert is_builtin(name, shell) is True
+
+    @pytest.mark.parametrize("shell", ["bash", "zsh", "fish"])
+    def test_posix_shells_stay_case_sensitive(self, shell) -> None:
+        assert is_builtin("cd", shell) is True
+        assert is_builtin("CD", shell) is False
+        assert is_builtin("Cd", shell) is False
+
+    @pytest.mark.parametrize("shell", ["nu", "xonsh"])
+    def test_nu_and_xonsh_stay_case_sensitive(self, shell) -> None:
+        assert is_builtin("cd", shell) is True
+        assert is_builtin("CD", shell) is False
+
+
+class TestNuAndXonshOwnBuiltinSets:
+    def test_nu_has_its_own_set(self) -> None:
+        assert is_builtin("cd", "nu") is True
+        assert is_builtin("each", "nu") is True
+        # bash-only builtins must not leak into nu's set via a fallback.
+        assert is_builtin("shopt", "nu") is False
+
+    def test_xonsh_has_its_own_set(self) -> None:
+        assert is_builtin("cd", "xonsh") is True
+        assert is_builtin("import", "xonsh") is True
+        assert is_builtin("shopt", "xonsh") is False
+
+    def test_nu_and_xonsh_are_distinct_sets(self) -> None:
+        assert SHELL_BUILTINS["nu"] != SHELL_BUILTINS["bash"]
+        assert SHELL_BUILTINS["xonsh"] != SHELL_BUILTINS["bash"]
+        assert SHELL_BUILTINS["nu"] is not SHELL_BUILTINS["bash"]
+
+
+class TestUnknownShellName:
+    def test_unrecognized_shell_is_not_silently_bash(self) -> None:
+        # A typo'd or unsupported shell name must not be treated as "no
+        # shell detected" (which falls back to bash) — that would let a
+        # bash builtin silently pass or fail for a shell qwik knows
+        # nothing about.
+        assert is_builtin("cd", "not-a-real-shell") is False
+        assert is_builtin("shopt", "not-a-real-shell") is False
+
+    def test_none_still_falls_back_to_bash(self) -> None:
+        assert is_builtin("cd", None) is True
+        assert is_builtin("shopt", None) is True

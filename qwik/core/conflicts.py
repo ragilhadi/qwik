@@ -40,27 +40,90 @@ SHELL_BUILTINS: dict[str, frozenset[str]] = {
         "command", "jobs", "fg", "bg", "kill", "bind", "complete", "pushd",
         "popd", "dirs", "history", "count", "math", "random",
     ]),
-    "pwsh": frozenset([
-        "Write-Output", "Write-Host", "Write-Error", "Write-Warning",
-        "Write-Verbose", "Write-Debug", "Get-ChildItem", "Set-Location",
-        "Invoke-Expression", "ForEach-Object", "Where-Object",
-        "Select-Object", "Measure-Object", "Sort-Object", "Group-Object",
-        "Compare-Object", "Test-Path", "Get-Content", "Set-Content",
-        "Add-Content", "Remove-Item", "New-Item", "Copy-Item", "Move-Item",
+    # cmd.exe and PowerShell resolve command names case-insensitively, so
+    # this set (and the lookup in is_builtin) is lowercase-normalised.
+    # Built from PowerShell's real default alias table (`Get-Alias`) —
+    # the short names a user would actually type and collide with — plus
+    # the language's reserved keywords, rather than the long-form cmdlet
+    # names an alias name can't realistically match in practice.
+    "pwsh": frozenset(name.lower() for name in [
+        "ac", "asnp", "cat", "cd", "chdir", "clc", "clear", "clhy", "cli",
+        "clp", "cls", "clv", "cnsn", "compare", "copy", "cp", "cpi", "cpp",
+        "cvpa", "dbp", "del", "diff", "dir", "dnsn", "ebp", "echo", "epal",
+        "epcsv", "epsn", "erase", "etsn", "exsn", "fc", "fhx", "fl",
+        "foreach", "ft", "fw", "gal", "gbp", "gc", "gcb", "gci", "gcm",
+        "gcs", "gdr", "ghy", "gi", "gjb", "gl", "gm", "gmo", "gp", "gps",
+        "gpv", "group", "gsn", "gsnp", "gsv", "gu", "gv", "gwmi", "h",
+        "history", "icm", "iex", "ihy", "ii", "ipal", "ipcsv", "ipmo",
+        "ipsn", "irm", "ise", "iwmi", "iwr", "kill", "lp", "ls", "man",
+        "md", "measure", "mi", "mount", "move", "mp", "mv", "nal", "ndr",
+        "ni", "nmo", "npssc", "nsn", "nv", "ogv", "oh", "popd", "ps",
+        "pushd", "pwd", "r", "rbp", "rcjb", "rcsn", "rd", "rdr", "ren",
+        "ri", "rjb", "rm", "rmdir", "rmo", "rni", "rnp", "rp", "rsn",
+        "rsnp", "rv", "rvpa", "rwmi", "sajb", "sal", "saps", "sasv", "sbp",
+        "sc", "select", "set", "shcm", "si", "sl", "sleep", "sls", "sort",
+        "sp", "spjb", "spps", "spsv", "start", "sv", "swmi", "tag", "type",
+        "where", "wjb", "write",
+        # Language keywords (not resolvable as an alias name but included
+        # for completeness of "reserved words a name shouldn't shadow").
+        "if", "while", "function", "param", "return", "break", "continue",
+        "switch", "try", "catch", "finally", "throw", "filter", "class",
+        "enum", "using",
     ]),
-    "cmd": frozenset([
+    "cmd": frozenset(name.lower() for name in [
         "echo", "set", "cd", "dir", "cls", "exit", "if", "for", "rem",
         "call", "goto", "shift", "title", "prompt", "ver", "vol", "path",
         "date", "time", "type", "copy", "del", "ren", "md", "rd",
+        "start", "pause", "assoc", "ftype", "pushd", "popd", "mklink",
+        "move", "erase", "mkdir", "rmdir", "chdir", "setlocal", "endlocal",
+        "color", "mode", "more", "tree", "where",
+    ]),
+    "nu": frozenset([
+        "cd", "ls", "cp", "mv", "rm", "mkdir", "pwd", "echo", "cat", "open",
+        "save", "table", "where", "each", "if", "let", "def", "export",
+        "alias", "source", "use", "hide", "du", "ps", "sys", "date",
+        "touch", "first", "last", "get", "select", "sort-by", "uniq",
+        "length", "reverse", "help", "exit", "history", "which",
+    ]),
+    "xonsh": frozenset([
+        "cd", "pwd", "exit", "history", "source", "which", "rehashx",
+        "xonfig", "aliases",
+        # Python keywords reachable in xonsh's Python-mode.
+        "and", "or", "not", "if", "else", "elif", "for", "while", "def",
+        "class", "import", "from", "as", "with", "try", "except",
+        "finally", "return", "yield", "pass", "break", "continue",
+        "lambda", "global", "del", "raise", "assert", "async", "await",
+        "in", "is", "None", "True", "False",
     ]),
 }
 
+# Shells whose command resolution is case-insensitive. bash/zsh/fish treat
+# `CD` and `cd` as genuinely different commands, so those stay exact-match;
+# nu and xonsh resolve names case-sensitively too.
+_CASE_INSENSITIVE_SHELLS = frozenset({"cmd", "pwsh"})
+
 
 def is_builtin(name: str, shell: str | None = None) -> bool:
-    """Return True if *name* is a builtin of *shell* (defaults to bash)."""
+    """Return True if *name* is a builtin of *shell* (defaults to bash).
+
+    Args:
+        name: Candidate alias name to check.
+        shell: Shell whose builtin set to consult. ``None`` means "no
+            shell detected" and falls back to bash's set, same as
+            before. An explicit but *unrecognised* shell name is
+            deliberately **not** folded into that same fallback — it
+            returns ``False`` rather than silently checking against an
+            unrelated shell's builtins, since an unknown shell's real
+            builtin set could contain or omit anything.
+    """
     if shell is None:
         shell = "bash"
-    return name in SHELL_BUILTINS.get(shell, SHELL_BUILTINS["bash"])
+    builtins = SHELL_BUILTINS.get(shell)
+    if builtins is None:
+        return False
+    if shell in _CASE_INSENSITIVE_SHELLS:
+        return name.lower() in builtins
+    return name in builtins
 
 
 class ConflictResult:

@@ -2,34 +2,59 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from typing import TYPE_CHECKING
-
-from prompt_toolkit import Application
-from prompt_toolkit.buffer import Buffer
-from prompt_toolkit.input import Input
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.layout import (
-    HSplit,
-    Layout,
-    Window,
-)
-from prompt_toolkit.formatted_text import StyleAndTextTuples
-from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
-from prompt_toolkit.layout.dimension import Dimension
-from prompt_toolkit.output import Output
-from prompt_toolkit.styles import Style as PTStyle
 
 from qwik.core.search import search_aliases
 from qwik.ui.theme import get_console
 
 if TYPE_CHECKING:
+    # prompt_toolkit costs ~80ms to import. Every qwik invocation loads
+    # this module (qwik/commands/pick.py imports it at module scope so
+    # the CLI can register the `pick` command), but only an actual picker
+    # session needs prompt_toolkit itself — so the real imports live
+    # inside the functions that use them, and only these type-only names
+    # are needed up here (erased at runtime by `from __future__ import
+    # annotations`).
+    from prompt_toolkit.formatted_text import StyleAndTextTuples
+    from prompt_toolkit.input import Input
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import Window
+    from prompt_toolkit.output import Output
+    from prompt_toolkit.styles import Style as PTStyle
+
     from qwik.core.models import Alias, AliasStore
 
-__all__ = ["run_picker"]
+__all__ = ["run_picker", "PickerAction", "PickerResult"]
 
 
-def _build_style() -> PTStyle:
+class PickerAction(Enum):
+    """What the user asked the picker to do with the selected alias."""
+
+    RUN = "run"
+    EDIT = "edit"
+    DELETE = "delete"
+
+
+@dataclass(frozen=True)
+class PickerResult:
+    """The alias name and action chosen when the picker exits.
+
+    Replaces the previous ``"__edit__:name"`` / ``"__delete__:name"``
+    string-prefix protocol, which relied on ``:`` being forbidden in
+    alias names to disambiguate an action from a literal alias — fragile
+    to rely on, and impossible to express in the type system.
+    """
+
+    action: PickerAction
+    name: str
+
+
+def _build_style() -> "PTStyle":
+    from prompt_toolkit.styles import Style as PTStyle
+
     from qwik.ui.theme import _no_color_active
 
     if _no_color_active():
@@ -75,17 +100,19 @@ class _PickerState:
     def __init__(self) -> None:
         self.selected_index: int = 0
         self.results: list[tuple[str, Alias, float]] = []
-        self.selected_name: str | None = None
+        self.selected_result: PickerResult | None = None
         self.history_mode: bool = False
 
 
 def _bind_keys(
-    kb: KeyBindings,
+    kb: "KeyBindings",
     store: "AliasStore",
     state: _PickerState,
-    result_window: Window,
-    preview_window: Window,
+    result_window: "Window",
+    preview_window: "Window",
 ) -> None:
+    from prompt_toolkit.layout.controls import FormattedTextControl
+
     @kb.add("up")
     def _up(event) -> None:  # type: ignore[no-untyped-def]
         if state.results:
@@ -111,7 +138,8 @@ def _bind_keys(
     @kb.add("enter")
     def _enter(event) -> None:  # type: ignore[no-untyped-def]
         if state.results and state.selected_index < len(state.results):
-            state.selected_name = state.results[state.selected_index][0]
+            name = state.results[state.selected_index][0]
+            state.selected_result = PickerResult(PickerAction.RUN, name)
             event.app.exit()
 
     @kb.add("c-c")
@@ -122,13 +150,15 @@ def _bind_keys(
     @kb.add("c-e")
     def _edit(event) -> None:  # type: ignore[no-untyped-def]
         if state.results and state.selected_index < len(state.results):
-            state.selected_name = f"__edit__:{state.results[state.selected_index][0]}"
+            name = state.results[state.selected_index][0]
+            state.selected_result = PickerResult(PickerAction.EDIT, name)
             event.app.exit()
 
     @kb.add("c-d")
     def _delete(event) -> None:  # type: ignore[no-untyped-def]
         if state.results and state.selected_index < len(state.results):
-            state.selected_name = f"__delete__:{state.results[state.selected_index][0]}"
+            name = state.results[state.selected_index][0]
+            state.selected_result = PickerResult(PickerAction.DELETE, name)
             event.app.exit()
 
     @kb.add("c-r")
@@ -140,22 +170,32 @@ def _bind_keys(
 def run_picker(
     store: "AliasStore",
     *,
-    input_: Input | None = None,
-    output: Output | None = None,
-) -> str | None:
-    """Run the interactive fuzzy picker and return the selected alias name.
+    input_: "Input | None" = None,
+    output: "Output | None" = None,
+) -> PickerResult | None:
+    """Run the interactive fuzzy picker and return the chosen action.
 
     Args:
         store: The alias database.
 
     Returns:
-        The chosen alias name, or ``None`` if the user cancelled.
+        A :class:`PickerResult` naming the alias and the action the user
+        chose (run/edit/delete), or ``None`` if the user cancelled.
     """
     if not store.all_aliases():
         get_console().print(
             "[qwik.error]No aliases found. Run `qwik add` first.[/qwik.error]"
         )
         return None
+
+    # Deferred until an interactive session is actually needed (see the
+    # module-level comment above) rather than paid by every qwik invocation.
+    from prompt_toolkit import Application
+    from prompt_toolkit.buffer import Buffer
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import HSplit, Layout, Window
+    from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+    from prompt_toolkit.layout.dimension import Dimension
 
     kb = KeyBindings()
     state = _PickerState()
@@ -228,16 +268,18 @@ def run_picker(
     _refresh(store, state, result_window, preview_window, "")
     app.run()
 
-    return state.selected_name
+    return state.selected_result
 
 
 def _refresh(
     store: "AliasStore",
     state: _PickerState,
-    result_window: Window,
-    preview_window: Window,
+    result_window: "Window",
+    preview_window: "Window",
     query: str,
 ) -> None:
+    from prompt_toolkit.layout.controls import FormattedTextControl
+
     current_name = None
     if state.results and state.selected_index < len(state.results):
         current_name = state.results[state.selected_index][0]

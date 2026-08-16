@@ -4,12 +4,12 @@ from __future__ import annotations
 
 
 import typer
-from rich.console import Console
 
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success, prompt_confirm
+from qwik.ui.theme import get_console
 
-__all__ = ["remove_command"]
+__all__ = ["remove_command", "remove_alias"]
 
 
 def remove_command(
@@ -17,9 +17,24 @@ def remove_command(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
 ) -> None:
     """Delete an alias (with confirmation unless ``--yes``)."""
+    remove_alias(name, yes=yes)
+
+
+def remove_alias(name: str, *, yes: bool) -> None:
+    """Delete *name*; the logic behind ``remove_command``.
+
+    A plain function taking real values rather than ``typer.Argument``/
+    ``typer.Option`` defaults, so callers other than Click — the
+    picker's Ctrl+D binding — can invoke it directly instead of going
+    through a CLI-testing shim.
+
+    Args:
+        name: Alias identifier to delete.
+        yes: If ``True``, skip the confirmation prompt.
+    """
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     if name in data.overlay_aliases and name not in data.aliases:
         print_error(

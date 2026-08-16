@@ -238,10 +238,15 @@ class TestDoctorShellDetection:
         from qwik.commands.doctor import _detect_shell
 
         monkeypatch.delenv("SHELL", raising=False)
-        # On non-Linux, this returns None
+        monkeypatch.delenv("QWIK_SHELL", raising=False)
+        monkeypatch.delenv("NU_VERSION", raising=False)
+        monkeypatch.delenv("XONSH_VERSION", raising=False)
+        # Falls back to a parent-process inspection, so the result depends
+        # on whatever shell/runner is actually hosting the test process.
         result = _detect_shell()
-        # Result depends on platform
-        assert result is None or result in ("bash", "zsh", "fish", "pwsh")
+        assert result is None or result in (
+            "bash", "zsh", "fish", "pwsh", "cmd", "nu", "xonsh"
+        )
 
 
 class TestPromptText:

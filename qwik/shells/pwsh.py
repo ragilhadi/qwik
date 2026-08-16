@@ -28,8 +28,11 @@ class PwshRenderer(ShellRenderer):
 
         All aliases are rendered as functions because PowerShell does not
         support passing arbitrary arguments to native ``alias``.
-        Template mode uses ``qwik run``; append mode forwards ``$args``
-        directly.
+        Template mode uses ``qwik run``; append mode wraps the command as
+        a single-quoted string literal compiled into a script block at
+        call time, so the raw command text is never spliced into the
+        function body as source — a ``}`` (or any other PowerShell
+        syntax) inside it can't close the function early.
 
         Args:
             name: Alias identifier.
@@ -42,7 +45,12 @@ class PwshRenderer(ShellRenderer):
 
         if has_placeholders(alias.command):
             return f'function {name} {{\n    qwik run "{name}" @args\n}}'
-        return f"function {name} {{\n    {alias.command} @args\n}}"
+        escaped = alias.command.replace("'", "''")
+        return (
+            f"function {name} {{\n"
+            f"    & ([ScriptBlock]::Create('{escaped}')) @args\n"
+            f"}}"
+        )
 
     def rc_path(self) -> Path | None:
         """Return the PowerShell profile path, Windows-aware."""

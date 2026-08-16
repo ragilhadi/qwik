@@ -23,7 +23,7 @@ def list_command(
     data = store.load()
     console = get_console()
 
-    if not data.aliases:
+    if not data.all_aliases():
         console.print(
             "[dim]No aliases yet. Run `qwik add <name> <command>` to create one.[/dim]"
         )

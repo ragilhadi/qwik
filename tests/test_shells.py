@@ -1,5 +1,7 @@
 """Unit tests for shell renderers."""
 
+import pytest
+
 from qwik.core.models import Alias
 from qwik.shells.base import supported_shells, get_renderer
 from qwik.shells.bash import BashRenderer
@@ -48,7 +50,28 @@ class TestRenderers:
         renderer = get_renderer("pwsh")
         out = renderer.render_alias("gs", Alias(command="git status"))
         assert "function gs" in out
-        assert "git status @args" in out
+        assert "[ScriptBlock]::Create('git status')" in out
+        assert "@args" in out
+
+    def test_pwsh_function_escapes_embedded_quote(self) -> None:
+        renderer = get_renderer("pwsh")
+        out = renderer.render_alias("q", Alias(command="echo it's fine"))
+        assert "[ScriptBlock]::Create('echo it''s fine')" in out
+
+    def test_pwsh_function_brace_cannot_break_out(self) -> None:
+        # Regression: a `}` in the command used to be spliced as raw
+        # PowerShell source and close the function early.
+        renderer = get_renderer("pwsh")
+        payload = "echo hi } ; Write-Host PWNED ; function dummy {"
+        out = renderer.render_alias("brace", Alias(command=payload))
+        # The whole payload — including its literal `}` and the text
+        # "function dummy {" — ends up inert inside one string literal,
+        # never reaching PowerShell's own parser as code.
+        assert out == (
+            "function brace {\n"
+            f"    & ([ScriptBlock]::Create('{payload}')) @args\n"
+            "}"
+        )
 
     def test_fish_alias(self) -> None:
         renderer = get_renderer("fish")
@@ -77,12 +100,38 @@ class TestRenderers:
     def test_cmd_best_effort(self) -> None:
         renderer = get_renderer("cmd")
         out = renderer.render_alias("gs", Alias(command="git status"))
-        assert "doskey" in out
+        assert out == "doskey gs=git status $*"
 
     def test_cmd_skips_template(self) -> None:
         renderer = get_renderer("cmd")
         out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
         assert "omitted" in out or out == ""
+
+    def test_cmd_skips_multiline(self) -> None:
+        renderer = get_renderer("cmd")
+        out = renderer.render_alias("multi", Alias(command="echo hi\necho bye"))
+        assert "omitted" in out
+        assert "doskey" not in out
+
+    def test_cmd_escapes_metacharacters(self) -> None:
+        renderer = get_renderer("cmd")
+        out = renderer.render_alias("danger", Alias(command="echo hi & del /q *"))
+        assert out == "doskey danger=echo hi ^& del /q * $*"
+
+    def test_cmd_doubles_dollar_sign(self) -> None:
+        # A literal $ must not be misread as a doskey $N/$*/$$ substitution.
+        renderer = get_renderer("cmd")
+        out = renderer.render_alias("p", Alias(command="echo $HOME"))
+        assert out == "doskey p=echo $$HOME $*"
+
+    def test_cmd_brace_payload_has_no_live_ampersand(self) -> None:
+        # The pwsh-flavored injection payload from the issue repro: `;`
+        # isn't special to cmd.exe (no separator meaning), but `&` is,
+        # and there is none in this payload, so it renders as inert text.
+        renderer = get_renderer("cmd")
+        payload = "echo hi } ; Write-Host PWNED ; function dummy {"
+        out = renderer.render_alias("brace", Alias(command=payload))
+        assert out == f"doskey brace={payload} $*"
 
     def test_render_all_respects_disabled(self) -> None:
         renderer = get_renderer("bash")
@@ -101,10 +150,19 @@ class TestRenderers:
         assert "...$args" in out
 
     def test_nu_append_function(self) -> None:
+        # Nu has no safe way to splice an arbitrary command string into
+        # source (unlike pwsh's ScriptBlock.Create), so append mode now
+        # delegates to `qwik run` the same way template mode does.
         renderer = get_renderer("nu")
         out = renderer.render_alias("gs", Alias(command="git status"))
-        assert "def gs" in out
-        assert "^git status" in out
+        assert out == 'def gs [...args] {\n    qwik run "gs" ...$args\n}'
+
+    def test_nu_brace_payload_cannot_break_out(self) -> None:
+        renderer = get_renderer("nu")
+        payload = "echo hi } ; Write-Host PWNED ; function dummy {"
+        out = renderer.render_alias("brace", Alias(command=payload))
+        assert out == 'def brace [...args] {\n    qwik run "brace" ...$args\n}'
+        assert out.count("def ") == 1
 
     def test_nu_rc_path(self, tmp_path, monkeypatch) -> None:
         from qwik.shells.nu import NuRenderer
@@ -162,3 +220,73 @@ class TestRenderers:
         monkeypatch.setenv("XONSHRC", str(custom))
         rc = XonshRenderer().rc_path()
         assert rc == custom
+
+
+class TestAdversarialCommandMatrix:
+    """One adversarial command set x every renderer.
+
+    Each command below is chosen to probe a specific escaping rule this
+    renderer or another one in the same family needs: quote characters,
+    shell metacharacters, and characters with a special meaning to only
+    one of the seven target shells. None of these should ever let text
+    escape its containing string/quote and become live code — every
+    assertion below is a structural containment check, not a full parse
+    (that's what the real-shell integration tests do where the shell is
+    available).
+    """
+
+    ADVERSARIAL_COMMANDS = [
+        'echo "double quoted"',
+        "echo 'single quoted'",
+        "echo `backtick`",
+        "echo $HOME",
+        "echo %USERPROFILE%",
+        "echo a & b",
+        "echo a | b",
+        "echo a ^ b",
+        "echo a ; b",
+        "echo hi } ; function dummy {",
+    ]
+
+    def test_every_renderer_survives_every_adversarial_command(self) -> None:
+        for shell in supported_shells():
+            renderer = get_renderer(shell)
+            for command in self.ADVERSARIAL_COMMANDS:
+                # Must not raise, and must produce non-empty output for
+                # every renderer (cmd's template-mode skip doesn't apply
+                # here since none of these are template commands).
+                out = renderer.render_alias("adv", Alias(command=command))
+                assert out, f"{shell} produced empty output for {command!r}"
+
+    def test_pwsh_every_command_fully_contained_in_scriptblock_literal(self) -> None:
+        renderer = get_renderer("pwsh")
+        for command in self.ADVERSARIAL_COMMANDS:
+            out = renderer.render_alias("adv", Alias(command=command))
+            escaped = command.replace("'", "''")
+            assert f"[ScriptBlock]::Create('{escaped}')" in out
+
+    def test_cmd_every_command_has_no_live_metacharacter(self) -> None:
+        from qwik.shells.cmd import _CMD_METACHARACTERS, _escape_doskey_body
+
+        for command in self.ADVERSARIAL_COMMANDS:
+            escaped = _escape_doskey_body(command)
+            # Walk the escaped body treating every "^X" as one consumed
+            # escape sequence; anything left over must not be a bare
+            # metacharacter (a caret always escapes the char right after
+            # it, including another caret — "^^" is a literal caret).
+            i = 0
+            while i < len(escaped):
+                if escaped[i] == "^":
+                    i += 2
+                    continue
+                assert escaped[i] not in _CMD_METACHARACTERS, (
+                    f"unescaped {escaped[i]!r} in {escaped!r} (from {command!r})"
+                )
+                i += 1
+
+    def test_nu_every_command_delegates_to_qwik_run(self) -> None:
+        renderer = get_renderer("nu")
+        for command in self.ADVERSARIAL_COMMANDS:
+            out = renderer.render_alias("adv", Alias(command=command))
+            assert out == 'def adv [...args] {\n    qwik run "adv" ...$args\n}'
+            assert command not in out

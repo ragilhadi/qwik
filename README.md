@@ -220,14 +220,30 @@ qwik sync status                       # branch, remote, dirty, ahead/behind, al
 ```bash
 qwik overlay add --url https://github.com/team/qwik-aliases --branch main
 qwik overlay list           # show overlay aliases
-qwik overlay update         # git pull the overlay repo
+qwik overlay update         # fetch and show added/changed/removed before applying
 qwik overlay copy --name gs # copy an overlay alias to your user store
 qwik overlay remove         # remove the overlay
 ```
 
-Overlay aliases appear in search, `qwik init`, and the picker, but cannot be
-edited or removed (they're read-only). Running an overlay alias copies it to
-your user store for usage tracking.
+`overlay add` and `overlay update` show the same trust-boundary preview as
+`qwik import`/`qwik sync pull` — the incoming (or changed) commands, and a
+confirmation prompt — before anything is applied; pass `--yes` to skip the
+prompt. `update` reports "already up to date" and doesn't prompt when
+nothing changed. The overlay repo is managed with `git clone` on `add` and
+`git fetch` + `git reset --hard` on `update`, so it always exactly mirrors
+the remote branch and can't enter a merge-conflict state.
+
+> **Trust warning:** overlay aliases are a code-execution vector — anyone
+> with push access to the overlay repo can add or change a command that
+> runs under `shell=True` the next time you use it. Always review the
+> preview before confirming an `overlay add`/`update`; only point the
+> overlay at a repo you control.
+
+Overlay aliases appear in `qwik list`, `qwik search`, `qwik init`, and the
+picker — marked `(overlay)` in `list`/`search` — but cannot be edited or
+removed (they're read-only). A user alias with the same name shadows the
+overlay one. Running an overlay alias copies it to your user store for
+usage tracking.
 
 ### `doctor` — Health check
 
@@ -243,6 +259,12 @@ qwik init zsh --install                # append to ~/.zshrc with backup
 ```
 
 Supported shells: `bash`, `zsh`, `fish`, `pwsh`.
+
+Every `qwik` invocation defers importing `prompt_toolkit` (used only by
+the interactive `pick` screen) and caches shell-renderer discovery
+instead of re-scanning installed-package metadata on each call — so a
+`qwik` call your shell hook makes on every prompt, like `qwik init`,
+isn't paying for either.
 
 ### `completion` — Shell completions
 
@@ -324,7 +346,9 @@ qwik add gco "git checkout {1}"
 gco main                # → git checkout main
 ```
 
-> **Note:** `{1}`, `{@}`, and `{N:-default}` interpolations are `shlex.quote`d at runtime, so args containing shell metacharacters are passed safely. `{*}` is shell-quoted as a single string. For example, `qwik run gco '; rm -rf /'` expands to `git checkout '; rm -rf /'` — the `;` is quoted and treated as a literal argument, not a command separator.
+> **Note:** `{1}`, `{@}`, and `{N:-default}` interpolations are quoted at runtime, so args containing shell metacharacters are passed safely. `{*}` is shell-quoted as a single string. For example, `qwik run gco '; rm -rf /'` expands to `git checkout '; rm -rf /'` on a POSIX shell — the `;` is quoted and treated as a literal argument, not a command separator.
+>
+> The quoting rule depends on which shell will actually run the expanded command — chosen by `qwik run`'s shell detection, not by the host platform (a user can be running POSIX bash under Git Bash or WSL on a Windows host). `shlex.quote`'s POSIX single-quote syntax is used for bash/zsh/fish; cmd.exe gets caret-escaped metacharacters wrapped in doubled double quotes; PowerShell gets single-quoted strings with embedded `'` doubled, invoked via `pwsh`/`powershell` explicitly rather than through `cmd.exe`'s default `shell=True` interpreter. The guarantee above holds on all three; it does not extend to `nu` or `xonsh`, which currently fall back to POSIX quoting.
 
 **Multiple positionals:**
 
@@ -455,8 +479,11 @@ The hook generates native aliases/functions for each shell:
 |---|---|---|
 | bash / zsh | `alias gs='git status'` | `gs() { git checkout "$1" ; }` |
 | fish | `alias gs 'git status'` | `function gs ; … ; end` |
-| PowerShell | `function gs { echo hi @args }` | `function gs { echo "{1}" $args[0] }` |
+| PowerShell | `function gs { & ([ScriptBlock]::Create('git status')) @args }` | `function gs { qwik run "gs" @args }` |
+| nu | `def gs [...args] { qwik run "gs" ...$args }` | `def gs [...args] { qwik run "gs" ...$args }` |
 | cmd | `doskey gs=git status $*` | (best-effort, no template) |
+
+PowerShell's append mode wraps the command as a string literal compiled into a script block at call time rather than splicing it into the function body as source, and cmd's `doskey` macros are `$`/metacharacter-escaped — both so a command containing `}`, `&`, `$`, or another shell's syntax can't break out of the generated definition. Nu has no equivalent to a compiled-string script block, so both modes delegate to `qwik run`. Supported characters in a command are documented per shell in [`docs/shell-quoting.md`](docs/shell-quoting.md).
 
 ### Variable expansion
 
@@ -538,6 +565,7 @@ If the file's version is newer than the version qwik understands, qwik refuses t
 | `XDG_CONFIG_HOME` | Base config dir (used by fish rc resolution) |
 | `QWIK_DEBUG=1` | Enable debug logs to stderr |
 | `NO_COLOR` | Disable colored output (also `--no-color`) |
+| `QWIK_SHELL` | Force shell detection (`bash`, `zsh`, `fish`, `pwsh`, `cmd`, `nu`, `xonsh`) instead of auto-detecting from the environment/parent process |
 
 ---
 

@@ -23,7 +23,7 @@ def search_command(
     data = store.load()
     console = get_console()
 
-    if not data.aliases:
+    if not data.all_aliases():
         console.print("[dim]No aliases yet.[/dim]")
         raise typer.Exit(0)
 
@@ -32,12 +32,18 @@ def search_command(
         console.print("[dim]No matches.[/dim]")
         raise typer.Exit(0)
 
-    # Build a filtered AliasStore for rendering
+    # Build a filtered AliasStore for rendering, preserving provenance:
+    # a result that came from data.aliases (the user's own store) stays
+    # there so render_list_table's "(overlay)" marker is accurate; a
+    # result found only via the overlay goes into overlay_aliases.
     from qwik.core.models import AliasStore
 
     filtered = AliasStore()
     for name, alias, _ in results:
-        filtered.aliases[name] = alias
+        if name in data.aliases:
+            filtered.aliases[name] = alias
+        else:
+            filtered.overlay_aliases[name] = alias
 
     table = render_list_table(filtered)
     console.print(table)

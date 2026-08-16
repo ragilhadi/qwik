@@ -7,9 +7,13 @@ import sys
 
 import typer
 
+from qwik.commands.edit import edit_alias
+from qwik.commands.remove import remove_alias
+from qwik.core.shell_detect import detect_shell
+from qwik.core.shell_exec import build_invocation
 from qwik.core.store import get_store
 from qwik.core.substitute import expand
-from qwik.ui.picker import run_picker
+from qwik.ui.picker import PickerAction, run_picker
 from qwik.ui.prompts import print_error, print_success
 from qwik.ui.theme import get_console
 
@@ -22,31 +26,25 @@ def pick_command() -> None:
     data = store.load()
     console = get_console()
 
-    selected = run_picker(data)
-    if selected is None:
+    result = run_picker(data)
+    if result is None:
         raise typer.Exit(0)
 
-    # Handle special actions from picker keybindings
-    if selected.startswith("__edit__:"):
-        name = selected.split(":", 1)[1]
-        # Delegate to edit command by re-invoking CLI
-        from typer.testing import CliRunner
-        from qwik.cli import app
+    if result.action is PickerAction.EDIT:
+        # Call the command's own logic directly rather than re-entering
+        # the CLI through a test harness — typer.testing.CliRunner
+        # replaces stdin with an empty stream and buffers stdout, so a
+        # confirmation prompt inside it can never reach the real
+        # terminal. This runs with the real TTY, exactly like `qwik edit`
+        # invoked directly would.
+        edit_alias(result.name)
+        raise typer.Exit(0)
 
-        result = CliRunner().invoke(app, ["edit", name])
-        console.print(result.output)
-        raise typer.Exit(result.exit_code)
+    if result.action is PickerAction.DELETE:
+        remove_alias(result.name, yes=False)
+        raise typer.Exit(0)
 
-    if selected.startswith("__delete__:"):
-        name = selected.split(":", 1)[1]
-        from typer.testing import CliRunner
-        from qwik.cli import app
-
-        result = CliRunner().invoke(app, ["rm", name])
-        console.print(result.output)
-        raise typer.Exit(result.exit_code)
-
-    name = selected
+    name = result.name
     alias = data.get(name)
     if alias is None and name in data.overlay_aliases:
         alias = data.overlay_aliases[name]
@@ -61,8 +59,9 @@ def pick_command() -> None:
         print_error(f'Alias "{name}" is disabled.', console=console)
         raise typer.Exit(1)
 
+    active_shell = detect_shell()
     try:
-        expanded = expand(alias.command, [])
+        expanded = expand(alias.command, [], shell=active_shell)
     except ValueError as exc:
         print_error(str(exc), console=console)
         raise typer.Exit(1)
@@ -76,7 +75,8 @@ def pick_command() -> None:
         )
     returncode = 1
     try:
-        completed = subprocess.run(expanded, shell=True)
+        cmd, use_shell = build_invocation(expanded, active_shell)
+        completed = subprocess.run(cmd, shell=use_shell)
         returncode = completed.returncode
     except KeyboardInterrupt:
         # Child received SIGINT (e.g. user hit Ctrl+C on a long-running command).
