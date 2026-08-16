@@ -30,6 +30,13 @@ class FileLock:
                 if sys.platform == "win32":
                     import msvcrt
 
+                    # msvcrt.locking() locks a byte range starting at the
+                    # file's *current* position. "a+b" opens at EOF, so
+                    # without this seek, acquire() and release() (which
+                    # seeks to 0) would lock and unlock different byte
+                    # ranges — only accidentally symmetric because the
+                    # lock file is always empty.
+                    fh.seek(0)
                     msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
                 else:
                     import fcntl

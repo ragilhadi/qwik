@@ -33,8 +33,9 @@ def run_command(
     alias = data.get(name)
     if alias is None and name in data.overlay_aliases:
         alias = data.overlay_aliases[name]
-        data.add(name, alias)
-        store.save_with_backup(data)
+        with store.mutate() as fresh_data:
+            if name not in fresh_data.aliases:
+                fresh_data.add(name, alias)
     if alias is None:
         print_error(f'Alias "{name}" does not exist.', console=console)
         raise typer.Exit(1)

@@ -148,11 +148,11 @@ def add_command(
     )
 
     try:
-        store_data.add(name, alias, force=force)
+        with store.mutate() as fresh_data:
+            fresh_data.add(name, alias, force=force)
     except KeyError as exc:
         print_error(str(exc))
         raise typer.Exit(1)
 
-    store.save_with_backup(store_data)
     print_success(f'Added "{name}" → {full_command!r}', console=console)
     print_info("Run `source <rc>` or open a new terminal to use it.", console=console)

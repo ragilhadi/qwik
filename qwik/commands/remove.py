@@ -39,6 +39,10 @@ def remove_command(
         if not prompt_confirm("Confirm", default=False, console=console):
             raise typer.Exit(0)
 
-    data.remove(name)
-    store.save_with_backup(data)
+    try:
+        with store.mutate() as fresh_data:
+            fresh_data.remove(name)
+    except KeyError as exc:
+        print_error(str(exc), console=console)
+        raise typer.Exit(1)
     print_success(f'Removed "{name}".', console=console)

@@ -62,6 +62,10 @@ def rename_command(
         )
         raise typer.Exit(1)
 
-    data.rename(old, new)
-    store.save_with_backup(data)
+    try:
+        with store.mutate() as fresh_data:
+            fresh_data.rename(old, new)
+    except KeyError as exc:
+        print_error(str(exc), console=console)
+        raise typer.Exit(1)
     print_success(f'Renamed "{old}" → "{new}".', console=console)

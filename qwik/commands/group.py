@@ -20,13 +20,7 @@ def group_command(
 ) -> None:
     """Assign the canonical group of an alias."""
     store = get_store()
-    data = store.load()
     console = get_console()
-
-    alias = data.get(name)
-    if alias is None:
-        print_error(f'Alias "{name}" does not exist.', console=console)
-        raise typer.Exit(1)
 
     group = group.strip()
     try:
@@ -38,13 +32,19 @@ def group_command(
         )
         raise typer.Exit(1)
 
-    if alias.group == validated:
-        print_info(f'"{name}" already in group "{validated}".', console=console)
-        raise typer.Exit(0)
+    with store.mutate() as data:
+        alias = data.get(name)
+        if alias is None:
+            print_error(f'Alias "{name}" does not exist.', console=console)
+            raise typer.Exit(1)
 
-    alias.group = validated
-    alias.updated_at = datetime.now(timezone.utc)
-    store.save_with_backup(data)
+        if alias.group == validated:
+            print_info(f'"{name}" already in group "{validated}".', console=console)
+            raise typer.Exit(0)
+
+        alias.group = validated
+        alias.updated_at = datetime.now(timezone.utc)
+
     print_success(f'Grouped "{name}" under "{validated}".', console=console)
 
 
@@ -53,19 +53,19 @@ def ungroup_command(
 ) -> None:
     """Remove the canonical group from an alias."""
     store = get_store()
-    data = store.load()
     console = get_console()
 
-    alias = data.get(name)
-    if alias is None:
-        print_error(f'Alias "{name}" does not exist.', console=console)
-        raise typer.Exit(1)
+    with store.mutate() as data:
+        alias = data.get(name)
+        if alias is None:
+            print_error(f'Alias "{name}" does not exist.', console=console)
+            raise typer.Exit(1)
 
-    if alias.group is None:
-        print_info(f'"{name}" has no group.', console=console)
-        raise typer.Exit(0)
+        if alias.group is None:
+            print_info(f'"{name}" has no group.', console=console)
+            raise typer.Exit(0)
 
-    alias.group = None
-    alias.updated_at = datetime.now(timezone.utc)
-    store.save_with_backup(data)
+        alias.group = None
+        alias.updated_at = datetime.now(timezone.utc)
+
     print_success(f'Removed group from "{name}".', console=console)

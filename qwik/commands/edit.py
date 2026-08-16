@@ -108,17 +108,25 @@ def edit_command(
             key = key.strip()
             new_fields[key] = _parse_value(raw_val)
 
-        data.aliases[name] = Alias(
-            command=str(new_fields.get("command", alias.command)),
-            tag=list(new_fields.get("tag", alias.tag)) or [],  # type: ignore[call-overload]
-            description=str(new_fields.get("description", alias.description)),
-            enabled=bool(new_fields.get("enabled", alias.enabled)),
-            created_at=alias.created_at,
-            updated_at=datetime.now(timezone.utc),
-            last_used=alias.last_used,
-            run_count=alias.run_count,
-        )
-        store.save_with_backup(data)
+        # $EDITOR already ran (a blocking, potentially long, external
+        # process) above, outside any lock. Re-acquire the lock and reload
+        # now, immediately before writing, so a concurrent mutation to this
+        # or any other alias made while the editor was open isn't clobbered.
+        with store.mutate() as fresh_data:
+            fresh_alias = fresh_data.get(name)
+            if fresh_alias is None:
+                print_error(f'Alias "{name}" no longer exists.', console=console)
+                raise typer.Exit(1)
+            fresh_data.aliases[name] = Alias(
+                command=str(new_fields.get("command", fresh_alias.command)),
+                tag=list(new_fields.get("tag", fresh_alias.tag)) or [],  # type: ignore[call-overload]
+                description=str(new_fields.get("description", fresh_alias.description)),
+                enabled=bool(new_fields.get("enabled", fresh_alias.enabled)),
+                created_at=fresh_alias.created_at,
+                updated_at=datetime.now(timezone.utc),
+                last_used=fresh_alias.last_used,
+                run_count=fresh_alias.run_count,
+            )
         print_success(f'Updated "{name}".', console=console)
     except subprocess.CalledProcessError as exc:
         print_error(f"Editor exited with code {exc.returncode}.", console=console)

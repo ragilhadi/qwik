@@ -21,17 +21,17 @@ def _toggle(name: str, enabled: bool) -> None:
         enabled: Desired state.
     """
     store = get_store()
-    data = store.load()
     console = Console()
 
-    alias = data.get(name)
-    if alias is None:
-        print_error(f'Alias "{name}" does not exist.', console=console)
-        raise typer.Exit(1)
+    with store.mutate() as data:
+        alias = data.get(name)
+        if alias is None:
+            print_error(f'Alias "{name}" does not exist.', console=console)
+            raise typer.Exit(1)
 
-    alias.enabled = enabled
-    alias.updated_at = datetime.now(timezone.utc)
-    store.save_with_backup(data)
+        alias.enabled = enabled
+        alias.updated_at = datetime.now(timezone.utc)
+
     state = "enabled" if enabled else "disabled"
     print_success(f'"{name}" is now {state}.', console=console)
 
