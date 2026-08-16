@@ -235,6 +235,8 @@ class TestOverlayUpdatePreview:
 
         overlay_repo = tmp_path / "overlay-repo"
         (overlay_repo / "stray.txt").write_text("local-only change")
+        _git(["config", "user.email", "test@example.com"], overlay_repo)
+        _git(["config", "user.name", "Test"], overlay_repo)
         _git(["add", "-A"], overlay_repo)
         _git(["commit", "-m", "stray local commit"], overlay_repo)
 
