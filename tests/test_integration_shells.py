@@ -96,6 +96,32 @@ def test_zsh_hook_runs_alias(qwik_store, git_repo, tmp_path):
 
 
 @pytest.mark.integration
+def test_zsh_completion_install_clean_startup(qwik_store, tmp_path):
+    # Regression: the installed block called bare `compinit` with no
+    # `autoload -Uz compinit` first, so every new zsh session printed
+    # "command not found: compinit" and completions never activated.
+    if not _shell_available("zsh"):
+        pytest.skip("zsh not installed")
+    rc = tmp_path / ".zshrc"
+    rc.write_text("", encoding="utf-8")
+    env = _qwik_env()
+    env["HOME"] = str(tmp_path)
+    env["ZDOTDIR"] = str(tmp_path)
+    result = subprocess.run(
+        ["qwik", "completion", "zsh", "--install"],
+        capture_output=True, text=True, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+
+    startup = subprocess.run(
+        ["zsh", "-i", "-c", "true"],
+        capture_output=True, text=True, env=env,
+    )
+    assert "command not found" not in startup.stderr
+    assert "compinit" not in startup.stderr
+
+
+@pytest.mark.integration
 def test_fish_hook_runs_alias(qwik_store, git_repo, tmp_path):
     if not _shell_available("fish"):
         pytest.skip("fish not installed")
