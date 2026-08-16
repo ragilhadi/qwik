@@ -22,21 +22,13 @@
 # ---
 # name: test_render_all_snapshot[fish]
   '''
-  function bsg
-      'echo hello\\' $argv
-  end
-  function envg
-      'echo $HOME %USERPROFILE%' $argv
-  end
+  alias bsg 'echo hello\\'
+  alias envg 'echo $HOME %USERPROFILE%'
   function gco
       qwik run "gco" $argv
   end
-  function gs
-      'git status' $argv
-  end
-  function lsg
-      'echo \'hello world\'' $argv
-  end
+  alias gs 'git status'
+  alias lsg 'echo \'hello world\''
   '''
 # ---
 # name: test_render_all_snapshot[nu]

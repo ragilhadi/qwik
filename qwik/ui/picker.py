@@ -14,6 +14,7 @@ from prompt_toolkit.layout import (
     Layout,
     Window,
 )
+from prompt_toolkit.formatted_text import StyleAndTextTuples
 from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.output import Output
@@ -38,8 +39,8 @@ def _build_style() -> PTStyle:
 
 def _get_result_lines(
     results: list[tuple[str, Alias, float]], selected_index: int
-) -> list[tuple[str, str]]:
-    lines: list[tuple[str, str]] = []
+) -> StyleAndTextTuples:
+    lines: StyleAndTextTuples = []
     for idx, (name, alias, _score) in enumerate(results):
         prefix = "▶ " if idx == selected_index else "  "
         style = "bold" if idx == selected_index else ""
@@ -52,11 +53,11 @@ def _get_result_lines(
 
 def _get_preview_lines(
     results: list[tuple[str, Alias, float]], selected_index: int
-) -> list[tuple[str, str]]:
+) -> StyleAndTextTuples:
     if not results or selected_index >= len(results):
         return [("dim", "  (no selection)\n")]
     name, alias, _ = results[selected_index]
-    lines: list[tuple[str, str]] = [
+    lines: StyleAndTextTuples = [
         ("bold", f"  Name: {name}\n"),
         ("", f"  Cmd:  {alias.command}\n"),
         ("", f"  Group: {alias.group or '—'}\n"),

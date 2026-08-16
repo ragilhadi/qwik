@@ -42,7 +42,7 @@ class FishRenderer(ShellRenderer):
         if has_placeholders(alias.command):
             return f'function {name}\n    qwik run "{name}" $argv\nend'
         escaped = alias.command.replace("\\", "\\\\").replace("'", "\\'")
-        return f"function {name}\n    '{escaped}' $argv\nend"
+        return f"alias {name} '{escaped}'"
 
     def rc_path(self) -> Path | None:
         """Return the fish config path honoring env overrides."""

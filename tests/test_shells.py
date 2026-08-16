@@ -53,24 +53,26 @@ class TestRenderers:
     def test_fish_alias(self) -> None:
         renderer = get_renderer("fish")
         out = renderer.render_alias("gs", Alias(command="git status"))
-        assert "function gs" in out
-        assert "'git status' $argv" in out
+        assert out == "alias gs 'git status'"
 
     def test_fish_alias_with_quotes(self) -> None:
         renderer = get_renderer("fish")
         out = renderer.render_alias("e", Alias(command="echo 'hello'"))
-        assert "function e" in out
-        assert "echo \\'hello\\'" in out
+        assert out == "alias e 'echo \\'hello\\''"
 
     def test_fish_append_quoted(self) -> None:
         from qwik.core.models import Alias
         from qwik.shells.fish import FishRenderer
 
         out = FishRenderer().render_alias("gco", Alias(command="git checkout 'main'"))
-        assert "function gco" in out
         # The command must be wrapped in single quotes so the embedded \' escapes work
-        assert "git checkout \\'main\\'" in out
-        assert "'git checkout \\'main\\'" in out
+        assert out == "alias gco 'git checkout \\'main\\''"
+
+    def test_fish_template_alias_still_uses_function(self) -> None:
+        renderer = get_renderer("fish")
+        out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
+        assert "function gco" in out
+        assert 'qwik run "gco" $argv' in out
 
     def test_cmd_best_effort(self) -> None:
         renderer = get_renderer("cmd")

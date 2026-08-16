@@ -215,7 +215,7 @@ class TestInitCommand:
         runner.invoke(app, ["add", "gs", "git", "status"])
         result = runner.invoke(app, ["init", "fish"])
         assert result.exit_code == 0
-        assert "function gs" in result.output
+        assert "alias gs 'git status'" in result.output
 
     def test_init_pwsh(self, clean_store) -> None:
         runner.invoke(app, ["add", "gs", "git", "status"])
