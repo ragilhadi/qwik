@@ -191,8 +191,13 @@ class TestRestoreFromBackup:
         Produces exactly one backup containing both ``gs`` and ``gp`` so
         the restore flow deterministically picks it.
         """
+        # --force on "gp": it's a builtin alias in some shells (e.g.
+        # PowerShell's Get-ItemProperty), and without --force the add
+        # would silently no-op on a declined confirmation prompt (no
+        # stdin here to answer it) rather than fail loudly.
         runner.invoke(app, ["add", "gs", "git", "status"])
-        runner.invoke(app, ["add", "gp", "git", "push"])
+        result = runner.invoke(app, ["add", "gp", "git", "push", "--force"])
+        assert result.exit_code == 0, result.output
         backups_dir = tmp_path / "backups"
         for f in backups_dir.glob("aliases-*.toml"):
             f.unlink()

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 import shutil
+import time
 from pathlib import Path
 
 import tomlkit
@@ -35,14 +37,62 @@ _shell_name_from_env = shell_name_from_env
 _shell_name_from_proc = shell_name_from_proc
 
 
+_BACKUP_STAMP_RE = re.compile(r"^aliases-(\d{8})-(\d{6})-(\d{6})-(\d+)\.toml$")
+
+
+def _backup_sort_key(path: Path) -> tuple[int, int, int, int]:
+    """Parse a backup filename's stamp into a numerically comparable key.
+
+    Sorting the filenames themselves as strings (the previous approach)
+    silently breaks the moment the trailing counter's zero-padded width
+    is exceeded — ``"...-9999"`` sorts *after* ``"...-10000"``
+    lexicographically, the reverse of numeric order — reintroducing
+    exactly the collision the counter exists to prevent. Parsing each
+    field and comparing as integers has no such width dependency.
+    Anything not matching the expected shape (e.g. a hand-placed or
+    corrupt file) sorts as the oldest possible entry rather than
+    erroring, since :func:`_latest_valid_backup` already validates
+    content separately.
+    """
+    match = _BACKUP_STAMP_RE.match(path.name)
+    if match is None:
+        return (0, 0, 0, 0)
+    date, clock, micros, counter = match.groups()
+    return (int(date), int(clock), int(micros), int(counter))
+
+
+def _read_backup_text(path: Path) -> str:
+    """Read *path*, retrying briefly on a transient Windows file lock.
+
+    A backup file is written moments before this reads it back, and on
+    Windows a just-created file can be held open for a short window by
+    antivirus real-time scanning or the search indexer — long enough for
+    a same-process read immediately afterward to see ``PermissionError``
+    (WinError 32) even though nothing in *this* process still has it
+    open. POSIX never raises for this case, so the loop costs nothing
+    there beyond the (never-taken) first attempt.
+    """
+    delay = 0.05
+    for attempt in range(5):
+        try:
+            return path.read_text(encoding="utf-8")
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(delay)
+            delay *= 2
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
 def _latest_valid_backup(backup_dir: Path) -> Path | None:
     """Return the newest valid backup TOML in *backup_dir*, or ``None``.
 
     Backups are named ``aliases-<stamp>.toml`` where ``<stamp>`` is a
     UTC timestamp with microseconds and a per-process monotonic counter
-    (see :func:`qwik.core.store._now_stamp`). The filename therefore
-    sorts chronologically, which is more reliable than ``st_mtime`` on
-    filesystems with coarse mtime resolution (Windows ~15 ms).
+    (see :func:`qwik.core.store._now_stamp`), parsed and compared
+    numerically by :func:`_backup_sort_key` rather than as raw filename
+    strings — more reliable than ``st_mtime`` too, which has coarse
+    resolution on some filesystems (Windows ~15 ms).
 
     Args:
         backup_dir: Directory holding backup files.
@@ -53,10 +103,10 @@ def _latest_valid_backup(backup_dir: Path) -> Path | None:
     """
     if not backup_dir.exists():
         return None
-    candidates = sorted(backup_dir.glob("aliases-*.toml"), reverse=True)
+    candidates = sorted(backup_dir.glob("aliases-*.toml"), key=_backup_sort_key, reverse=True)
     for path in candidates:
         try:
-            doc = tomlkit.parse(path.read_text(encoding="utf-8"))
+            doc = tomlkit.parse(_read_backup_text(path))
             AliasStore.model_validate(doc.unwrap())
         except Exception:
             continue
@@ -116,7 +166,7 @@ def doctor_command() -> None:
         else:
             try:
                 backup_store = AliasStore.model_validate(
-                    tomlkit.parse(backup.read_text(encoding="utf-8")).unwrap()
+                    tomlkit.parse(_read_backup_text(backup)).unwrap()
                 )
                 count = len(backup_store.aliases)
             except Exception:

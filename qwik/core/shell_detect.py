@@ -203,7 +203,14 @@ def _shell_name_from_windows_parent_process() -> str | None:
                 ("szExeFile", ctypes.c_char * 260),
             ]
 
-        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        # getattr, not ctypes.windll.kernel32: `windll` only exists in the
+        # Windows-specific typeshed stub, so a static attribute access
+        # makes mypy's verdict depend on which OS happens to run it —
+        # `attr-defined` on Linux/macOS, "unused ignore" on Windows. The
+        # indirection sidesteps that platform-dependent check entirely;
+        # the AttributeError this raises on non-Windows is still caught
+        # below exactly like before.
+        kernel32 = getattr(ctypes, "windll").kernel32  # noqa: B009 — see comment above
         snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
         if snapshot == -1 or snapshot == 0:
             return None

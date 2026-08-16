@@ -111,15 +111,28 @@ class TestWindowsDetection:
             assert sd.detect_shell() == "pwsh"
 
     def test_no_signals_falls_back_to_none_without_crashing(self, clean_env) -> None:
-        # No env heuristics match, and the ToolHelp32 process walk fails
-        # cleanly on a non-Windows ctypes (no `windll`) — must not raise.
-        with mock.patch.object(sys, "platform", "win32"):
+        # No env heuristics match, and the ToolHelp32 process walk finds
+        # no classifiable ancestor — must not raise. The walk itself is
+        # stubbed out here rather than left to fail on its own: on a
+        # non-Windows CI runner it fails because `ctypes.windll` doesn't
+        # exist, but on a *real* Windows runner it succeeds and walks the
+        # actual process tree — which, inside a CI job, has a genuine
+        # shell (e.g. pwsh.exe, since that's what runs the job step) as
+        # an ancestor. Relying on that accidental failure made this test
+        # platform-dependent instead of actually testing "no signals".
+        with (
+            mock.patch.object(sys, "platform", "win32"),
+            mock.patch.object(sd, "_shell_name_from_windows_parent_process", return_value=None),
+        ):
             assert sd.detect_shell() is None
 
     def test_shell_env_not_consulted_on_windows_when_absent(self, clean_env) -> None:
         # $SHELL is a POSIX convention; genuine Windows sessions don't set
         # it, so detection must not depend on it being present.
-        with mock.patch.object(sys, "platform", "win32"):
+        with (
+            mock.patch.object(sys, "platform", "win32"),
+            mock.patch.object(sd, "_shell_name_from_windows_parent_process", return_value=None),
+        ):
             assert "SHELL" not in __import__("os").environ
             assert sd.detect_shell() is None
 

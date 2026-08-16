@@ -184,15 +184,26 @@ class TestPickCommandEditDelete:
         import os
         import sys
 
-        editor = tmp_path / "editor.sh"
-        editor.write_text(
-            "#!/usr/bin/env bash\n"
-            'cat > "$1" <<\'EOF\'\n'
-            'command = "echo edited"\ntag = []\ngroup = ""\n'
-            'description = ""\nenabled = true\nEOF\n',
-            encoding="utf-8",
-        )
-        os.chmod(editor, 0o700)
+        snippet = 'command = "echo edited"\ntag = []\ngroup = ""\ndescription = ""\nenabled = true\n'
+        if sys.platform == "win32":
+            editor = tmp_path / "editor.bat"
+            payload = tmp_path / "payload.txt"
+            payload.write_text(snippet, encoding="utf-8")
+            editor.write_text(
+                f'@echo off\r\n"{sys.executable}" -c "'
+                "import sys; "
+                "open(sys.argv[1], 'w', encoding='utf-8')"
+                ".write(open(sys.argv[2], encoding='utf-8').read())"
+                f'" "%~1" "{payload}"\r\n',
+                encoding="utf-8",
+            )
+        else:
+            editor = tmp_path / "editor.sh"
+            editor.write_text(
+                f"#!/usr/bin/env bash\ncat > \"$1\" <<'EOF'\n{snippet}EOF\n",
+                encoding="utf-8",
+            )
+            os.chmod(editor, 0o700)
         monkeypatch.setenv("EDITOR", str(editor))
 
         import qwik.commands.pick as pick_mod

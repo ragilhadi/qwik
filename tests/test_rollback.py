@@ -53,8 +53,13 @@ class TestRollbackRm:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         backup_dir = _setup(tmp_path, monkeypatch)
+        # --force on "gp": it's a builtin alias in some shells (e.g.
+        # PowerShell's Get-ItemProperty), and without --force the add
+        # would silently no-op on a declined confirmation prompt (no
+        # stdin here to answer it) rather than fail loudly.
         runner.invoke(app, ["add", "gs", "git", "status"])
-        runner.invoke(app, ["add", "gp", "git", "push"])
+        result = runner.invoke(app, ["add", "gp", "git", "push", "--force"])
+        assert result.exit_code == 0, result.output
         before = _backup_count(backup_dir)
 
         result = runner.invoke(app, ["rm", "gs", "--yes"])
