@@ -102,6 +102,7 @@ qwik edit gs
 # Opens TOML snippet in your $EDITOR:
 #   command = "git status"
 #   tag = ["git"]
+#   group = ""
 #   description = ""
 #   enabled = true
 # Save and quit to apply changes.

@@ -128,6 +128,128 @@ class TestEditCommand:
         result = runner.invoke(app, ["edit", "gs"])
         assert result.exit_code == 0
 
+    def test_edit_no_op_preserves_group(self, tmp_path, monkeypatch) -> None:
+        # Regression: `group` used to be silently dropped by every edit,
+        # even a no-op one, because the snippet never included it and the
+        # reconstruction never passed it through.
+        self._setup(tmp_path, monkeypatch)
+        runner.invoke(app, ["group", "gs", "git"])
+
+        no_op_editor = tmp_path / "noop.sh"
+        no_op_editor.write_text("#!/usr/bin/env bash\ntrue\n", encoding="utf-8")
+        os.chmod(no_op_editor, 0o700)
+        monkeypatch.setenv("EDITOR", str(no_op_editor))
+
+        result = runner.invoke(app, ["edit", "gs"])
+        assert result.exit_code == 0
+
+        from qwik.core.store import get_store
+
+        data = get_store().load()
+        assert data.get("gs").group == "git"
+
+    def test_edit_can_change_group(self, tmp_path, monkeypatch) -> None:
+        self._setup(tmp_path, monkeypatch)
+        snippet = (
+            'command = "git status"\ntag = []\ngroup = "vcs"\n'
+            'description = ""\nenabled = true\n'
+        )
+        editor = _create_editor_script(tmp_path, snippet)
+        monkeypatch.setenv("EDITOR", str(editor))
+        result = runner.invoke(app, ["edit", "gs"])
+        assert result.exit_code == 0
+
+        from qwik.core.store import get_store
+
+        assert get_store().load().get("gs").group == "vcs"
+
+    def test_edit_can_clear_group(self, tmp_path, monkeypatch) -> None:
+        self._setup(tmp_path, monkeypatch)
+        runner.invoke(app, ["group", "gs", "git"])
+        snippet = (
+            'command = "git status"\ntag = []\ngroup = ""\n'
+            'description = ""\nenabled = true\n'
+        )
+        editor = _create_editor_script(tmp_path, snippet)
+        monkeypatch.setenv("EDITOR", str(editor))
+        result = runner.invoke(app, ["edit", "gs"])
+        assert result.exit_code == 0
+
+        from qwik.core.store import get_store
+
+        assert get_store().load().get("gs").group is None
+
+    def test_edit_round_trips_every_field_unchanged(self, tmp_path, monkeypatch) -> None:
+        # A no-op edit (the editor script exits without touching the file)
+        # must leave every field byte-identical apart from `updated_at`.
+        # This is the regression the group-drop bug was an instance of —
+        # it fails again if a future field is added to `Alias` without
+        # this command being updated to carry it through.
+        self._setup(tmp_path, monkeypatch)
+        runner.invoke(
+            app,
+            ["add", "gco", "git checkout {1}", "--tag", "git,vcs", "--group", "git",
+             "--description", "checkout a branch"],
+        )
+        runner.invoke(app, ["run", "gco", "main"])  # bump run_count / last_used
+
+        from qwik.core.store import get_store
+
+        before = get_store().load().get("gco")
+        assert before is not None
+        assert before.run_count > 0
+        assert before.last_used is not None
+
+        no_op_editor = tmp_path / "noop.sh"
+        no_op_editor.write_text("#!/usr/bin/env bash\ntrue\n", encoding="utf-8")
+        os.chmod(no_op_editor, 0o700)
+        monkeypatch.setenv("EDITOR", str(no_op_editor))
+
+        result = runner.invoke(app, ["edit", "gco"])
+        assert result.exit_code == 0
+
+        after = get_store().load().get("gco")
+        assert after is not None
+        assert after.command == before.command
+        assert after.tag == before.tag
+        assert after.group == before.group
+        assert after.description == before.description
+        assert after.enabled == before.enabled
+        assert after.created_at == before.created_at
+        assert after.last_used == before.last_used
+        assert after.run_count == before.run_count
+        assert after.updated_at >= before.updated_at
+
+    def test_edit_malformed_snippet_reports_error(self, tmp_path, monkeypatch) -> None:
+        # Invalid TOML must be a hard error, not silently keep the old
+        # values (the old ad-hoc line parser silently ignored anything it
+        # couldn't split on " = ").
+        self._setup(tmp_path, monkeypatch)
+        editor = _create_editor_script(tmp_path, 'command = "unterminated string\n')
+        monkeypatch.setenv("EDITOR", str(editor))
+        result = runner.invoke(app, ["edit", "gs"])
+        assert result.exit_code == 1
+        assert "parse" in result.output.lower()
+
+        from qwik.core.store import get_store
+
+        assert get_store().load().get("gs").command == "git status"
+
+    def test_edit_invalid_group_reports_error(self, tmp_path, monkeypatch) -> None:
+        self._setup(tmp_path, monkeypatch)
+        snippet = (
+            'command = "git status"\ntag = []\ngroup = "not a valid name!"\n'
+            'description = ""\nenabled = true\n'
+        )
+        editor = _create_editor_script(tmp_path, snippet)
+        monkeypatch.setenv("EDITOR", str(editor))
+        result = runner.invoke(app, ["edit", "gs"])
+        assert result.exit_code == 1
+
+        from qwik.core.store import get_store
+
+        assert get_store().load().get("gs").group is None
+
     def test_edit_editor_failed(self, tmp_path, monkeypatch) -> None:
         self._setup(tmp_path, monkeypatch)
         if sys.platform == "win32":
@@ -162,7 +284,7 @@ class TestEditorSelection:
         monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
         _reset_config()
         runner.invoke(app, ["add", "gs", "git", "status"])
-        editor = _create_editor_script(tmp_path, 'command = "git log"\ntag = []\ndescription = ""\nenabled = True')
+        editor = _create_editor_script(tmp_path, 'command = "git log"\ntag = []\ndescription = ""\nenabled = true')
         monkeypatch.setenv("EDITOR", "")
         monkeypatch.setenv("VISUAL", str(editor))
         result = runner.invoke(app, ["edit", "gs"])
