@@ -9,6 +9,7 @@ to prevent injection.
 from __future__ import annotations
 
 import subprocess
+import sys
 
 import typer
 
@@ -48,7 +49,15 @@ def run_command(
         print_error(str(exc), console=console)
         raise typer.Exit(1)
 
-    print_success(f'Running "{name}" → {expanded!r}', console=console)
+    # The banner must never touch stdout: `qwik run` is meant to be
+    # composable in pipes and `$(...)` captures, and a decorated status
+    # line interleaved with the child's own output would corrupt both. It
+    # is also only useful to a human watching the terminal, so it is
+    # skipped entirely when stdout isn't a TTY (e.g. piped or captured).
+    if sys.stdout.isatty():
+        print_success(
+            f'Running "{name}" → {expanded!r}', console=get_console(stderr=True)
+        )
     returncode = 1
     try:
         result = subprocess.run(expanded, shell=True)
@@ -59,7 +68,7 @@ def run_command(
     finally:
         try:
             store.bump_usage(name)
-        except OSError:
+        except (OSError, RuntimeError):
             # best-effort usage tracking; never mask the command's exit code
             pass
 
