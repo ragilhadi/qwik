@@ -8,6 +8,7 @@ from qwik.core.substitute import (
     expand,
     find_unrecognized_braces,
     has_placeholders,
+    quote_for_shell,
     validate_placeholders_static,
 )
 
@@ -104,6 +105,83 @@ class TestQuoting:
 
     def test_all_args_normal_stays_unquoted(self) -> None:
         assert expand("echo {@}", ["a", "b"]) == "echo a b"
+
+
+class TestQuoteForShell:
+    """shlex.quote is POSIX-only; cmd.exe and PowerShell need their own
+    quoting rules, chosen by the shell that will actually execute the
+    expanded string rather than hardcoded to POSIX."""
+
+    CASES = [" ", '"', "'", "%VAR%", "$VAR", "&", "|", "^", ""]
+
+    @pytest.mark.parametrize("value", CASES)
+    def test_posix_default_matches_shlex_quote(self, value: str) -> None:
+        assert quote_for_shell(value, None) == shlex.quote(value)
+        assert quote_for_shell(value, "bash") == shlex.quote(value)
+        assert quote_for_shell(value, "zsh") == shlex.quote(value)
+        assert quote_for_shell(value, "fish") == shlex.quote(value)
+
+    def test_cmd_wraps_in_doubled_quotes(self) -> None:
+        assert quote_for_shell("my branch", "cmd") == '"my branch"'
+
+    def test_cmd_escapes_embedded_quote(self) -> None:
+        assert quote_for_shell('say "hi"', "cmd") == '"say ""hi"""'
+
+    def test_cmd_empty_string(self) -> None:
+        assert quote_for_shell("", "cmd") == '""'
+
+    @pytest.mark.parametrize("meta", list("&|<>^()%!"))
+    def test_cmd_caret_escapes_metacharacters(self, meta: str) -> None:
+        quoted = quote_for_shell(f"a{meta}b", "cmd")
+        assert f"^{meta}" in quoted
+        assert quoted == f'"a^{meta}b"'
+
+    def test_cmd_injection_payload_stays_one_argument(self) -> None:
+        # The payload from the README's injection example, targeted at cmd.
+        quoted = quote_for_shell("; echo PWNED", "cmd")
+        assert quoted == '"; echo PWNED"'
+        assert "^" not in quoted  # no cmd metacharacters in this payload
+
+    def test_cmd_var_is_not_expanded_by_our_quoting(self) -> None:
+        # `%` is caret-escaped so cmd doesn't treat %VAR% as expandable.
+        quoted = quote_for_shell("%VAR%", "cmd")
+        assert quoted == '"^%VAR^%"'
+
+    def test_pwsh_wraps_in_single_quotes(self) -> None:
+        assert quote_for_shell("my branch", "pwsh") == "'my branch'"
+
+    def test_pwsh_doubles_embedded_single_quote(self) -> None:
+        assert quote_for_shell("it's fine", "pwsh") == "'it''s fine'"
+
+    def test_pwsh_dollar_not_specially_escaped(self) -> None:
+        # PowerShell single-quoted strings never expand $var themselves,
+        # so no extra escaping is needed for $.
+        assert quote_for_shell("$VAR", "pwsh") == "'$VAR'"
+
+    def test_pwsh_empty_string(self) -> None:
+        assert quote_for_shell("", "pwsh") == "''"
+
+    def test_pwsh_injection_payload_stays_one_argument(self) -> None:
+        assert quote_for_shell("; echo PWNED", "pwsh") == "'; echo PWNED'"
+
+    def test_expand_uses_cmd_quoting_when_shell_is_cmd(self) -> None:
+        assert expand("git checkout {1}", ["my branch"], shell="cmd") == (
+            'git checkout "my branch"'
+        )
+
+    def test_expand_uses_pwsh_quoting_when_shell_is_pwsh(self) -> None:
+        assert expand("git checkout {1}", ["my branch"], shell="pwsh") == (
+            "git checkout 'my branch'"
+        )
+
+    def test_expand_defaults_to_posix_quoting(self) -> None:
+        assert expand("git checkout {1}", ["my branch"]) == (
+            f"git checkout {shlex.quote('my branch')}"
+        )
+
+    def test_expand_append_mode_respects_shell(self) -> None:
+        assert expand("echo", ["a b"], shell="cmd") == 'echo "a b"'
+        assert expand("echo", ["a b"], shell="pwsh") == "echo 'a b'"
 
 
 from qwik.core.substitute import _named_placeholder_index_map

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 
 import pytest
 from typer.testing import CliRunner
@@ -138,6 +139,57 @@ def test_xonsh_hook_parses_and_runs_template_alias(qwik_store, git_repo, tmp_pat
     )
     assert "SyntaxError" not in result.stderr
     assert "Switched to branch" in result.stdout or "Switched to branch" in result.stderr
+
+
+@pytest.mark.integration
+def test_run_cmd_quoting_preserves_spaced_argument(tmp_path):
+    # Regression: shlex.quote()'s POSIX single-quote output means nothing
+    # to cmd.exe, so a spaced argument used to arrive at the child program
+    # split into two — this only runs for real on a Windows CI runner.
+    if sys.platform != "win32":
+        pytest.skip("cmd.exe quoting only applies on Windows")
+    env = _qwik_env()
+    env["QWIK_CONFIG_DIR"] = str(tmp_path)
+    env["QWIK_SHELL"] = "cmd"
+
+    marker = tmp_path / "argv.txt"
+    script = tmp_path / "argecho.py"
+    script.write_text(
+        "import sys, pathlib\n"
+        f"pathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
+        encoding="utf-8",
+    )
+    alias_cmd = f'{sys.executable} "{script}" {{1}}'
+    subprocess.run(["qwik", "add", "argecho", alias_cmd], check=True, env=env)
+    result = subprocess.run(["qwik", "run", "argecho", "my branch"], env=env)
+    assert result.returncode == 0
+    assert marker.read_text(encoding="utf-8") == "['my branch']"
+
+
+@pytest.mark.integration
+def test_run_pwsh_quoting_preserves_spaced_argument(tmp_path):
+    # Regression: even with correct PowerShell-style quoting, shell=True
+    # on Windows always runs the string through cmd.exe (COMSPEC), not
+    # pwsh/powershell.exe — so the quoting has to be paired with an
+    # explicit interpreter choice, not just a different quote function.
+    if sys.platform != "win32":
+        pytest.skip("pwsh quoting only applies on Windows")
+    env = _qwik_env()
+    env["QWIK_CONFIG_DIR"] = str(tmp_path)
+    env["QWIK_SHELL"] = "pwsh"
+
+    marker = tmp_path / "argv.txt"
+    script = tmp_path / "argecho.py"
+    script.write_text(
+        "import sys, pathlib\n"
+        f"pathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
+        encoding="utf-8",
+    )
+    alias_cmd = f'{sys.executable} "{script}" {{1}}'
+    subprocess.run(["qwik", "add", "argecho", alias_cmd], check=True, env=env)
+    result = subprocess.run(["qwik", "run", "argecho", "my branch"], env=env)
+    assert result.returncode == 0
+    assert marker.read_text(encoding="utf-8") == "['my branch']"
 
 
 @pytest.mark.integration

@@ -7,6 +7,8 @@ import sys
 
 import typer
 
+from qwik.core.shell_detect import detect_shell
+from qwik.core.shell_exec import build_invocation
 from qwik.core.store import get_store
 from qwik.core.substitute import expand
 from qwik.ui.picker import run_picker
@@ -61,8 +63,9 @@ def pick_command() -> None:
         print_error(f'Alias "{name}" is disabled.', console=console)
         raise typer.Exit(1)
 
+    active_shell = detect_shell()
     try:
-        expanded = expand(alias.command, [])
+        expanded = expand(alias.command, [], shell=active_shell)
     except ValueError as exc:
         print_error(str(exc), console=console)
         raise typer.Exit(1)
@@ -76,7 +79,8 @@ def pick_command() -> None:
         )
     returncode = 1
     try:
-        completed = subprocess.run(expanded, shell=True)
+        cmd, use_shell = build_invocation(expanded, active_shell)
+        completed = subprocess.run(cmd, shell=use_shell)
         returncode = completed.returncode
     except KeyboardInterrupt:
         # Child received SIGINT (e.g. user hit Ctrl+C on a long-running command).

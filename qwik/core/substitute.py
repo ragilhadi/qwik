@@ -10,9 +10,85 @@ __all__ = [
     "expand",
     "find_unrecognized_braces",
     "has_placeholders",
+    "quote_for_shell",
     "validate_placeholders",
     "validate_placeholders_static",
 ]
+
+# cmd.exe interprets these even inside a quoted argument unless each is
+# individually caret-escaped.
+_CMD_METACHARACTERS = frozenset("&|<>^()%!")
+
+
+def _quote_cmd(value: str) -> str:
+    """Quote *value* as one literal cmd.exe/doskey argument.
+
+    cmd.exe has no single quoting convention that makes a string fully
+    opaque the way POSIX single quotes do: metacharacters are still live
+    even inside a double-quoted argument, so they must be caret-escaped
+    individually, and the whole thing is then wrapped in doubled double
+    quotes so the target program's own CRT argv parser treats it as one
+    argument.
+
+    Args:
+        value: The raw argument value.
+
+    Returns:
+        The quoted string, safe to splice into a cmd.exe command line.
+    """
+    if not value:
+        return '""'
+    out: list[str] = []
+    for ch in value:
+        if ch in _CMD_METACHARACTERS:
+            out.append("^" + ch)
+        elif ch == '"':
+            out.append('""')
+        else:
+            out.append(ch)
+    return '"' + "".join(out) + '"'
+
+
+def _quote_pwsh(value: str) -> str:
+    """Quote *value* as a PowerShell single-quoted string literal.
+
+    PowerShell single-quoted strings perform no variable or subexpression
+    expansion at all — unlike POSIX, ``$var`` inside one stays literal —
+    so the only character that needs escaping is an embedded ``'``,
+    doubled per PowerShell's own convention.
+
+    Args:
+        value: The raw argument value.
+
+    Returns:
+        The quoted string, safe to splice into a PowerShell command line.
+    """
+    return "'" + value.replace("'", "''") + "'"
+
+
+def quote_for_shell(value: str, shell: str | None) -> str:
+    """Quote *value* as one literal argument for *shell*'s parsing rules.
+
+    ``shlex.quote`` (POSIX single-quote syntax) is only meaningful to
+    ``sh``/``bash``/``zsh``/``fish`` — it means nothing to ``cmd.exe``,
+    and PowerShell has its own escaping convention. The right quoting
+    therefore depends on which shell will actually execute the expanded
+    string, not on the host platform: a user can be running POSIX bash
+    under Git Bash or WSL on a Windows host.
+
+    Args:
+        value: The raw argument value.
+        shell: The target shell name (e.g. ``"cmd"``, ``"pwsh"``,
+            ``"bash"``), or ``None`` to fall back to POSIX quoting.
+
+    Returns:
+        The quoted string.
+    """
+    if shell == "cmd":
+        return _quote_cmd(value)
+    if shell == "pwsh":
+        return _quote_pwsh(value)
+    return shlex.quote(value)
 
 _NAMED_RE = r"[A-Za-z_][A-Za-z0-9_-]*"
 _PLACEHOLDER_RE: re.Pattern[str] = re.compile(
@@ -201,38 +277,46 @@ def validate_placeholders(command: str, args: Sequence[str]) -> None:
             pass
 
 
-def _parse_positional(match: re.Match[str], args: Sequence[str], command: str) -> str:
+def _parse_positional(
+    match: re.Match[str], args: Sequence[str], command: str, shell: str | None
+) -> str:
     """Handle {N} and {N:-default} placeholders."""
     if match.group(1) is not None:
         idx = int(match.group(1))
         if idx < 1:
             _raise_invalid_index(idx, command)
-        return shlex.quote(args[idx - 1]) if idx <= len(args) else ""
+        return quote_for_shell(args[idx - 1], shell) if idx <= len(args) else ""
     if match.group(4) is not None:
         idx = int(match.group(4))
         if idx < 1:
             _raise_invalid_index(idx, command)
         value = args[idx - 1] if idx <= len(args) else match.group(5)
-        return shlex.quote(value)
+        return quote_for_shell(value, shell)
     return match.group(0)
 
 
-def _replacer(match: re.Match[str], args: Sequence[str], command: str, name_map: dict[str, int]) -> str:
+def _replacer(
+    match: re.Match[str],
+    args: Sequence[str],
+    command: str,
+    name_map: dict[str, int],
+    shell: str | None,
+) -> str:
     if match.group(1) is not None or match.group(4) is not None:
-        return _parse_positional(match, args, command)
+        return _parse_positional(match, args, command, shell)
     if match.group(2) is not None:  # {@}
-        return " ".join(shlex.quote(a) for a in args)
+        return " ".join(quote_for_shell(a, shell) for a in args)
     if match.group(3) is not None:  # {*}
-        return shlex.quote(" ".join(args))
+        return quote_for_shell(" ".join(args), shell)
     if match.group(6) is not None:  # {name}
         name = match.group(6)
         idx = name_map[name]
-        return shlex.quote(args[idx - 1]) if idx <= len(args) else ""
+        return quote_for_shell(args[idx - 1], shell) if idx <= len(args) else ""
     if match.group(7) is not None:  # {name:-default}
         name = match.group(7)
         idx = name_map[name]
         value = args[idx - 1] if idx <= len(args) else match.group(8)
-        return shlex.quote(value)
+        return quote_for_shell(value, shell)
     return match.group(0)
 
 
@@ -254,7 +338,7 @@ def _extract_surplus(command: str, args: Sequence[str]) -> Sequence[str]:
     return args[max_ref:]
 
 
-def expand(command: str, args: Sequence[str]) -> str:
+def expand(command: str, args: Sequence[str], *, shell: str | None = None) -> str:
     """Expand *command* using the provided positional *args*.
 
     When *command* contains no placeholders the behaviour is **append**
@@ -287,6 +371,10 @@ def expand(command: str, args: Sequence[str]) -> str:
     Args:
         command: The raw alias command.
         args: Runtime positional arguments.
+        shell: The shell that will execute the expanded string (e.g.
+            ``"bash"``, ``"cmd"``, ``"pwsh"``). Determines the quoting
+            rules applied to each interpolated argument; ``None`` falls
+            back to POSIX quoting via ``shlex.quote``.
 
     Returns:
         The fully expanded shell command.
@@ -297,19 +385,19 @@ def expand(command: str, args: Sequence[str]) -> str:
     if not has_placeholders(command):
         if not args:
             return command
-        quoted = " ".join(shlex.quote(a) for a in args)
+        quoted = " ".join(quote_for_shell(a, shell) for a in args)
         return f"{command} {quoted}"
 
     validate_placeholders(command, args)
     name_map = _named_placeholder_index_map(command)
 
     expanded = _PLACEHOLDER_RE.sub(
-        lambda m: _replacer(m, args, command, name_map), command
+        lambda m: _replacer(m, args, command, name_map, shell), command
     )
 
     surplus = _extract_surplus(command, args)
     if surplus:
-        quoted = " ".join(shlex.quote(a) for a in surplus)
+        quoted = " ".join(quote_for_shell(a, shell) for a in surplus)
         expanded = f"{expanded} {quoted}"
 
     return expanded
