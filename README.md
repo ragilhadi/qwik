@@ -220,10 +220,24 @@ qwik sync status                       # branch, remote, dirty, ahead/behind, al
 ```bash
 qwik overlay add --url https://github.com/team/qwik-aliases --branch main
 qwik overlay list           # show overlay aliases
-qwik overlay update         # git pull the overlay repo
+qwik overlay update         # fetch and show added/changed/removed before applying
 qwik overlay copy --name gs # copy an overlay alias to your user store
 qwik overlay remove         # remove the overlay
 ```
+
+`overlay add` and `overlay update` show the same trust-boundary preview as
+`qwik import`/`qwik sync pull` — the incoming (or changed) commands, and a
+confirmation prompt — before anything is applied; pass `--yes` to skip the
+prompt. `update` reports "already up to date" and doesn't prompt when
+nothing changed. The overlay repo is managed with `git clone` on `add` and
+`git fetch` + `git reset --hard` on `update`, so it always exactly mirrors
+the remote branch and can't enter a merge-conflict state.
+
+> **Trust warning:** overlay aliases are a code-execution vector — anyone
+> with push access to the overlay repo can add or change a command that
+> runs under `shell=True` the next time you use it. Always review the
+> preview before confirming an `overlay add`/`update`; only point the
+> overlay at a repo you control.
 
 Overlay aliases appear in `qwik list`, `qwik search`, `qwik init`, and the
 picker — marked `(overlay)` in `list`/`search` — but cannot be edited or

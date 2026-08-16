@@ -22,6 +22,9 @@ __all__ = [
     "add_remote",
     "push",
     "pull",
+    "clone",
+    "fetch",
+    "reset_hard",
     "status_short",
     "behind_ahead",
     "get_remote_url",
@@ -105,6 +108,47 @@ def push(path: Path, remote: str, branch: str) -> None:
 def pull(path: Path, remote: str, branch: str) -> None:
     """Pull *branch* from *remote*."""
     _run_git(["pull", remote, branch], path)
+
+
+def clone(url: str, dest: Path, branch: str, *, depth: int | None = 1) -> None:
+    """Clone *url* at *branch* into *dest* (``dest`` must not yet exist).
+
+    Args:
+        url: Remote repository URL.
+        dest: Destination directory. Its parent must already exist;
+            ``dest`` itself must not.
+        branch: Branch to check out.
+        depth: History depth to fetch (``git clone --depth``), or
+            ``None`` for a full clone.
+    """
+    args = ["clone", "--branch", branch]
+    if depth is not None:
+        args += ["--depth", str(depth)]
+    args += [url, str(dest)]
+    _run_git(args, dest.parent)
+
+
+def fetch(path: Path, remote: str, branch: str) -> None:
+    """Fetch *branch* from *remote* without merging it."""
+    _run_git(["fetch", remote, branch], path)
+
+
+def reset_hard(path: Path, ref: str) -> None:
+    """Hard-reset the working tree to *ref* (e.g. ``origin/main``)."""
+    _run_git(["reset", "--hard", ref], path)
+
+
+def show_file(path: Path, ref: str, file: str) -> str:
+    """Return the contents of *file* at *ref* (``git show <ref>:<file>``).
+
+    Reads the blob directly from git's object store without touching the
+    working tree, so it can be used to preview incoming content (e.g.
+    after a ``fetch``, before a ``reset --hard``) without applying it.
+
+    Raises:
+        RuntimeError: If *file* does not exist at *ref*.
+    """
+    return _run_git(["show", f"{ref}:{file}"], path)
 
 
 def status_short(path: Path) -> str:
