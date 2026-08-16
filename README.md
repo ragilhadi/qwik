@@ -538,6 +538,7 @@ If the file's version is newer than the version qwik understands, qwik refuses t
 | `XDG_CONFIG_HOME` | Base config dir (used by fish rc resolution) |
 | `QWIK_DEBUG=1` | Enable debug logs to stderr |
 | `NO_COLOR` | Disable colored output (also `--no-color`) |
+| `QWIK_SHELL` | Force shell detection (`bash`, `zsh`, `fish`, `pwsh`, `cmd`, `nu`, `xonsh`) instead of auto-detecting from the environment/parent process |
 
 ---
 
