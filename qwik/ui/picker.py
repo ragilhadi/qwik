@@ -7,25 +7,24 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from prompt_toolkit import Application
-from prompt_toolkit.buffer import Buffer
-from prompt_toolkit.input import Input
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.layout import (
-    HSplit,
-    Layout,
-    Window,
-)
-from prompt_toolkit.formatted_text import StyleAndTextTuples
-from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
-from prompt_toolkit.layout.dimension import Dimension
-from prompt_toolkit.output import Output
-from prompt_toolkit.styles import Style as PTStyle
-
 from qwik.core.search import search_aliases
 from qwik.ui.theme import get_console
 
 if TYPE_CHECKING:
+    # prompt_toolkit costs ~80ms to import. Every qwik invocation loads
+    # this module (qwik/commands/pick.py imports it at module scope so
+    # the CLI can register the `pick` command), but only an actual picker
+    # session needs prompt_toolkit itself — so the real imports live
+    # inside the functions that use them, and only these type-only names
+    # are needed up here (erased at runtime by `from __future__ import
+    # annotations`).
+    from prompt_toolkit.formatted_text import StyleAndTextTuples
+    from prompt_toolkit.input import Input
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import Window
+    from prompt_toolkit.output import Output
+    from prompt_toolkit.styles import Style as PTStyle
+
     from qwik.core.models import Alias, AliasStore
 
 __all__ = ["run_picker", "PickerAction", "PickerResult"]
@@ -53,7 +52,9 @@ class PickerResult:
     name: str
 
 
-def _build_style() -> PTStyle:
+def _build_style() -> "PTStyle":
+    from prompt_toolkit.styles import Style as PTStyle
+
     from qwik.ui.theme import _no_color_active
 
     if _no_color_active():
@@ -104,12 +105,14 @@ class _PickerState:
 
 
 def _bind_keys(
-    kb: KeyBindings,
+    kb: "KeyBindings",
     store: "AliasStore",
     state: _PickerState,
-    result_window: Window,
-    preview_window: Window,
+    result_window: "Window",
+    preview_window: "Window",
 ) -> None:
+    from prompt_toolkit.layout.controls import FormattedTextControl
+
     @kb.add("up")
     def _up(event) -> None:  # type: ignore[no-untyped-def]
         if state.results:
@@ -167,8 +170,8 @@ def _bind_keys(
 def run_picker(
     store: "AliasStore",
     *,
-    input_: Input | None = None,
-    output: Output | None = None,
+    input_: "Input | None" = None,
+    output: "Output | None" = None,
 ) -> PickerResult | None:
     """Run the interactive fuzzy picker and return the chosen action.
 
@@ -184,6 +187,15 @@ def run_picker(
             "[qwik.error]No aliases found. Run `qwik add` first.[/qwik.error]"
         )
         return None
+
+    # Deferred until an interactive session is actually needed (see the
+    # module-level comment above) rather than paid by every qwik invocation.
+    from prompt_toolkit import Application
+    from prompt_toolkit.buffer import Buffer
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import HSplit, Layout, Window
+    from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+    from prompt_toolkit.layout.dimension import Dimension
 
     kb = KeyBindings()
     state = _PickerState()
@@ -262,10 +274,12 @@ def run_picker(
 def _refresh(
     store: "AliasStore",
     state: _PickerState,
-    result_window: Window,
-    preview_window: Window,
+    result_window: "Window",
+    preview_window: "Window",
     query: str,
 ) -> None:
+    from prompt_toolkit.layout.controls import FormattedTextControl
+
     current_name = None
     if state.results and state.selected_index < len(state.results):
         current_name = state.results[state.selected_index][0]

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import functools
 import importlib.metadata
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,16 +21,39 @@ __all__ = [
 _ENTRY_POINT_GROUP = "qwik.shell_renderers"
 
 
+@functools.cache
 def supported_shells() -> tuple[str, ...]:
     """Return all registered shell identifiers, sorted.
 
     Discovers shells via the ``qwik.shell_renderers`` entry-point group.
+    Entry-point discovery walks installed-distribution metadata on disk,
+    so the result is cached: at most one scan per process, and only when
+    something actually needs it (not at import time — most invocations,
+    like ``qwik add``, never call this at all).
     """
     eps = importlib.metadata.entry_points(group=_ENTRY_POINT_GROUP)
     return tuple(sorted(ep.name for ep in eps))
 
 
-SUPPORTED_SHELLS: tuple[str, ...] = supported_shells()
+@functools.cache
+def _renderer_registry() -> dict[str, type]:
+    """Return ``{shell_name: renderer_class}``, loaded and cached once."""
+    return {
+        ep.name: ep.load()
+        for ep in importlib.metadata.entry_points(group=_ENTRY_POINT_GROUP)
+    }
+
+
+def __getattr__(name: str) -> Any:
+    """Compute ``SUPPORTED_SHELLS`` lazily on first access (PEP 562).
+
+    Kept as a module attribute for backward compatibility with any
+    ``from qwik.shells.base import SUPPORTED_SHELLS`` import, but no
+    longer computed eagerly at import time.
+    """
+    if name == "SUPPORTED_SHELLS":
+        return supported_shells()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class ShellRenderer(ABC):
@@ -98,16 +122,17 @@ class ShellRenderer(ABC):
 def get_renderer(shell: str) -> ShellRenderer:
     """Return the concrete renderer for *shell*.
 
-    Discovers renderers via the ``qwik.shell_renderers`` entry-point group.
+    Discovers renderers via the ``qwik.shell_renderers`` entry-point
+    group, cached after the first call (see :func:`_renderer_registry`)
+    rather than re-scanning entry points on every call.
 
     Raises:
         ValueError: If *shell* is not supported.
     """
     shell = shell.lower().strip()
-    for ep in importlib.metadata.entry_points(group=_ENTRY_POINT_GROUP):
-        if ep.name == shell:
-            cls = ep.load()
-            return cast("ShellRenderer", cls())
-    raise ValueError(
-        f"Unsupported shell: {shell}. Choose from {supported_shells()}."
-    )
+    cls = _renderer_registry().get(shell)
+    if cls is None:
+        raise ValueError(
+            f"Unsupported shell: {shell}. Choose from {supported_shells()}."
+        )
+    return cast("ShellRenderer", cls())

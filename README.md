@@ -260,6 +260,12 @@ qwik init zsh --install                # append to ~/.zshrc with backup
 
 Supported shells: `bash`, `zsh`, `fish`, `pwsh`.
 
+Every `qwik` invocation defers importing `prompt_toolkit` (used only by
+the interactive `pick` screen) and caches shell-renderer discovery
+instead of re-scanning installed-package metadata on each call — so a
+`qwik` call your shell hook makes on every prompt, like `qwik init`,
+isn't paying for either.
+
 ### `completion` — Shell completions
 
 Generate or install shell completion scripts for `qwik` itself (so `qwik <Tab>` offers command/alias suggestions).
