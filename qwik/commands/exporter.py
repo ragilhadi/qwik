@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Optional
 
 import typer
-from rich.console import Console
 
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success
+from qwik.ui.theme import get_console
 
 __all__ = ["export_command"]
 
@@ -26,7 +26,7 @@ def export_command(
     """Export aliases to a file."""
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     if not data.aliases:
         print_error("No aliases to export.", console=console)

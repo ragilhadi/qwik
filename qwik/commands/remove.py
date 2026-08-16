@@ -4,10 +4,10 @@ from __future__ import annotations
 
 
 import typer
-from rich.console import Console
 
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success, prompt_confirm
+from qwik.ui.theme import get_console
 
 __all__ = ["remove_command", "remove_alias"]
 
@@ -34,7 +34,7 @@ def remove_alias(name: str, *, yes: bool) -> None:
     """
     store = get_store()
     data = store.load()
-    console = Console()
+    console = get_console()
 
     if name in data.overlay_aliases and name not in data.aliases:
         print_error(

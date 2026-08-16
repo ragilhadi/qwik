@@ -15,14 +15,27 @@ __all__ = [
     "style",
 ]
 
-_NO_COLOR_OVERRIDE: bool = False
-
 
 def _no_color_active() -> bool:
-    """True if color output is disabled via flag, env, or platform."""
-    if _NO_COLOR_OVERRIDE:
+    """True if color output is disabled via flag, env, or platform.
+
+    The ``--no-color`` flag is carried on the current Click/Typer
+    context's ``obj`` (set once by the top-level callback) rather than
+    a mutable module-level global: a global would need to be
+    reassigned on every invocation to avoid leaking a prior process's
+    (or, in tests, a prior CliRunner.invoke's) value into one that never
+    passed the flag at all.
+    """
+    if os.environ.get("NO_COLOR") is not None:
         return True
-    return os.environ.get("NO_COLOR") is not None
+    try:
+        from typer._click.globals import get_current_context
+
+        ctx = get_current_context(silent=True)
+    except Exception:
+        ctx = None
+    obj = getattr(ctx, "obj", None)
+    return isinstance(obj, dict) and bool(obj.get("no_color"))
 
 
 THEME = Theme(
