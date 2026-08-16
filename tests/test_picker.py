@@ -3,7 +3,7 @@ from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 
 from qwik.core.models import Alias, AliasStore
-from qwik.ui.picker import run_picker, _build_style
+from qwik.ui.picker import PickerAction, PickerResult, run_picker, _build_style
 
 
 @pytest.fixture
@@ -19,14 +19,16 @@ def test_picker_selects_first(store_with_aliases):
     with create_pipe_input() as inp:
         inp.send_text("\r")
         result = run_picker(store_with_aliases, input_=inp, output=DummyOutput())
-    assert result in ("gco", "gp", "gs")
+    assert result is not None
+    assert result.action is PickerAction.RUN
+    assert result.name in ("gco", "gp", "gs")
 
 
 def test_picker_filters_and_selects(store_with_aliases):
     with create_pipe_input() as inp:
         inp.send_text("gco\r")
         result = run_picker(store_with_aliases, input_=inp, output=DummyOutput())
-    assert result == "gco"
+    assert result == PickerResult(PickerAction.RUN, "gco")
 
 
 def test_picker_escape_cancels(store_with_aliases):
@@ -40,14 +42,16 @@ def test_picker_ctrl_e_edits(store_with_aliases):
     with create_pipe_input() as inp:
         inp.send_text("\x05")
         result = run_picker(store_with_aliases, input_=inp, output=DummyOutput())
-    assert result is not None and result.startswith("__edit__:")
+    assert result is not None
+    assert result.action is PickerAction.EDIT
 
 
 def test_picker_ctrl_d_deletes(store_with_aliases):
     with create_pipe_input() as inp:
         inp.send_text("\x04")
         result = run_picker(store_with_aliases, input_=inp, output=DummyOutput())
-    assert result is not None and result.startswith("__delete__:")
+    assert result is not None
+    assert result.action is PickerAction.DELETE
 
 
 def test_picker_style_respects_no_color(monkeypatch):
@@ -103,3 +107,108 @@ def test_picker_preserves_selection(store_with_aliases):
         inp.send_text("\x1b[B\r")
         result = run_picker(store_with_aliases, input_=inp, output=DummyOutput())
     assert result is not None
+
+
+class TestPickCommandEditDelete:
+    """`pick_command`'s handling of the picker's Ctrl+E/Ctrl+D result.
+
+    Regression: this used to re-enter the CLI via
+    typer.testing.CliRunner, a test harness that replaces stdin with an
+    empty stream — so Ctrl+D's confirmation prompt hit EOF and Click
+    aborted, leaving the alias in place despite the picker reporting
+    success. `run_picker` (driven through prompt_toolkit's pipe input
+    above) is monkeypatched here to isolate pick_command's own wiring:
+    does it call the real edit_alias/remove_alias and does the store
+    actually change.
+    """
+
+    @staticmethod
+    def _setup(tmp_path, monkeypatch):
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        from typer.testing import CliRunner
+
+        from qwik.cli import app
+
+        CliRunner().invoke(app, ["add", "doomed", "echo", "doomed"])
+
+    def test_ctrl_d_deletes_with_real_confirmation(self, tmp_path, monkeypatch):
+        self._setup(tmp_path, monkeypatch)
+        import qwik.commands.pick as pick_mod
+        from qwik.ui.picker import PickerAction, PickerResult
+
+        monkeypatch.setattr(
+            pick_mod, "run_picker",
+            lambda data: PickerResult(PickerAction.DELETE, "doomed"),
+        )
+        monkeypatch.setattr(
+            "qwik.commands.remove.prompt_confirm", lambda *a, **k: True
+        )
+
+        import typer
+
+        with pytest.raises(typer.Exit) as exc:
+            pick_mod.pick_command()
+        assert exc.value.exit_code == 0
+
+        from qwik.core.store import get_store
+
+        assert get_store().load().get("doomed") is None
+
+    def test_ctrl_d_declined_keeps_alias(self, tmp_path, monkeypatch):
+        self._setup(tmp_path, monkeypatch)
+        import qwik.commands.pick as pick_mod
+        from qwik.ui.picker import PickerAction, PickerResult
+
+        monkeypatch.setattr(
+            pick_mod, "run_picker",
+            lambda data: PickerResult(PickerAction.DELETE, "doomed"),
+        )
+        monkeypatch.setattr(
+            "qwik.commands.remove.prompt_confirm", lambda *a, **k: False
+        )
+
+        import typer
+
+        with pytest.raises(typer.Exit):
+            pick_mod.pick_command()
+
+        from qwik.core.store import get_store
+
+        assert get_store().load().get("doomed") is not None
+
+    def test_ctrl_e_edits_with_real_editor(self, tmp_path, monkeypatch):
+        self._setup(tmp_path, monkeypatch)
+        import os
+        import sys
+
+        editor = tmp_path / "editor.sh"
+        editor.write_text(
+            "#!/usr/bin/env bash\n"
+            'cat > "$1" <<\'EOF\'\n'
+            'command = "echo edited"\ntag = []\ngroup = ""\n'
+            'description = ""\nenabled = true\nEOF\n',
+            encoding="utf-8",
+        )
+        os.chmod(editor, 0o700)
+        monkeypatch.setenv("EDITOR", str(editor))
+
+        import qwik.commands.pick as pick_mod
+        from qwik.ui.picker import PickerAction, PickerResult
+
+        monkeypatch.setattr(
+            pick_mod, "run_picker",
+            lambda data: PickerResult(PickerAction.EDIT, "doomed"),
+        )
+
+        import typer
+
+        with pytest.raises(typer.Exit) as exc:
+            pick_mod.pick_command()
+        assert exc.value.exit_code == 0
+
+        from qwik.core.store import get_store
+
+        assert get_store().load().get("doomed").command == "echo edited"

@@ -19,7 +19,7 @@ from qwik.core.store import get_store
 from qwik.ui.prompts import print_error, print_success
 from qwik.ui.theme import get_console
 
-__all__ = ["edit_command"]
+__all__ = ["edit_command", "edit_alias"]
 
 # Fields the user may edit through the snippet. Everything else on `Alias`
 # (created_at, updated_at, last_used, run_count) is preserved structurally
@@ -33,6 +33,19 @@ def edit_command(
     name: str = typer.Argument(..., help="Alias name to edit."),
 ) -> None:
     """Open the alias entry in ``$EDITOR`` as an editable TOML snippet."""
+    edit_alias(name)
+
+
+def edit_alias(name: str) -> None:
+    """Open *name*'s entry in ``$EDITOR``; the logic behind ``edit_command``.
+
+    A plain function taking real values rather than ``typer.Argument``
+    defaults, so callers other than Click — the picker's Ctrl+E binding —
+    can invoke it directly instead of going through a CLI-testing shim.
+
+    Args:
+        name: Alias identifier to edit.
+    """
     store = get_store()
     data = store.load()
     console = get_console()
