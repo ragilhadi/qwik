@@ -88,7 +88,7 @@ def search_aliases(
 
     if not query:
         # No query → return all candidates alphabetically with dummy score.
-        return [(n, a, 0.0) for n, a in sorted(candidates)]
+        return [(n, a, 0.0) for n, a in sorted(candidates)][:limit]
 
     scored: list[tuple[str, Alias, float]] = []
     for name, alias in candidates:
