@@ -65,9 +65,7 @@ class TestRenderers:
         # The whole payload — including its literal `}` and the text
         # "function dummy {" — ends up inert inside one string literal,
         # never reaching PowerShell's own parser as code.
-        assert out == (
-            "function brace {\n" f"    & ([ScriptBlock]::Create('{payload}')) @args\n" "}"
-        )
+        assert out == (f"function brace {{\n    & ([ScriptBlock]::Create('{payload}')) @args\n}}")
 
     def test_fish_alias(self) -> None:
         renderer = get_renderer("fish")
@@ -275,9 +273,9 @@ class TestAdversarialCommandMatrix:
                 if escaped[i] == "^":
                     i += 2
                     continue
-                assert (
-                    escaped[i] not in _CMD_METACHARACTERS
-                ), f"unescaped {escaped[i]!r} in {escaped!r} (from {command!r})"
+                assert escaped[i] not in _CMD_METACHARACTERS, (
+                    f"unescaped {escaped[i]!r} in {escaped!r} (from {command!r})"
+                )
                 i += 1
 
     def test_nu_every_command_delegates_to_qwik_run(self) -> None:

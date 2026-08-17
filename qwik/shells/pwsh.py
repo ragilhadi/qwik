@@ -46,7 +46,7 @@ class PwshRenderer(ShellRenderer):
         if has_placeholders(alias.command):
             return f'function {name} {{\n    qwik run "{name}" @args\n}}'
         escaped = alias.command.replace("'", "''")
-        return f"function {name} {{\n" f"    & ([ScriptBlock]::Create('{escaped}')) @args\n" f"}}"
+        return f"function {name} {{\n    & ([ScriptBlock]::Create('{escaped}')) @args\n}}"
 
     def rc_path(self) -> Path | None:
         """Return the PowerShell profile path, Windows-aware."""

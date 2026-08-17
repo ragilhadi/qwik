@@ -87,7 +87,7 @@ def preview_import(
     if not yes:
         if mode == "replace":
             prompt = (
-                f"Replace store — {len(removed_names)} alias(es) will be deleted. " "Continue?"
+                f"Replace store — {len(removed_names)} alias(es) will be deleted. Continue?"
                 if removed_names
                 else "Replace store? Continue?"
             )

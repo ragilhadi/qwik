@@ -155,8 +155,7 @@ class TestNoColorFlag:
             assert result.exit_code == 0, (cmd, result.output, result.exception)
             assert seen_color_systems, f"no Console() built for {cmd}"
             assert all(cs is None for cs in seen_color_systems), (
-                f"{cmd} built a Console with color_system={seen_color_systems!r} "
-                "despite --no-color"
+                f"{cmd} built a Console with color_system={seen_color_systems!r} despite --no-color"
             )
 
     def test_no_color_flag_disables_color(self, tmp_path, monkeypatch) -> None:
