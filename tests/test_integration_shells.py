@@ -276,7 +276,7 @@ def test_run_cmd_quoting_preserves_spaced_argument(tmp_path):
     marker = tmp_path / "argv.txt"
     script = tmp_path / "argecho.py"
     script.write_text(
-        "import sys, pathlib\n" f"pathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
+        f"import sys, pathlib\npathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
         encoding="utf-8",
     )
     alias_cmd = f'{sys.executable} "{script}" {{1}}'
@@ -301,7 +301,7 @@ def test_run_pwsh_quoting_preserves_spaced_argument(tmp_path):
     marker = tmp_path / "argv.txt"
     script = tmp_path / "argecho.py"
     script.write_text(
-        "import sys, pathlib\n" f"pathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
+        f"import sys, pathlib\npathlib.Path(r'{marker}').write_text(repr(sys.argv[1:]))\n",
         encoding="utf-8",
     )
     alias_cmd = f'{sys.executable} "{script}" {{1}}'

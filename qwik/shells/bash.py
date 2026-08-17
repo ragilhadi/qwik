@@ -40,7 +40,7 @@ class BashRenderer(ShellRenderer):
 
         if has_placeholders(alias.command):
             # Function wrapper so complex quoting is handled by qwik itself.
-            return f"{name}() {{\n" f'    qwik run "{name}" "$@"\n' f"}}"
+            return f'{name}() {{\n    qwik run "{name}" "$@"\n}}'
         escaped = alias.command.replace("'", "'\"'\"'")
         return f"alias {name}='{escaped}'"
 

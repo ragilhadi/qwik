@@ -71,12 +71,7 @@ class TestEditCommand:
 
     def test_edit_success(self, tmp_path, monkeypatch) -> None:
         self._setup(tmp_path, monkeypatch)
-        snippet = (
-            'command = "git log"\n'
-            'tag = ["work"]\n'
-            'description = "changed"\n'
-            "enabled = false\n"
-        )
+        snippet = 'command = "git log"\ntag = ["work"]\ndescription = "changed"\nenabled = false\n'
         editor = _create_editor_script(tmp_path, snippet)
         monkeypatch.setenv("EDITOR", str(editor))
         result = runner.invoke(app, ["edit", "gs"])
@@ -165,7 +160,7 @@ class TestEditCommand:
     def test_edit_can_change_group(self, tmp_path, monkeypatch) -> None:
         self._setup(tmp_path, monkeypatch)
         snippet = (
-            'command = "git status"\ntag = []\ngroup = "vcs"\n' 'description = ""\nenabled = true\n'
+            'command = "git status"\ntag = []\ngroup = "vcs"\ndescription = ""\nenabled = true\n'
         )
         editor = _create_editor_script(tmp_path, snippet)
         monkeypatch.setenv("EDITOR", str(editor))
@@ -179,9 +174,7 @@ class TestEditCommand:
     def test_edit_can_clear_group(self, tmp_path, monkeypatch) -> None:
         self._setup(tmp_path, monkeypatch)
         runner.invoke(app, ["group", "gs", "git"])
-        snippet = (
-            'command = "git status"\ntag = []\ngroup = ""\n' 'description = ""\nenabled = true\n'
-        )
+        snippet = 'command = "git status"\ntag = []\ngroup = ""\ndescription = ""\nenabled = true\n'
         editor = _create_editor_script(tmp_path, snippet)
         monkeypatch.setenv("EDITOR", str(editor))
         result = runner.invoke(app, ["edit", "gs"])

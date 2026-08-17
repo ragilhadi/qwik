@@ -36,7 +36,7 @@ class ZshRenderer(ShellRenderer):
         from qwik.core.substitute import has_placeholders
 
         if has_placeholders(alias.command):
-            return f"{name}() {{\n" f'    qwik run "{name}" "$@"\n' f"}}"
+            return f'{name}() {{\n    qwik run "{name}" "$@"\n}}'
         escaped = alias.command.replace("'", "'\"'\"'")
         return f"alias {name}='{escaped}'"
 

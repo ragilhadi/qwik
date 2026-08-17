@@ -160,7 +160,7 @@ def _do_add(
     if overlay_repo.exists():
         print_error(
             "Overlay already configured.",
-            suggestion="Run `qwik overlay remove` first, or " "`qwik overlay update` to refresh.",
+            suggestion="Run `qwik overlay remove` first, or `qwik overlay update` to refresh.",
             console=console,
         )
         raise typer.Exit(1)
