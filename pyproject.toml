@@ -52,7 +52,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "syrupy>=4.0.0",
     "mypy==2.3.0",
-    "ruff==0.16.2",
+    "ruff==0.16.3",
 ]
 
 [tool.hatch.build.targets.wheel]
