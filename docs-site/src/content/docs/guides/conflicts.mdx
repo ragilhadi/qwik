@@ -1,0 +1,60 @@
+---
+title: Conflict Detection
+description: How qwik validates alias names against existing aliases, shell builtins, and PATH binaries before saving.
+---
+
+Every `add` and `rename` validates the new name:
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Already an alias? | Refuse unless `--force` |
+| 2 | Shell builtin? (`cd`, `echo`, `alias`, …) | Refuse unless `--force` |
+| 3 | Binary on `$PATH`? | Warn but allow |
+| 4 | Valid syntax? | Refuse if it contains spaces, slashes, `$`, backticks, semicolons |
+
+## Example UX
+
+```bash
+qwik add ls "ls --color=auto"
+⚠ Warning: "ls" shadows /usr/bin/ls.
+  Continue? [y/N]
+
+qwik add cd "echo nope"
+✗ "cd" is a shell builtin. Shadowing it can break your shell.
+
+qwik add "my alias" "echo hi"
+✗ Invalid name "my alias": contains whitespace.
+```
+
+## Why each check exists
+
+1. **Existing alias** — silently overwriting an alias would lose its
+   command and stats. Use `--force` when you really mean it.
+2. **Shell builtin** — shadowing `cd` or `echo` can break scripts and even
+   your shell session, because the generated native alias wins in
+   interactive use. qwik refuses unless forced.
+3. **Binary on `$PATH`** — shadowing `ls` with `ls --color=auto` is a
+   *popular, deliberate* trick, so this is a warning with a confirmation
+   rather than a refusal.
+4. **Name syntax** — alias names become identifiers in generated shell
+   code across seven shells; whitespace, slashes, `$`, backticks, and
+   semicolons in a name would break or escape those definitions.
+
+## Escaping in generated hooks
+
+Related, but at the command level: the *command text* (not the name) is
+embedded into generated hook definitions with per-shell escaping so a
+command containing `}`, `&`, `$`, or another shell's syntax can't break out
+of the generated definition. Full details in the
+[Shell Quoting & Escaping reference](/reference/shell-quoting/).
+
+## Forced overrides
+
+When you intentionally shadow something, `--force` skips check 1 and 2:
+
+```bash
+qwik add gs "git status --short" --force    # overwrite the old gs
+```
+
+Check 4 (syntax) is never skippable — an invalid name has no safe
+representation in a generated hook.

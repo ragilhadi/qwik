@@ -1,0 +1,70 @@
+---
+title: Introduction
+description: What qwik is, why it exists, and when to reach for it.
+---
+
+qwik is a friendly CLI alias manager. You register aliases once in a single
+store, and qwik makes them available as **real shell commands** on every shell
+you use — bash, zsh, fish, PowerShell, cmd, Nushell, and Xonsh.
+
+## The problem
+
+Raw shell aliases live scattered across `~/.bashrc`, `~/.zshrc`, and
+PowerShell's `$PROFILE`. They don't travel between machines or shells, they
+can't accept arguments safely, and a mistake like `alias gco='git checkout $1'`
+fails *silently* when you forget the argument.
+
+## What qwik does
+
+1. You **register** aliases with [`qwik add`](/reference/commands/#add):
+   ```bash
+   qwik add gs "git status"
+   ```
+2. You **install** a one-line shell hook with
+   [`qwik init --install`](/guides/shell-integration/#one-time-setup)
+3. Every new shell session **regenerates** shell-native aliases from the store
+4. You type `gs` just like a normal alias — because it is one
+
+The store is a single human-readable [TOML file](/reference/store/), safe to
+edit by hand, with rolling backups and atomic writes.
+
+## Two ways to run any alias
+
+| Way | Example | When to use |
+|---|---|---|
+| **Native** | `gs` | Daily use after one-time shell hook setup |
+| **Via qwik** | `qwik -r gs` | Scripts, CI, restricted shells, or pre-setup |
+
+Both share the **same store and substitution engine** — behavior is
+identical. The `qwik -r` form works with no hook installed at all, which
+makes it ideal for non-interactive environments:
+
+```bash
+qwik -r gco main         # in a script or CI job
+```
+
+## When to reach for qwik
+
+- You use **multiple machines** and want one alias set everywhere — see
+  [Sharing & Syncing](/guides/sharing/)
+- You want aliases that **take arguments safely**, with defaults and clear
+  errors — see [Alias Templates & Arguments](/guides/alias-templates/)
+- You jump between **bash, zsh, fish, or PowerShell** and don't want to
+  maintain four rc files
+- You manage **team alias sets** — publish a repo and teammates attach it as a
+  read-only [overlay](/guides/sharing/#overlays-team-alias-store)
+- You're unsure what an alias does — `qwik show gs` prints its full metadata
+
+## The mental model
+
+Think of qwik as a **registry** plus a **renderer**:
+
+- The **registry** is `~/.config/qwik/aliases.toml` — names, commands, tags,
+  groups, usage stats
+- The **renderer** is the shell hook. On each new shell it calls
+  `qwik init <shell>` internally and generates native
+  `alias`/`function`/`def` definitions from the store
+
+Because native commands are regenerated from the store, edits made anywhere
+(`qwik edit`, `qwik rename`, an import, a sync pull) appear in every new
+shell session automatically — no rc-file spelunking.

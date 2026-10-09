@@ -1,0 +1,112 @@
+---
+title: Sharing & Syncing
+description: Move aliases between machines and teams — export/import files, git-based sync, and read-only team overlays.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+qwik gives you three mechanisms for moving aliases around, ranked from
+simplest to most collaborative:
+
+| Mechanism | Best for | How |
+|---|---|---|
+| **export / import** | one-off backups and handoffs | a TOML file |
+| **sync** | your own aliases across your machines | a dedicated git repo |
+| **overlay** | team-shared read-only alias sets | a git repo you point at |
+
+## Export & import
+
+```bash
+qwik export ~/aliases.toml             # share / backup
+qwik import ~/aliases.toml             # merge
+qwik import ~/aliases.toml --overwrite # replace the whole store
+```
+
+`import` merges by default: incoming aliases are added, existing ones are
+kept unless the file contains them. With `--overwrite`, the store is
+replaced wholesale — aliases not in the file are deleted; **the preview
+lists them before you confirm**.
+
+### The trust-boundary preview
+
+Every import shows a preview of the incoming commands and asks for
+confirmation before anything is applied. This matters because imported
+commands eventually run under `shell=True` — treat an alias file like you'd
+treat a shell script from the internet.
+
+<Aside type="caution">
+  **Trust warning:** imported stores are a code-execution vector. Always
+  review the command preview before confirming; only import files you trust.
+</Aside>
+
+## Sync — dotfile sharing across machines
+
+`qwik sync` keeps a separate git repo at `<config_dir>/qwik-sync/` so your
+aliases travel between machines.
+
+```bash
+qwik sync init --remote <git-url>      # one-time setup; exports current store + first commit
+qwik sync push [-m "msg"]              # export → commit (if dirty) → push
+qwik sync pull [-y]                    # pull → preview → merge into live store
+qwik sync status                       # branch, remote, dirty, ahead/behind, alias count
+```
+
+How it works:
+
+- `sync init` writes `sync.toml` (remote + branch) and `aliases.toml` (your
+  store) into the sync repo and makes the first commit
+- `sync push` overwrites `aliases.toml` with the current live store, commits
+  only if the tree is dirty, then pushes to `origin <branch>`
+- `sync pull` runs `git pull`, then shows the **same trust-boundary preview**
+  as `qwik import` — incoming commands run under `shell=True`, so review the
+  preview before confirming
+
+<Aside type="caution">
+  **Trust warning:** pulled stores are a code-execution vector. Always review
+  the command preview before confirming a `sync pull`; only sync with repos
+  you control.
+</Aside>
+
+## Overlays — team alias store
+
+An overlay is a **read-only** alias store published as a git repo. You
+attach it once; its aliases appear alongside your own, marked `(overlay)`.
+
+```bash
+qwik overlay add --url https://github.com/team/qwik-aliases --branch main
+qwik overlay list           # show overlay aliases
+qwik overlay update         # fetch and show added/changed/removed before applying
+qwik overlay copy --name gs # copy an overlay alias to your user store
+qwik overlay remove         # remove the overlay
+```
+
+Behavior:
+
+- **Read-only:** overlay aliases cannot be edited or removed. A user alias
+  with the same name **shadows** the overlay one.
+- **Usage tracking:** running an overlay alias copies it to your user store
+- **Visibility:** overlays appear in `qwik list`, `qwik search`, `qwik init`,
+  and the picker
+- **Exact mirroring:** the overlay repo is managed with `git clone` on
+  `add` and `git fetch` + `git reset --hard` on `update`, so it always
+  mirrors the remote branch and can't enter a merge-conflict state
+- **Preview gates:** `overlay add` and `overlay update` show the same
+  trust-boundary preview as import/sync pull before applying anything; pass
+  `--yes` to skip the prompt. `update` reports "already up to date" and
+  doesn't prompt when nothing changed
+
+<Aside type="caution">
+  **Trust warning:** overlay aliases are a code-execution vector — anyone
+  with push access to the overlay repo can add or change a command that runs
+  under `shell=True` the next time you use it. Always review the preview
+  before confirming an `overlay add`/`update`; only point the overlay at a
+  repo you control.
+</Aside>
+
+## Which one should I use?
+
+- Backing up before a risky change? → **export** to a file
+- New laptop? → **sync init --remote** on the old one, **sync pull** on the new
+- Team shares a standard `kubectl` alias set? → maintain one repo, teammates
+  **overlay add** it; anyone can `overlay copy` the aliases they want to
+  customize locally

@@ -1,0 +1,99 @@
+---
+title: Troubleshooting
+description: Common qwik problems and fixes — command not found, broken hooks, store issues, and shell detection.
+---
+
+## `gs: command not found`
+
+**Symptom:**
+
+```bash
+$ gs
+-bash: gs: command not found
+$ qwik ls
+  ...gs is right there in the list...
+```
+
+**Cause:** the alias exists in the store but the **shell hook isn't
+installed** — the store and your shell's live commands are separate things
+until the hook generates them.
+
+**Fix:**
+
+```bash
+qwik init bash --install    # or zsh, fish…
+source ~/.bashrc
+qwik doctor                 # should report the hook as installed
+```
+
+Until then, `qwik -r gs` always works with no setup.
+
+**Check it:** after `--install`, look for the qwik hook block at the end of
+your rc file (`~/.bashrc`, `~/.zshrc`, …). If your shell session predates
+the install, `source` the rc file or open a new terminal.
+
+## Aliases vanished from a new terminal
+
+The hook regenerates on **new sessions**. If you just ran `qwik rm`,
+`qwik disable`, or `qwik import`, the current session keeps its old
+generated definitions. Open a new terminal (or re-source the rc file).
+
+## qwik picked the wrong shell
+
+In WSL, Git Bash, or SSH setups, parent-process detection can misfire.
+Force it:
+
+```bash
+export QWIK_SHELL=bash      # bash, zsh, fish, pwsh, cmd, nu, xonsh
+qwik doctor                 # verify detection now
+```
+
+See [Shell Integration](/guides/shell-integration/#wsl-git-bash-and-mixed-environments).
+
+## "refuses to load" / store version errors
+
+If the store file's schema is **newer** than your qwik understands (e.g.
+you downgraded or synced from a machine with a newer qwik), qwik refuses to
+load it.
+
+**Fix:** upgrade qwik (`pipx upgrade qwik`). Migration is forward-only —
+see [Store & Backups](/reference/store/#store-versioning).
+
+## Recovering from a bad edit or import
+
+Every destructive operation writes a timestamped backup. To find them:
+
+```bash
+ls ~/.config/qwik/backups/          # or $QWIK_CONFIG_DIR/qwik/backups/
+qwik doctor                         # points at the latest valid backup
+```
+
+Restore by copying a backup over `aliases.toml` (with qwik closed), or use
+`qwik import <backup>` to merge.
+
+## Duplicate names / shadowing confusion
+
+A user alias with the same name **shadows** an overlay alias; native
+commands come from the most recent hook generation. To see what will
+actually exist in a *new* session:
+
+```bash
+qwik init bash | grep "gs="
+```
+
+## Diagnosing with doctor
+
+`qwik doctor` checks the shell in use, hook installation, store health,
+name conflicts, and the sync repo in one pass:
+
+```bash
+qwik doctor
+```
+
+Run it first whenever something is off — most issues fall into one of: hook
+not installed, shell misdetected, store version mismatch.
+
+## Still stuck?
+
+- Search [GitHub issues](https://github.com/ragilhadi/qwik/issues)
+- Include the output of `qwik doctor` and `qwik --version` in any report

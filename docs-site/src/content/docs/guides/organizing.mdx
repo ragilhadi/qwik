@@ -1,0 +1,113 @@
+---
+title: Organizing Aliases
+description: Tags, groups, filters, the interactive picker, editing, and enable/disable — keep a growing alias store discoverable.
+---
+
+As your store grows past a dozen aliases, qwik gives you labels, filters, an
+interactive picker, and inline editing to keep it navigable.
+
+## Tags vs groups
+
+An alias has **at most one group** (the canonical primary namespace it
+belongs to) but may carry **many tags** (free-form labels). Use `--group` on
+`add`, `list`, and `search` to filter by group.
+
+```bash
+qwik add gs "git status" --tag git --group git --description "Repo status"
+qwik tag gs work            # add another tag
+qwik untag gs work          # remove one
+qwik group gs git           # assign primary group
+qwik ungroup gs             # remove the group
+```
+
+Choosing between them:
+
+- **Group** — the alias's home category, like `git` or `k8s`. One per alias.
+- **Tags** — cross-cutting labels, like `work` or `daily`. Many per alias.
+
+## Listing and filtering
+
+```bash
+qwik list                              # all aliases (or: qwik -l)
+qwik list --tag git                    # filter by tag
+qwik list --group git                  # filter by group
+qwik list --search stat                # filter by substring
+```
+
+Output:
+
+```
+  Name   Command                     Group   Tag    Used   Last
+ ─────  ──────────────────────────  ──────  ─────  ─────  ───────────
+  gs     git status                  git     git     42     2 min ago
+  gco    git checkout {1}            git     git     18     1 hour ago
+  k      kubectl                     —       k8s     7     yesterday
+```
+
+Usage stats are tracked automatically — `Used` counts runs, `Last` shows the
+most recent run.
+
+## Fuzzy search
+
+```bash
+qwik search "git"                       # ranked fuzzy match (or: qwik -s "git")
+qwik search "git" --group git           # restrict to a group
+```
+
+## The interactive picker
+
+```bash
+qwik          # bare invocation
+qwik pick     # same thing, explicit
+```
+
+- Type characters to filter matching aliases live
+- `↑`/`↓` navigate
+- `Enter` runs the selected alias
+- `Ctrl+E` edits it
+- `Ctrl+D` deletes it
+- `Esc` cancels
+
+## Detailed view
+
+```bash
+qwik show gs    # full metadata: command, tags, group, description, stats
+```
+
+## Editing an alias
+
+```bash
+qwik edit gs
+```
+
+Opens a TOML snippet in your `$EDITOR`:
+
+```toml
+command = "git status"
+tag = ["git"]
+group = ""
+description = ""
+enabled = true
+```
+
+Save and quit to apply changes.
+
+## Enable / disable without deleting
+
+```bash
+qwik disable gs     # hides from the generated shell hook
+qwik enable gs      # re-enables
+```
+
+Disabled aliases stay in the store (with their stats) but are omitted when
+the hook regenerates — useful for pausing an alias you're not ready to
+delete. See [Shell Integration](/guides/shell-integration/).
+
+## Renaming
+
+```bash
+qwik rename gs gstat    # preserves stats
+```
+
+Rename runs the same conflict checks as `add` — see
+[Conflict Detection](/guides/conflicts/).

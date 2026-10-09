@@ -1,0 +1,82 @@
+---
+title: qwik
+description: A friendly CLI alias manager. Create, manage, and run shell aliases from a single interface — bash, zsh, fish, PowerShell, cmd, Nushell, and Xonsh.
+template: splash
+hero:
+  tagline: A friendly CLI alias manager. Create, manage, and run shell aliases from a single interface — cross-platform, with one-time shell hook setup.
+  actions:
+    - text: Get started
+      link: /start-here/quick-start/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/ragilhadi/qwik
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why qwik?
+
+<CardGrid stagger>
+	<Card title="Two ways to run" icon="seti:shell">
+		Type <code>gs</code> as a native shell command after a one-time hook install, or run <code>qwik -r gs</code> anywhere — scripts, CI, restricted shells — with no setup at all.
+	</Card>
+	<Card title="Arguments done right" icon="seti:config">
+		Template aliases with <code>{"{1}"}</code>, <code>{"{name}"}</code>, <code>{"{&#64;}"}</code>, <code>{"{*}"}</code>, and <code>{"{1:-default}"}</code>. Missing required arguments produce clear errors, never silently-empty output.
+	</Card>
+	<Card title="Cross-platform" icon="window">
+		Rendered natively for bash, zsh, fish, PowerShell, cmd, Nushell, and Xonsh — with shell-aware quoting chosen by the shell that will run the command.
+	</Card>
+	<Card title="Safe by default" icon="padlock">
+		Conflict detection against builtins and <code>$PATH</code>, atomic writes with rolling backups, quoted runtime substitution, and trust-boundary previews before any import.
+	</Card>
+	<Card title="Organized" icon="star">
+		Tags, groups, fuzzy search, usage stats, and an interactive picker — your alias store stays discoverable as it grows.
+	</Card>
+	<Card title="Shareable" icon="link">
+		Export and import TOML files, sync through a dedicated git repo, or point an overlay at a team alias repository — read-only and shadow-safe.
+	</Card>
+	<Card title="Fast startup" icon="rocket">
+		Interactive dependencies load lazily and shell renderers are cached, so hook-time invocations like <code>qwik init</code> stay quick.
+	</Card>
+	<Card title="Extensible" icon="puzzle">
+		Add your own shell renderers and CLI commands through Python entry points — qwik discovers them automatically.
+	</Card>
+</CardGrid>
+
+## Use it in 30 seconds
+
+```bash
+# install (pipx or uv)
+pipx install qwik
+
+# register an alias and install the shell hook
+qwik add gs "git status"
+qwik init bash --install
+source ~/.bashrc
+
+gs                      # native shell alias
+qwik -r gs              # same thing, no hook needed
+```
+
+<CardGrid>
+	<Card title="New to qwik?" icon="open-book">
+		Start with the [Introduction](/start-here/introduction/) to understand the two ways to run aliases and how the shell hook works.
+	</Card>
+	<Card title="Up and running?" icon="rocket">
+		Install it from [Installation](/start-here/installation/) and follow [Quick Start](/start-here/quick-start/).
+	</Card>
+	<Card title="Want parameters?" icon="setting">
+		[Alias Templates & Arguments](/guides/alias-templates/) covers placeholders, named slots, defaults, and safe quoting.
+	</Card>
+	<Card title="Sharing with a team?" icon="external">
+		[Sharing & Syncing](/guides/sharing/) explains export/import, git sync, and team overlays.
+	</Card>
+	<Card title="Something broken?" icon="magnifier">
+		Run <code>qwik doctor</code>, then check [Troubleshooting](/reference/troubleshooting/) for the common cases.
+	</Card>
+	<Card title="Command reference" icon="document">
+		Every command and flag is documented in [Commands](/reference/commands/).
+	</Card>
+</CardGrid>

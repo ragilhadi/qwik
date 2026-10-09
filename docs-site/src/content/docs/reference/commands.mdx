@@ -1,0 +1,190 @@
+---
+title: Commands
+description: Complete reference for every qwik command, flag, and shortcut.
+---
+
+Every qwik command, in one place. For narrative guides, start at
+[Quick Start](/start-here/quick-start/).
+
+## Global usage
+
+```bash
+qwik [COMMAND] [ARGS...]
+qwik -r NAME [ARGS...]     # run an alias
+qwik -l                    # quick list
+qwik -s QUERY              # quick search
+qwik                       # interactive picker
+```
+
+Global options: `--version` / `-v`, `--help` / `-h`, and `--no-color`
+(disable colored output for this invocation).
+
+## Managing aliases
+
+### `add` — Create alias
+
+```bash
+qwik add gs "git status"
+qwik add gs "git status" --tag git --description "Repo status"
+qwik add gs "git status" --group git
+qwik add gs "git status" --force       # overwrite existing
+qwik add                               # interactive mode
+```
+
+Runs [conflict detection](/guides/conflicts/) on the name.
+
+### `rm` — Delete alias
+
+```bash
+qwik rm gs
+qwik rm gs --yes                       # skip confirmation
+```
+
+### `rename` — Rename alias
+
+```bash
+qwik rename gs gstat                   # preserves stats
+```
+
+### `edit` — Edit in $EDITOR
+
+```bash
+qwik edit gs
+```
+
+Opens a TOML snippet (`command`, `tag`, `group`, `description`,
+`enabled`) in your `$EDITOR`. Save and quit to apply.
+
+### `enable` / `disable` — Toggle without deleting
+
+```bash
+qwik disable gs                        # hides from shell hook
+qwik enable gs                         # re-enables
+```
+
+## Viewing and finding
+
+### `list` / `ls` — Pretty table
+
+```bash
+qwik list                              # all aliases (or: qwik -l)
+qwik list --tag git                    # filter by tag
+qwik list --group git                  # filter by group
+qwik list --search stat                # filter by query
+```
+
+### `show` — Detailed view
+
+```bash
+qwik show gs                           # full metadata
+```
+
+### `search` — Fuzzy search
+
+```bash
+qwik search "git"
+qwik search "git" --group git          # restrict to a group
+```
+
+## Running
+
+### `run` — Execute alias
+
+```bash
+qwik run gs
+qwik run gs --short                    # pass extra args
+qwik -r gs --short                     # shortcut flag
+```
+
+Argument behavior (append mode, template mode, quoting) is documented in
+[Alias Templates & Arguments](/guides/alias-templates/).
+
+### `pick` — Interactive fuzzy picker
+
+```bash
+qwik                # bare invocation opens the picker
+qwik pick           # explicit
+```
+
+Keys: filter by typing, `↑`/`↓` navigate, `Enter` run, `Ctrl+E` edit,
+`Ctrl+D` delete, `Esc` cancel.
+
+## Organizing
+
+### `tag` / `untag`
+
+```bash
+qwik tag gs git
+qwik untag gs work
+```
+
+### `group` / `ungroup`
+
+```bash
+qwik group gs git                      # assign primary group
+qwik ungroup gs                        # remove the group
+```
+
+One group per alias, many tags — see
+[Organizing Aliases](/guides/organizing/).
+
+## Moving aliases
+
+### `export` / `import`
+
+```bash
+qwik export ~/aliases.toml             # share / backup
+qwik import ~/aliases.toml             # merge
+qwik import ~/aliases.toml --overwrite # replace the whole store (preview + confirm)
+```
+
+### `sync` — Git-based machine-to-machine sync
+
+```bash
+qwik sync init --remote <git-url>
+qwik sync push [-m "msg"]
+qwik sync pull [-y]
+qwik sync status
+```
+
+### `overlay` — Team shared read-only store
+
+```bash
+qwik overlay add --url https://github.com/team/qwik-aliases --branch main
+qwik overlay list
+qwik overlay update
+qwik overlay copy --name gs
+qwik overlay remove
+```
+
+All of these show a trust-boundary preview before applying incoming
+commands — see [Sharing & Syncing](/guides/sharing/).
+
+## Setup and health
+
+### `init` — Shell hook
+
+```bash
+qwik init bash                         # print hook to stdout
+qwik init bash --install               # append to rc file with backup
+```
+
+### `completion` — Shell completions
+
+```bash
+qwik completion bash
+qwik completion zsh --install
+```
+
+### `doctor` — Health check
+
+```bash
+qwik doctor                            # shell, hook, store, conflicts, sync repo
+```
+
+## Performance notes
+
+Every `qwik` invocation defers importing `prompt_toolkit` (used only by the
+interactive `pick` screen) and caches shell-renderer discovery instead of
+re-scanning installed-package metadata on each call — so a `qwik` call your
+shell hook makes on every prompt, like `qwik init`, isn't paying for either.

@@ -1,0 +1,64 @@
+---
+title: Installation
+description: Install qwik with pipx or uv tool — an isolated CLI install, no venv wrangling.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+qwik is a Python application requiring **Python 3.12 or newer**. It's
+published to [PyPI](https://pypi.org/project/qwik/) as an isolated CLI
+application, so the recommended installers are `pipx` and `uv tool` — they
+install qwik in its own virtual environment and put the `qwik` command on
+your `PATH`.
+
+## Install with pipx
+
+```bash
+pipx install qwik
+```
+
+## Install with uv
+
+```bash
+uv tool install qwik
+```
+
+## Verify
+
+```bash
+qwik --version
+# qwik 1.1.2
+```
+
+## Upgrading
+
+```bash
+pipx upgrade qwik    # or: uv tool upgrade qwik
+```
+
+<Aside type="note">
+  Store files written by older versions are migrated forward automatically on
+  first load — see [Store & Backups](/reference/store/#store-versioning).
+  Downgrades are not supported; restore from a backup instead.
+</Aside>
+
+## Installing from source (development)
+
+Clone the repo and install with the dev extras if you want to hack on qwik:
+
+```bash
+git clone https://github.com/ragilhadi/qwik.git
+cd qwik
+pip install -e ".[dev]"
+pytest    # run the test suite
+```
+
+See [Development](#development) notes in the repo README — CI enforces
+`mypy --strict`, `ruff`, and an 85% coverage gate.
+
+## Next steps
+
+- [Quick Start](/start-here/quick-start/) — register your first alias and
+  install the shell hook
+- [Shell Integration](/guides/shell-integration/) — make aliases native
+  commands in your shell
