@@ -25,6 +25,7 @@ from qwik.commands.rename import rename_command
 from qwik.commands.run import run_command
 from qwik.commands.search import search_command
 from qwik.commands.show import show_command
+from qwik.commands.stats import stats_command
 from qwik.commands.sync import sync_command
 from qwik.commands.tag import tag_command, untag_command
 from qwik.ui.theme import get_console
@@ -74,6 +75,7 @@ app.command("doctor")(doctor_command)
 app.command("completion")(completion_command)
 app.command("sync")(sync_command)
 app.command("overlay")(overlay_command)
+app.command("stats")(stats_command)
 
 
 def _discover_plugin_commands() -> None:
