@@ -1,0 +1,124 @@
+---
+title: Shell Integration
+description: Install the qwik shell hook so your aliases become real native commands in bash, zsh, fish, PowerShell, and more.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Make aliases available as **real shell commands**.
+
+## How the hook works
+
+Every new shell session evaluates the hook, which calls
+`qwik init <shell>` and generates native alias/function definitions from the
+store. That means edits made anywhere — `qwik edit`, imports, sync pulls —
+appear automatically in every new session.
+
+## One-time setup
+
+**bash:**
+
+```bash
+qwik init bash --install
+source ~/.bashrc
+```
+
+**zsh:**
+
+```bash
+qwik init zsh --install
+source ~/.zshrc
+```
+
+**fish:**
+
+```bash
+qwik init fish --install
+source ~/.config/fish/config.fish
+```
+
+**PowerShell:**
+
+```powershell
+qwik init pwsh --install
+```
+
+The `--install` flag:
+
+- Creates a timestamped backup of your rc file
+- Appends the hook (**idempotent** — safe to run multiple times)
+
+## Manual setup
+
+If you prefer to edit your rc file directly, `qwik init <shell>` prints the
+hook:
+
+```bash
+eval "$(qwik init zsh)"
+```
+
+Or paste the printed snippet into your rc file by hand.
+
+## Per-shell rendering
+
+The hook generates native aliases/functions for each shell:
+
+| Shell | Append mode | Template mode |
+|---|---|---|
+| bash / zsh | `alias gs='git status'` | `gs() { git checkout "$1" ; }` |
+| fish | `alias gs 'git status'` | `function gs ; … ; end` |
+| PowerShell | `function gs { & ([ScriptBlock]::Create('git status')) @args }` | `function gs { qwik run "gs" @args }` |
+| nu | `def gs [...args] { qwik run "gs" ...$args }` | `def gs [...args] { qwik run "gs" ...$args }` |
+| cmd | `doskey gs=git status $*` | (best-effort, no template) |
+
+PowerShell's append mode wraps the command as a string literal compiled into
+a script block at call time rather than splicing it into the function body
+as source, and cmd's `doskey` macros are `$`/metacharacter-escaped — both so
+a command containing `}`, `&`, `$`, or another shell's syntax can't break
+out of the generated definition. Nu has no equivalent to pwsh's
+compiled-string script block, so both modes delegate to `qwik run`.
+Supported characters in a command are documented per shell in the
+[Shell Quoting & Escaping reference](/reference/shell-quoting/).
+
+## Disabling or removing aliases
+
+- `qwik disable gs` — hides the alias from the generated hook without
+  deleting it; `qwik enable gs` brings it back
+- `qwik rm gs` — removes it from the store entirely (with a backup)
+
+The regenerated hook in the *next* session reflects the change; the current
+session keeps its generated definitions until restarted.
+
+<Aside type="caution">
+  Disabled aliases remain in the store. If you want them fully gone, use
+  `qwik rm`.
+</Aside>
+
+## Variable expansion behavior
+
+On cmd and pwsh, `%VAR%` and `$VAR` in alias commands are expanded by the
+shell at run time, not treated as literal text. `qwik add` warns when it
+detects these patterns. On bash/zsh/fish, `$VAR` expansion is the expected
+behavior and no warning is shown. When the active shell is cmd and a
+template alias (`{1}`, `{name}`) is created, `qwik add` also warns that
+cmd/doskey cannot expand parameters and the alias will be omitted from cmd
+hooks.
+
+## WSL, Git Bash, and mixed environments
+
+Shell detection picks the renderer by the shell that will actually run the
+command — not the host platform. Running POSIX bash under WSL on a Windows
+host gets POSIX quoting; running PowerShell on Linux gets PowerShell
+quoting. If auto-detection picks the wrong shell in an unusual setup, force
+it with the `QWIK_SHELL` environment variable:
+
+```bash
+export QWIK_SHELL=bash    # bash, zsh, fish, pwsh, cmd, nu, or xonsh
+qwik doctor               # confirm what qwik detected
+```
+
+## Supported shells
+
+`qwik init` supports: `bash`, `zsh`, `fish`, `pwsh`, plus rendering for
+`cmd`, `nu`, and `xonsh`. Third-party shells can register additional
+renderers via the [Plugin System](/reference/plugins/).

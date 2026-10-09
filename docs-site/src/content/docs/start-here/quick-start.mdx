@@ -1,0 +1,91 @@
+---
+title: Quick Start
+description: Register your first alias, install the shell hook, and run it as a native command — in about two minutes.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+This guide gets you from zero to a working native alias in about two minutes.
+
+<Steps>
+
+1. **Install qwik.**
+
+   ```bash
+   pipx install qwik
+   ```
+
+   See [Installation](/start-here/installation/) for the `uv` alternative.
+
+2. **Register your first alias.**
+
+   ```bash
+   qwik add gs "git status"
+   ```
+
+   qwik checks the name for conflicts (builtins, existing binaries) before
+   saving — see [Conflict Detection](/guides/conflicts/).
+
+3. **Test it immediately, no setup needed.**
+
+   ```bash
+   qwik -r gs
+   ```
+
+   The `-r` flag runs any alias through qwik's engine — handy in scripts and
+   CI, and your safety net before the hook is installed.
+
+4. **Install the shell hook.**
+
+   ```bash
+   # bash
+   qwik init bash --install && source ~/.bashrc
+
+   # zsh
+   qwik init zsh --install && source ~/.zshrc
+   ```
+
+   This appends a small hook to your rc file (with a timestamped backup) that
+   regenerates native aliases on every new shell session.
+
+5. **Run it as a native command.**
+
+   ```bash
+   gs
+   ```
+
+   `qwik ls` now shows `gs` with a native command and a `Used` count of 1.
+
+</Steps>
+
+## Make it interesting: an alias with arguments
+
+```bash
+qwik add gco "git checkout {1}"
+gco main                  # → git checkout main
+gs --short                # → git status --short (extra args appended)
+```
+
+Placeholders like `{1}` turn aliases into mini-functions with validated
+arguments and default values. Full details in
+[Alias Templates & Arguments](/guides/alias-templates/).
+
+## Try editing the store
+
+Run `qwik edit gs` — it opens a TOML snippet in your `$EDITOR`. Save and
+quit to apply. The change is live in every *new* shell session automatically.
+
+## What's in the store
+
+```bash
+qwik list      # pretty table: name, command, group, tag, usage
+qwik show gs   # full metadata for one alias
+```
+
+## Where to go next
+
+- Pass arguments to aliases: [Alias Templates & Arguments](/guides/alias-templates/)
+- Set up other shells (fish, PowerShell, Nushell): [Shell Integration](/guides/shell-integration/)
+- Tidy up with tags and groups: [Organizing Aliases](/guides/organizing/)
+- Move your old rc-file aliases in: [export/import in Sharing & Syncing](/guides/sharing/#export--import)
+- Something not working? [Troubleshooting](/reference/troubleshooting/)

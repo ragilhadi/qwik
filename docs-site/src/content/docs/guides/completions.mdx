@@ -1,0 +1,46 @@
+---
+title: Shell Completions
+description: Tab-completion for qwik itself — commands and alias names, per shell, with idempotent installs.
+---
+
+Generate or install shell completion scripts for `qwik` itself, so
+`qwik <Tab>` offers command and alias suggestions.
+
+```bash
+qwik completion bash            # print completion script to stdout
+qwik completion zsh --install   # install into ~/.zshrc + ~/.zfunc/_qwik
+```
+
+## Install behavior per shell
+
+| Shell | `--install` action |
+|---|---|
+| bash | writes `~/.bash_completions/qwik.sh` + appends `source` line to `~/.bashrc` |
+| zsh | writes `~/.zfunc/_qwik` + appends `fpath`/`compinit` to `~/.zshrc` |
+| fish | writes `<fish config>/completions/qwik.fish` (auto-loaded, no rc edit) |
+| pwsh / powershell | appends the script to `$PROFILE` |
+
+## Idempotency and backups
+
+Installs are idempotent — a `# qwik completion (<shell>)` marker is checked
+before appending — and back up the rc file with a timestamp before
+modifying it. Re-running `--install` is always safe.
+
+## Built-in Typer completions
+
+Typer's built-in completion also works:
+
+```bash
+qwik --install-completion bash
+qwik --show-completion bash
+```
+
+`qwik completion` provides the same scripts with qwik's own backup +
+idempotency behavior on top.
+
+## Completions vs native aliases
+
+This page is about completing **qwik's own commands**. The aliases you
+register with `qwik add` become native shell commands via the hook — see
+[Shell Integration](/guides/shell-integration/) — and are completed by your
+shell as ordinary commands.

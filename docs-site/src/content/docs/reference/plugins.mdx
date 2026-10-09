@@ -1,0 +1,69 @@
+---
+title: Plugin System
+description: Extend qwik with third-party shell renderers and CLI commands via Python entry points.
+---
+
+qwik supports third-party shell renderers and CLI commands via Python entry
+points. Install a package that registers them, and qwik discovers the
+extensions automatically at startup — no configuration file needed.
+
+## Shell renderers
+
+Register a class implementing `ShellRenderer` under the
+`qwik.shell_renderers` entry-point group in your plugin's `pyproject.toml`:
+
+```toml
+# In your plugin's pyproject.toml
+[project.entry-points."qwik.shell_renderers"]
+myshell = "my_package.shell:MyShellRenderer"
+```
+
+A renderer generates the native alias/function definitions for a shell —
+the same contract qwik's built-in renderers (`qwik/shells/*.py`) implement
+for bash, zsh, fish, pwsh, cmd, nu, and xonsh. Study those for a reference
+implementation, along with the
+[Shell Quoting & Escaping reference](/reference/shell-quoting/) for the
+safety requirements (a command from an untrusted import must never be able
+to break out of the generated definition).
+
+Installed plugins appear to users as additional targets for
+`qwik init <shell>`.
+
+## CLI commands
+
+Register a Typer-compatible callable under the `qwik.commands` entry-point
+group:
+
+```toml
+# In your plugin's pyproject.toml
+[project.entry-points."qwik.commands"]
+mycommand = "my_package.cli:my_command"
+```
+
+The callable becomes a first-class subcommand: `qwik mycommand` works like
+any built-in command.
+
+## Building a plugin
+
+A minimal distribution layout:
+
+```
+qwik-plugin-myshell/
+├── pyproject.toml
+└── src/
+    └── qwik_plugin_myshell/
+        ├── __init__.py
+        └── shell.py          # implements ShellRenderer
+```
+
+Install it with pipx/uv alongside qwik (into the same environment):
+
+```bash
+pipx inject qwik qwik-plugin-myshell
+```
+
+## See also
+
+- Builtin renderers: [`qwik/shells/`](https://github.com/ragilhadi/qwik/tree/master/qwik/shells)
+- Store model the renderers consume:
+  [Store & Backups](/reference/store/)

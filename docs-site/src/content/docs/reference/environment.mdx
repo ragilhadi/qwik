@@ -1,0 +1,38 @@
+---
+title: Environment Variables
+description: Every environment variable qwik reads — editor, config dir, debugging, colors, and shell forcing.
+---
+
+| Variable | Purpose |
+|---|---|
+| `EDITOR` | Editor for `qwik edit` (default: `vi`) |
+| `QWIK_CONFIG_DIR` | Override default config directory |
+| `XDG_CONFIG_HOME` | Base config dir (used by fish rc resolution) |
+| `QWIK_DEBUG=1` | Enable debug logs to stderr |
+| `NO_COLOR` | Disable colored output (also `--no-color`) |
+| `QWIK_SHELL` | Force shell detection (`bash`, `zsh`, `fish`, `pwsh`, `cmd`, `nu`, `xonsh`) instead of auto-detecting from the environment/parent process |
+
+## Notes
+
+- `QWIK_CONFIG_DIR` is the cleanest way to run an **isolated store** —
+  useful for testing, dotfile management, or keeping work and personal
+  alias sets separate:
+  ```bash
+  export QWIK_CONFIG_DIR=~/.config/qwik-work
+  qwik list    # reads that store only
+  ```
+- `QWIK_SHELL` helps in mixed environments (WSL, Git Bash, SSH with unusual
+  parents) where parent-process detection might pick the wrong renderer —
+  see [Shell Integration](/guides/shell-integration/#wsl-git-bash-and-mixed-environments).
+- `QWIK_DEBUG=1` + `QWIK_SHELL` together are the fastest way to debug "why
+  did my hook render like that?":
+  ```bash
+  QWIK_DEBUG=1 QWIK_SHELL=bash qwik init bash | head
+  ```
+- `NO_COLOR` follows the [no-color.org](https://no-color.org/) convention;
+  the `--no-color` flag affects only the current invocation.
+
+## Related
+
+- `qwik doctor` reports the detected shell and config dir in effect —
+  see [Troubleshooting](/reference/troubleshooting/)
