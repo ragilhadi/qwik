@@ -1,19 +1,32 @@
-"""Rich table renderers for ``qwik list``, ``qwik show``, etc."""
+"""Rich table renderers for ``qwik list``, ``qwik show``, ``qwik stats``."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from rich.box import SIMPLE_HEAVY
 from rich.console import Console
 from rich.table import Table
 
+from qwik.core.models import Alias
+from qwik.core.stats import (
+    TIME_SAVED_LABEL,
+    AliasUsage,
+    StatsOverview,
+    estimate_time_saved,
+    format_timedelta,
+)
+
 if TYPE_CHECKING:
-    from qwik.core.models import Alias, AliasStore
+    from datetime import timedelta
+
+    from qwik.core.models import AliasStore
 
 __all__ = [
     "render_alias_detail",
     "render_list_table",
+    "render_stats",
 ]
 
 
@@ -108,4 +121,125 @@ def render_alias_detail(name: str, alias: Alias) -> Table:
     table.add_row("Last used", alias.format_last_used())
     table.add_row("Run count", str(alias.run_count))
 
+    return table
+
+
+def render_stats(
+    store: AliasStore,
+    *,
+    top_rows: list[AliasUsage] | None = None,
+    unused_rows: list[AliasUsage] | None = None,
+    overview: StatsOverview | None = None,
+    since: timedelta | None = None,
+    now: Any = None,
+) -> Table:
+    """Build a Rich table for ``qwik stats`` views.
+
+    Exactly one of *top_rows*, *unused_rows*, or *overview* drives the
+    rendered view; ``None`` means "not this view", while an empty list
+    renders the view with an empty-state line.
+
+    Args:
+        store: The alias database (used for the total/summary header).
+        top_rows: Rows for the ``--top N`` view.
+        unused_rows: Rows for the ``--unused`` view.
+        overview: Aggregated overview (bare ``qwik stats``).
+        since: The ``--since`` window, when one was given.
+        now: Current time used to compute the view.
+
+    Returns:
+        A fully populated :class:`~rich.table.Table`.
+    """
+    if now is None:
+        now = datetime.now(UTC)
+
+    table = Table(box=SIMPLE_HEAVY, show_header=False, padding=(0, 1))
+    table.add_column(style="bold", no_wrap=True)
+    table.add_column()
+
+    merged = store.all_aliases()
+    total_aliases = len(merged)
+    total_runs = sum(a.run_count for a in merged.values())
+
+    if top_rows is not None:
+        header = f"  {total_aliases} alias{'es' if total_aliases != 1 else ''} · {total_runs} runs"
+        table.add_row("Top used", header)
+        if not top_rows:
+            table.add_row("", "[qwik.dim]No usage recorded yet — run some aliases![/qwik.dim]")
+        for i, row in enumerate(top_rows, 1):
+            saved = format_timedelta(
+                estimate_time_saved([row]),
+            )
+            name = f"{row.name} [dim](overlay)[/dim]" if row.is_overlay else row.name
+            last = row.alias.format_last_used()
+            table.add_row(f"  {i}.", f"{name}  {row.run_count} runs  {saved}  last: {last}")
+        return table
+
+    if unused_rows is not None:
+        if since is not None:
+            days = int(since.total_seconds() // 86400)
+            window = f"not run in the last {days} day{'s' if days != 1 else ''}"
+        else:
+            window = "never used"
+        header = (
+            f"  {len(unused_rows)} unused alias{'es' if len(unused_rows) != 1 else ''} ({window})"
+        )
+        table.add_row("Unused", header)
+        for row in unused_rows:
+            name = f"{row.name} [dim](overlay)[/dim]" if row.is_overlay else row.name
+            marker = "never" if row.alias.last_used is None else row.alias.format_last_used()
+            table.add_row("  •", f"{name}  last: {marker}")
+        if unused_rows:
+            table.add_row("", "[qwik.dim]→ qwik stats --unused --prune  to remove them[/qwik.dim]")
+        return table
+
+    assert overview is not None
+    table.add_row(
+        "",
+        f"  {overview.total_aliases} alias{'es' if overview.total_aliases != 1 else ''}"
+        f" · {overview.total_runs} runs"
+        f" · {overview.recent_used} used this week",
+    )
+    if not overview.total_runs:
+        table.add_row("", "[qwik.dim]No usage recorded yet — run some aliases![/qwik.dim]")
+
+    top_in_overview = sorted(merged.items(), key=lambda kv: (-kv[1].run_count, kv[0]))[:5]
+    if any(a.run_count for _, a in top_in_overview):
+        table.add_row("Most used", "")
+        for i, (name, alias) in enumerate(top_in_overview, 1):
+            if alias.run_count == 0:
+                continue
+            is_overlay = name not in store.aliases
+            display = f"{name} [dim](overlay)[/dim]" if is_overlay else name
+            saved = format_timedelta(
+                estimate_time_saved([AliasUsage(name=name, alias=alias, is_overlay=is_overlay)])
+            )
+            table.add_row(
+                f"  {i}.",
+                f"{display}  {alias.run_count} runs  {saved}  last: {alias.format_last_used()}",
+            )
+
+    unused_sorted = sorted((n for n, a in merged.items() if a.last_used is None), key=str)
+    never_count = len(unused_sorted)
+    if never_count:
+        preview = ", ".join(unused_sorted[:5])
+        more = " …" if never_count > 5 else ""
+        table.add_row(
+            f"Never used ({never_count})",
+            f"{preview}{more}\n[qwik.dim]→ qwik stats --unused --prune  to remove them[/qwik.dim]",
+        )
+
+    all_rows = [
+        AliasUsage(name=n, alias=a, is_overlay=n not in store.aliases) for n, a in merged.items()
+    ]
+    table.add_row(
+        TIME_SAVED_LABEL,
+        format_timedelta(estimate_time_saved(all_rows)),
+    )
+    if overview.busiest_group is not None:
+        g = overview.busiest_group
+        table.add_row(
+            "Busiest group",
+            f"{g.group} ({g.runs} runs across {g.aliases} aliases)",
+        )
     return table
