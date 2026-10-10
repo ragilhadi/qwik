@@ -31,3 +31,44 @@ def test_remove_stale_lock_keeps_live_lock(tmp_path: Path) -> None:
         assert lock.exists()
     # After release it's stale and removable.
     assert remove_stale_lock(lock) is True
+
+
+def _path_has_open_fd(p: Path) -> bool:
+    """True if *p* is held open by any fd of this process (Linux only)."""
+    fd_dir = Path("/proc/self/fd")
+    if not fd_dir.is_dir():
+        return False
+    for fd in fd_dir.iterdir():
+        try:
+            if fd.resolve() == p:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def test_remove_stale_lock_closes_handle_before_unlink(tmp_path: Path, monkeypatch) -> None:
+    """Regression: the probe handle must be closed before unlinking.
+
+    Windows refuses to delete a file that any process still has open
+    (WinError 32), so unlinking while the FileLock probe's handle is
+    still open makes remove_stale_lock fail on every call there. This
+    pins the close-then-unlink ordering (verified via /proc on Linux;
+    other platforms merely run the happy path).
+    """
+    import qwik.core.locking as locking
+
+    lock = tmp_path / "aliases.toml.lock"
+    lock.write_text("", encoding="utf-8")
+
+    real_unlink = Path.unlink
+    fd_state_at_unlink: list[bool] = []
+
+    def spy_unlink(path_self: Path, *args: object, **kwargs: object) -> None:
+        fd_state_at_unlink.append(_path_has_open_fd(lock))
+        real_unlink(path_self)  # type: ignore[arg-type]
+
+    monkeypatch.setattr("pathlib.Path.unlink", spy_unlink)
+    assert locking.remove_stale_lock(lock) is True
+    if fd_state_at_unlink and Path("/proc/self/fd").is_dir():
+        assert fd_state_at_unlink == [False], "lock file was still open (would fail on Windows)"
