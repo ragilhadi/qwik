@@ -22,12 +22,89 @@ if TYPE_CHECKING:
     from datetime import timedelta
 
     from qwik.core.models import AliasStore
+    from qwik.core.store import BackupInfo
 
 __all__ = [
     "render_alias_detail",
+    "render_backup_table",
     "render_list_table",
     "render_stats",
 ]
+
+
+def _relative_time(dt: datetime, now: datetime) -> str:
+    """Return a compact relative time ("2 min ago", "yesterday", ...)."""
+    delta = now - dt
+    seconds = int(delta.total_seconds())
+    if seconds < 0:
+        seconds = 0
+    if seconds < 60:
+        return "just now"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} min ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    days = hours // 24
+    if days == 1:
+        return "yesterday"
+    if days < 7:
+        return f"{days} days ago"
+    weeks = days // 7
+    if weeks < 5:
+        return f"{weeks} week{'s' if weeks != 1 else ''} ago"
+    months = days // 30
+    if months < 12:
+        return f"{months} month{'s' if months != 1 else ''} ago"
+    years = days // 365
+    return f"{years} year{'s' if years != 1 else ''} ago"
+
+
+def _format_size(size: int) -> str:
+    """Format a byte count as ``bytes``, ``KB``, or ``MB``."""
+    if size < 1024:
+        return f"{size} B"
+    kb = size / 1024
+    if kb < 1024:
+        return f"{kb:.1f} KB"
+    return f"{kb / 1024:.1f} MB"
+
+
+def render_backup_table(
+    backups: list[BackupInfo],
+    *,
+    now: datetime | None = None,
+) -> Table:
+    """Build a Rich table of backup files for ``qwik undo --list``.
+
+    Args:
+        backups: :class:`~qwik.core.store.BackupInfo` list, newest first.
+        now: Override the current time (tests).
+
+    Returns:
+        A fully populated :class:`~rich.table.Table`.
+    """
+    if now is None:
+        now = datetime.now(UTC)
+    table = Table(
+        box=SIMPLE_HEAVY,
+        header_style="bold",
+        show_header=True,
+        row_styles=["", "dim"],
+    )
+    table.add_column("When", no_wrap=True)
+    table.add_column("Aliases", justify="right")
+    table.add_column("Size", justify="right")
+    table.add_column("Stamp", no_wrap=True)
+    for info in backups:
+        try:
+            dt = datetime.strptime(info.stamp[:15], "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
+        except ValueError:
+            dt = None
+        when = _relative_time(dt, now) if dt is not None else info.stamp[:15]
+        table.add_row(when, str(info.alias_count), _format_size(info.size), info.stamp)
+    return table
 
 
 def render_list_table(

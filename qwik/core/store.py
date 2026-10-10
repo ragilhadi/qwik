@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import itertools
 import os
+import re
 import shutil
 import tempfile
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -20,8 +23,11 @@ from qwik.config import Config, get_config
 from qwik.core.models import AliasStore
 
 __all__ = [
+    "BackupInfo",
     "Store",
+    "backup_sort_key",
     "get_store",
+    "read_backup_text",
 ]
 
 # Maximum number of backup files to retain.
@@ -33,6 +39,55 @@ _MAX_BACKUPS: int = 20
 # a tight loop (Windows clock resolution is ~15 ms, so microsecond stamps
 # can still collide).
 _backup_counter: itertools.count[int] = itertools.count()
+
+_BACKUP_STAMP_RE: re.Pattern[str] = re.compile(r"^aliases-(\d{8})-(\d{6})-(\d{6})-(\d+)\.toml$")
+
+
+def backup_sort_key(path: Path) -> tuple[int, int, int, int]:
+    """Parse a backup filename's stamp into a numerically comparable key.
+
+    Sorting the filenames themselves as strings (a previous approach)
+    silently breaks the moment the trailing counter's zero-padded width
+    is exceeded — ``"...-9999"`` sorts *after* ``"...-10000"``
+    lexicographically, the reverse of numeric order — reintroducing
+    exactly the collision the counter exists to prevent. Parsing each
+    field and comparing as integers has no such width dependency.
+
+    Anything not matching the expected shape (e.g. a hand-placed or
+    corrupt file) sorts as the oldest possible entry rather than
+    erroring, since backup content is validated separately.
+
+    Returns:
+        ``(date, clock, micros, counter)`` as integers, or all zeros.
+    """
+    match = _BACKUP_STAMP_RE.match(path.name)
+    if match is None:
+        return (0, 0, 0, 0)
+    date, clock, micros, counter = match.groups()
+    return (int(date), int(clock), int(micros), int(counter))
+
+
+def read_backup_text(path: Path) -> str:
+    """Read *path*, retrying briefly on a transient Windows file lock.
+
+    A backup file is written moments before this reads it back, and on
+    Windows a just-created file can be held open for a short window by
+    antivirus real-time scanning or the search indexer — long enough for
+    a same-process read immediately afterward to see ``PermissionError``
+    (WinError 32) even though nothing in *this* process still has it
+    open. POSIX never raises for this case, so the loop costs nothing
+    there beyond the (never-taken) first attempt.
+    """
+    delay = 0.05
+    for attempt in range(5):
+        try:
+            return path.read_text(encoding="utf-8")
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(delay)
+            delay *= 2
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def _now_stamp() -> str:
@@ -50,6 +105,25 @@ def _now_stamp() -> str:
     overflow unreachable in practice.
     """
     return f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S-%f')}-{next(_backup_counter):010d}"
+
+
+@dataclass(frozen=True)
+class BackupInfo:
+    """One valid backup file, as returned by :meth:`Store.list_backups`.
+
+    Attributes:
+        path: Full path to the backup TOML file.
+        stamp: The timestamp part of the filename (e.g.
+            ``20260815-141803-440913-0000``), usable with
+            ``qwik undo --to``.
+        alias_count: Number of aliases in the backup.
+        size: File size in bytes.
+    """
+
+    path: Path
+    stamp: str
+    alias_count: int
+    size: int
 
 
 class Store:
@@ -244,6 +318,130 @@ class Store:
         backups = sorted(self._backup_dir.glob("aliases-*.toml"))
         for old in backups[: len(backups) - _MAX_BACKUPS]:
             old.unlink(missing_ok=True)
+
+    @staticmethod
+    def _stamp_from_name(name: str) -> str:
+        """Extract the timestamp stamp from a backup filename.
+
+        Args:
+            name: Backup filename such as ``aliases-20260815-141803-....toml``.
+
+        Returns:
+            The stamp between the ``aliases-`` prefix and the ``.toml``
+            suffix, or the full name minus suffix when the prefix is
+            absent (a hand-placed file) — so ``--to`` still matches it.
+        """
+        stem = name.removesuffix(".toml")
+        if stem.startswith("aliases-"):
+            return stem[len("aliases-") :]
+        return stem
+
+    def list_backups(self) -> list[BackupInfo]:
+        """Enumerate the valid backups in the backup directory, newest first.
+
+        Parses and validates each candidate before listing it; a corrupt
+        or unreadable backup is skipped rather than raised, so ``qwik
+        undo --list`` always works.
+
+        Returns:
+            A list of :class:`BackupInfo` sorted newest-first (by the
+            numeric stamp components, not raw filename strings).
+        """
+        from qwik.core.models import AliasStore
+
+        if not self._backup_dir.exists():
+            return []
+        result: list[tuple[tuple[int, int, int, int], BackupInfo]] = []
+        for path in sorted(self._backup_dir.glob("aliases-*.toml")):
+            try:
+                raw = read_backup_text(path)
+                doc = tomlkit.parse(raw)
+                store = AliasStore.model_validate(doc.unwrap())
+                size = path.stat().st_size
+            except Exception:
+                continue  # corrupt backup: skip, don't crash the listing
+            key = backup_sort_key(path)
+            result.append(
+                (
+                    key,
+                    BackupInfo(
+                        path=path,
+                        stamp=self._stamp_from_name(path.name),
+                        alias_count=len(store.aliases),
+                        size=size,
+                    ),
+                )
+            )
+        result.sort(key=lambda pair: pair[0], reverse=True)
+        return [info for _, info in result]
+
+    def find_backup(self, stamp_prefix: str) -> BackupInfo | None:
+        """Return the backup matching *stamp_prefix*, or ``None``.
+
+        A full or unambiguous partial stamp is accepted: with multiple
+        matches the newest wins, with none it returns ``None``.
+
+        Args:
+            stamp_prefix: Full stamp (``20260815-141803-440913-0000``)
+                or a leading substring (``20260815``).
+        """
+        matches = [b for b in self.list_backups() if b.stamp.startswith(stamp_prefix)]
+        return matches[0] if matches else None
+
+    def restore(self, path: Path) -> AliasStore:
+        """Restore the store from the backup at *path*.
+
+        The current store file (if any and if readable) is backed up
+        first, so restoring is itself undoable. The restored file is
+        written through the normal atomic-write path and parsed back
+        before returning, so a restore either fully succeeds or leaves
+        the previous state (and its fresh backup) in place.
+
+        Args:
+            path: Backup file to restore from.
+
+        Returns:
+            The freshly loaded :class:`~qwik.core.models.AliasStore`.
+
+        Raises:
+            RuntimeError: If the backup is unreadable (including TOML
+                parse errors) — the caller surfaces this; nothing is
+                modified before validation.
+        """
+        from qwik.core.locking import FileLock
+        from qwik.core.models import AliasStore
+
+        # Validate before touching anything: raising here means the live
+        # store and its backups are untouched.
+        try:
+            doc = tomlkit.parse(read_backup_text(path))
+            restored = AliasStore.model_validate(doc.unwrap())
+        except Exception as exc:
+            raise RuntimeError(f"Could not read backup {path.name}: {exc}") from exc
+
+        lock = FileLock(self._path.with_suffix(".toml.lock"))
+        with lock:
+            if self._path.exists():
+                backup_name = f"aliases-{_now_stamp()}.toml"
+                shutil.copy2(self._path, self._backup_dir / backup_name)
+                self._rotate_backups()
+            # Atomic write of the backup's bytes through the temp+rename path.
+            fd, temp_name = tempfile.mkstemp(
+                prefix=f"{self._path.name}.tmp-", dir=self._path.parent
+            )
+            temp = Path(temp_name)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write(tomlkit.dumps(doc))
+                temp.replace(self._path)
+            except BaseException:
+                temp.unlink(missing_ok=True)
+                raise
+        # Return the already-validated snapshot rather than re-running
+        # load(): a backup bricked by a future ``version`` is exactly the
+        # state doctor --fix restores from, and load() would reject it as
+        # "newer than supported" even though the file is now fine.
+        return restored
 
     @staticmethod
     def _store_to_document(store: AliasStore) -> TOMLDocument:

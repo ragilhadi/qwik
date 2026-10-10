@@ -248,8 +248,128 @@ usage tracking.
 ### `doctor` — Health check
 
 ```bash
-qwik doctor                            # shell, hook, store, conflicts, sync repo
+qwik doctor                # shell, hook, store, conflicts, sync repo
+qwik doctor --fix          # apply safe repairs, report what changed
+qwik doctor --fix --yes    # no prompts at all
+qwik doctor --json         # machine-readable findings, exit 0 always
 ```
+
+`--fix` performs the obvious repairs non-interactively — the recovery
+path every error message names, usable from a dotfile bootstrap:
+
+| Finding | Fix |
+|---|---|
+| Store unreadable / future version | Restore newest valid backup |
+| Shell hook missing | Install `qwik init <shell> --install` (prompted unless `--yes`) |
+| Stale lock file | Remove if no live holder |
+| Orphaned `aliases.toml.tmp-*` files | Remove (older than 5 minutes) |
+| Overlay repo in a merge/conflict state | Reset to `origin/<branch>` |
+
+**Never** fixed automatically: anything that could shadow a binary or
+change an alias command (e.g. aliases shadowing PATH binaries) — those
+stay warnings.
+
+Exit codes: `0` clean or all-fixed, `1` unfixed errors remain, `2` a fix
+attempt failed.
+
+`--json` emits `{"status": ..., "checks": [{"id", "status", "message",
+"fixable", "fix", "detail"}...], "summary": {"ok", "warn", "error"}}`
+with no Rich markup, and always exits 0.
+
+### `undo` — Restore a backup
+
+Every destructive operation (add, rm, import, edit, sync pull, …) writes
+a timestamped backup to `<config_dir>/backups/` before mutating the
+store, keeping the last 20. `qwik undo` is the front door to that safety
+net — including for silent damage the store still parses fine after
+(`import --overwrite`, a lost concurrent write, an unwanted merge).
+
+```bash
+qwik undo                      # restore the most recent backup, with a diff + confirm
+qwik undo --list               # table of available backups
+qwik undo --to 20260815        # restore a specific backup (full or unambiguous partial stamp)
+qwik undo --diff               # show what restoring the newest backup would change
+qwik undo --yes                # skip confirmation
+```
+
+`--list` output:
+
+```
+  When              Aliases   Size    Stamp
+ ────────────────  ────────  ──────  ──────────────────────
+  2 min ago              42  3.1 KB  20260815-141803-440913-0000
+  1 hour ago             41  3.0 KB  20260815-134512-118820-0000
+```
+
+The confirmation always shows a diff, because "restore the last backup"
+is meaningless without knowing what it undoes:
+
+```
+Restoring 20260815-141803 would:
+  + add     deploy, k9s
+  - remove  gco
+  ~ change  gs   'git status' → 'git status --short'
+```
+
+Restoring takes its own backup first, so `undo` is itself undoable (run
+it twice to return to where you started). A corrupt backup is skipped in
+`--list` with a note, not a crash.
+
+### `suggest` — Alias candidates from shell history
+
+Mines your shell history for frequently repeated commands that have no
+alias, ranks them by estimated keystrokes saved, and offers to create
+them interactively.
+
+```bash
+qwik suggest                    # interactive review of top candidates
+qwik suggest --limit 20
+qwik suggest --min-count 5      # only commands run at least 5 times
+qwik suggest --since 30d
+qwik suggest --dry-run          # print, create nothing
+qwik suggest --json             # machine-readable candidates, no prompts
+```
+
+```
+Analyzed 8,432 commands from ~/.zsh_history (all time)
+
+  #   Count  Command                              Suggested   Saves
+ ───  ─────  ──────────────────────────────────  ──────────  ───────
+   1    312  git status                          gs          ~52 min
+   2    188  docker compose up -d                dcu-d       ~34 min
+
+Create alias for #1 (gs → 'git status')? [y/n/e(dit)/s(kip all)]
+```
+
+Name generation takes the initials of the command words (`git status` →
+`gs`), extended on collision, and every suggestion passes the same
+conflict checks as `qwik add` — a suggestion is never a builtin, a PATH
+binary, or an existing alias. Commands that already have an exact alias
+are excluded, and ranking is by estimated keystrokes saved
+(`count × characters saved`), not raw frequency.
+
+**Privacy.** History often contains secrets, so `qwik suggest`:
+
+- Never transmits anything anywhere — the only I/O is reading your local
+  history file and (on your confirmation) writing to your local store.
+- Excludes commands matching common secret shapes from suggestions and
+  output entirely: `--password`/`--token`/`-p <value>` flags,
+  `AKIA…` key ids, `user:pass@host` URLs, `Authorization: Bearer …`
+  headers, GitHub/GitLab/Slack/OpenAI-style tokens, JWTs, private-key
+  files, and secret-named env assignments (`export FOO_TOKEN=…`).
+- Skips one-shot commands (long absolute paths, UUIDs, hashes, pipes)
+  since they are not aliasable anyway.
+- **Files read:** bash `~/.bash_history` (or `$HISTFILE`), zsh
+  `~/.zsh_history` (plain + extended `: <ts>:<dur>;<cmd>` formats), fish
+  `~/.local/share/fish/fish_history`, PowerShell's PSReadLine
+  `ConsoleHost_history.txt`, and nushell's SQLite history
+  (`~/.local/share/nushell/history.sqlite3`, opened read-only). Override
+  with `--history-file <path>` to read exactly one file.
+- A missing or unreadable history file produces a clear message, never a
+  traceback.
+
+New shells can register history parsers via the `qwik.history_readers`
+entry-point group (same pattern as `qwik.shell_renderers`).
 
 ### `init` — Shell hook
 
@@ -528,8 +648,15 @@ qwik add "my alias" "echo hi"
 - **Linux/macOS:** `$XDG_CONFIG_HOME/qwik/aliases.toml` (usually `~/.config/qwik/aliases.toml`)
 - **Windows:** `%APPDATA%\qwik\aliases.toml`
 - **Backups:** every destructive operation writes to `qwik/backups/aliases-<timestamp>.toml` (last 20 kept)
-- **Atomic writes:** temp file + rename to prevent corruption
+- **Atomic writes:** temp file + rename to prevent corruption; crashed writes leave `aliases.toml.tmp-*` debris that `qwik doctor --fix` removes
 - **Format:** human-readable TOML, safe to edit by hand
+
+**Backup lifecycle:** a mutating command copies the current store into
+`backups/`, rotates older backups past 20, and writes the new store
+atomically. `qwik undo` lists (`--list`), diffs (`--diff`), and restores
+(`--to <stamp>`) those backups, taking its own backup before restoring —
+so the whole cycle is undoable. `qwik doctor --fix` uses the same
+mechanism to recover from an unreadable store non-interactively.
 
 Example store file:
 
@@ -550,7 +677,7 @@ run_count = 42
 
 ### Store versioning
 
-qwik writes a `version = N` field to the top of `aliases.toml` describing the schema of the file. On load, if the file's version is older than the current schema, qwik auto-migrates it forward (one migrator per version step) and backs up the pre-migration file before writing the new shape. Migration is forward-only — downgrade is not supported; restore from a backup (see `qwik doctor`) instead.
+qwik writes a `version = N` field to the top of `aliases.toml` describing the schema of the file. On load, if the file's version is older than the current schema, qwik auto-migrates it forward (one migrator per version step) and backs up the pre-migration file before writing the new shape. Migration is forward-only — downgrade is not supported; restore from a backup (see `qwik undo` or `qwik doctor --fix`) instead.
 
 If the file's version is newer than the version qwik understands, qwik refuses to load it and points at `qwik doctor` — typically you need to upgrade qwik to a newer release.
 
