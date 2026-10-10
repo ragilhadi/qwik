@@ -33,7 +33,8 @@ run_count = 42
 ## Safety guarantees
 
 - **Backups:** every destructive operation writes to
-  `qwik/backups/aliases-<timestamp>.toml` (last 20 kept)
+  `qwik/backups/aliases-<timestamp>.toml` (last 20 kept); restore with
+  [`qwik undo`](/reference/commands/#undo-restore-the-store-from-a-backup)
 - **Atomic writes:** temp file + rename to prevent corruption
 - **Concurrent access:** a file lock guards the store so two simultaneous
   qwik invocations can't interleave writes
