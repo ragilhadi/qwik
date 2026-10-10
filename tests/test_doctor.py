@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 from unittest.mock import patch
@@ -300,3 +301,245 @@ class TestLatestValidBackupHelper:
         good = backups / "aliases-20260719-120000-000002-0002.toml"
         good.write_text('version = 1\n[aliases.a]\ncommand = "x"\n', encoding="utf-8")
         assert _latest_valid_backup(backups) == good
+
+
+class TestDoctorFix:
+    """`qwik doctor --fix` repairs recoverable states non-interactively."""
+
+    def _future_version_store(self, tmp_path: Path) -> None:
+        (tmp_path / "aliases.toml").write_text("version = 99\n", encoding="utf-8")
+
+    def test_fix_recovers_future_version_store_exit_0(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        from qwik.core.models import Alias, AliasStore
+        from qwik.core.store import get_store
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        store = get_store()
+        # A valid store + backup, then brick the live store with version 99.
+        data = AliasStore()
+        data.add("gs", Alias(command="git status"))
+        store.save(data)
+        store.save_with_backup(data)
+        self._future_version_store(tmp_path)
+        result = runner.invoke(app, ["doctor", "--fix", "--yes"])
+        assert result.exit_code == 0, result.output
+        # The store file is replaceable TOML again with gs restored.
+        assert "gs" in get_store().load().aliases
+
+    def test_fix_restores_from_backup_no_prompt(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        from qwik.core.models import Alias, AliasStore
+        from qwik.core.store import get_store
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        store = get_store()
+        data = AliasStore()
+        data.add("gs", Alias(command="git status"))
+        store.save(data)
+        store.save_with_backup(data)
+        (tmp_path / "aliases.toml").write_text("!!!broken", encoding="utf-8")
+        result = runner.invoke(app, ["doctor", "--fix", "--yes"])
+        assert result.exit_code == 0, result.output
+        assert "gs" in get_store().load().aliases
+
+    def test_fix_unreadable_store_without_backup_exits_1(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        (tmp_path / "aliases.toml").write_text("!!!broken", encoding="utf-8")
+        result = runner.invoke(app, ["doctor", "--fix", "--yes"])
+        assert result.exit_code == 1
+
+    def test_fix_removes_stale_lock(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        lock = tmp_path / "aliases.toml.lock"
+        lock.write_text("", encoding="utf-8")  # no live holder
+        result = runner.invoke(app, ["doctor", "--fix", "--yes"])
+        assert result.exit_code == 0, result.output
+        assert not lock.exists()
+
+    def test_fix_removes_orphaned_tmp_files(self, tmp_path: Path, monkeypatch) -> None:
+        import os
+        import time
+
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        tmp_file = tmp_path / "aliases.toml.tmp-abc123"
+        tmp_file.write_text("debris", encoding="utf-8")
+        old = time.time() - 3600
+        os.utime(tmp_file, (old, old))
+        result = runner.invoke(app, ["doctor", "--fix", "--yes"])
+        assert result.exit_code == 0, result.output
+        assert not tmp_file.exists()
+
+    def test_no_fix_leaves_tmp_debris_alone(self, tmp_path: Path, monkeypatch) -> None:
+        import os
+        import time
+
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        tmp_file = tmp_path / "aliases.toml.tmp-abc123"
+        tmp_file.write_text("debris", encoding="utf-8")
+        old = time.time() - 3600
+        os.utime(tmp_file, (old, old))
+        result = runner.invoke(app, ["doctor"])
+        assert result.exit_code == 0
+        assert tmp_file.exists()
+
+    def test_fix_never_touches_alias_commands(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        from qwik.core.store import get_store
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "shadows_ls", "echo", "hi", "--force"])
+        # "shadows_ls" won't shadow anything real; instead use an
+        # unfixable-but-present state: a live-store alias named after a
+        # real binary must survive doctor --fix untouched.
+        import shutil
+
+        name = next((n for n in ["ls", "cat", "grep"] if shutil.which(n)), None)
+        if name is None:
+            pytest.skip("No PATH binary found")
+        runner.invoke(app, ["add", name, "echo", "shadower", "--force"])
+        result = runner.invoke(app, ["doctor", "--fix", "--yes"])
+        assert result.exit_code == 0, result.output
+        data = get_store().load()
+        assert data.aliases[name].command == "echo shadower"
+
+    def test_fix_reports_fix_failed_exit_2(self, tmp_path: Path, monkeypatch) -> None:
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        from qwik.config import _reset_config
+
+        _reset_config()
+        # Simulate a fix that doesn't take by making restore fail at the
+        # last moment: patch Store.restore to raise RuntimeError.
+        with patch("qwik.core.store.Store.restore", side_effect=RuntimeError("boom")):
+            store_bricks = tmp_path / "aliases.toml"
+            store_bricks.write_text("!!!broken", encoding="utf-8")
+            # create a valid backup file manually
+            backups = tmp_path / "backups"
+            backups.mkdir(exist_ok=True)
+            (backups / "aliases-20260815-141803-000000-0000.toml").write_text(
+                'version = 1\n\n[aliases.gs]\ncommand = "git status"\n'
+                'created_at = "2026-08-15T14:18:03Z"\n'
+                'updated_at = "2026-08-15T14:18:03Z"\n',
+                encoding="utf-8",
+            )
+            result = runner.invoke(app, ["doctor", "--fix", "--yes"])
+        assert result.exit_code == 2
+
+
+class TestDoctorJson:
+    """`qwik doctor --json` emits machine-readable findings, exit 0."""
+
+    def test_json_valid_and_exit_0(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        result = runner.invoke(app, ["doctor", "--json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["summary"]["error"] == 0
+        ids = [c["id"] for c in payload["checks"]]
+        assert "store.readable" in ids
+        assert "shell.hook" in ids
+
+    def test_json_markup_free_on_error(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        from qwik.core.models import Alias, AliasStore
+        from qwik.core.store import get_store
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        store = get_store()
+        data = AliasStore()
+        data.add("gs", Alias(command="git status"))
+        store.save(data)
+        store.save_with_backup(data)
+        (tmp_path / "aliases.toml").write_text("!!!broken", encoding="utf-8")
+        result = runner.invoke(app, ["doctor", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] == "error"
+        assert payload["summary"]["error"] >= 1
+        store_check = next(c for c in payload["checks"] if c["id"] == "store.readable")
+        assert store_check["status"] == "error"
+        assert store_check["fixable"] is True
+        assert store_check["fix"] == "restore-backup"
+
+    def test_json_exit_0_always(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        # Even a completely missing store (fine) with a broken hook
+        # (warning) and no shell (warning) must exit 0 in JSON mode.
+        with patch("qwik.commands.doctor._detect_shell", return_value=None):
+            result = runner.invoke(app, ["doctor", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["status"] in ("ok", "warn", "error")
+
+    def test_json_no_rich_markup_in_messages(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        from qwik.core.models import Alias, AliasStore
+        from qwik.core.store import get_store
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        store = get_store()
+        data = AliasStore()
+        data.add("gs", Alias(command="git status"))
+        store.save(data)
+        store.save_with_backup(data)
+        (tmp_path / "aliases.toml").write_text("!!!broken", encoding="utf-8")
+        result = runner.invoke(app, ["doctor", "--json"])
+        payload = json.loads(result.output)
+        for check in payload["checks"]:
+            message = str(check["message"])
+            assert "[/qwik" not in message
+            assert "[bold]" not in message
+            assert "[qwik.error]" not in message
+            detail = check.get("detail") or {}
+            assert "[qwik." not in str(detail)
+
+
+class TestDoctorStaleLockCheck:
+    def test_stale_lock_detected(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        (tmp_path / "aliases.toml.lock").write_text("", encoding="utf-8")
+        result = runner.invoke(app, ["doctor"])
+        assert "Stale lock" in result.output
+
+    def test_live_lock_not_reported(self, tmp_path: Path, monkeypatch) -> None:
+        from qwik.config import _reset_config
+        from qwik.core.locking import FileLock
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "gs", "git", "status"])
+        lock = FileLock(tmp_path / "aliases.toml.lock")
+        with lock:
+            result = runner.invoke(app, ["doctor"])
+        assert "Stale lock" not in result.output

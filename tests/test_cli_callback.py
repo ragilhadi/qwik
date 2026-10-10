@@ -190,7 +190,13 @@ class TestNoColorFlag:
         # rather than relying on ANSI codes CliRunner's non-tty output
         # wouldn't emit either way.
         import typer
-        from typer._click.core import Context
+
+        # typer >= 0.13 vendored click as typer._click; versions with a
+        # click dependency expose it at click.core instead.
+        try:
+            from typer._click.core import Context
+        except ImportError:
+            from click.core import Context  # type: ignore[no-redef]
 
         from qwik.cli import app as cli_app
         from qwik.ui.theme import _no_color_active

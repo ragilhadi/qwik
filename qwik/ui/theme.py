@@ -29,7 +29,14 @@ def _no_color_active() -> bool:
     if os.environ.get("NO_COLOR") is not None:
         return True
     try:
-        from typer._click.globals import get_current_context
+        # Where the current context lives depends on the typer version:
+        # some typer releases vendor click under typer._click (no click
+        # dependency), others depend on click directly (>= 0.25). Try the
+        # vendored path first, then click's own globals.
+        try:
+            from typer._click.globals import get_current_context
+        except ImportError:
+            from click.globals import get_current_context  # type: ignore[no-redef]
 
         ctx = get_current_context(silent=True)
     except Exception:
