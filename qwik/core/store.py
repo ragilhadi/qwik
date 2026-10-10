@@ -134,6 +134,9 @@ class Store:
     directory before mutating the store.
     """
 
+    # Suffix of the advisory lock guarding cross-process read-modify-writes.
+    _LOCK_SUFFIX = ".toml.lock"
+
     def __init__(self, config: Config | None = None) -> None:
         """Initialise the store.
 
@@ -153,6 +156,11 @@ class Store:
             A :class:`~pathlib.Path`.
         """
         return self._path
+
+    @property
+    def lock_path(self) -> Path:
+        """Return the advisory lock file path for this store."""
+        return self._path.with_suffix(self._LOCK_SUFFIX)
 
     def load(self, include_overlay: bool = True) -> AliasStore:
         """Read the alias database from disk.
@@ -242,7 +250,7 @@ class Store:
         """
         from qwik.core.locking import FileLock
 
-        lock = FileLock(self._path.with_suffix(".toml.lock"))
+        lock = FileLock(self.lock_path)
         with lock:
             data = self.load()
             alias = data.get(name)
@@ -282,7 +290,7 @@ class Store:
         """
         from qwik.core.locking import FileLock
 
-        lock = FileLock(self._path.with_suffix(".toml.lock"))
+        lock = FileLock(self.lock_path)
         with lock:
             data = self.load(include_overlay=include_overlay)
             before = data.model_dump(exclude={"overlay_aliases"})
@@ -419,7 +427,7 @@ class Store:
         except Exception as exc:
             raise RuntimeError(f"Could not read backup {path.name}: {exc}") from exc
 
-        lock = FileLock(self._path.with_suffix(".toml.lock"))
+        lock = FileLock(self.lock_path)
         with lock:
             if self._path.exists():
                 backup_name = f"aliases-{_now_stamp()}.toml"

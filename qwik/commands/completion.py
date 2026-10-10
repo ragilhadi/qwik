@@ -20,6 +20,8 @@ _COMPLETE_VAR = "_QWIK_COMPLETE"
 
 _VALID_SHELLS = {"bash", "zsh", "fish", "pwsh", "powershell"}
 
+_MSG_ALREADY_INSTALLED = "already installed"
+
 
 def _get_script(shell: str) -> str:
     """Return Typer's completion script for *shell*."""
@@ -107,7 +109,7 @@ def _install_bash(marker: str, console: Console) -> None:
     rc.parent.mkdir(parents=True, exist_ok=True)
     rc_content = rc.read_text(encoding="utf-8") if rc.exists() else ""
     if marker in rc_content:
-        print_info("already installed", console=console)
+        print_info(_MSG_ALREADY_INSTALLED, console=console)
         return
     if rc.exists():
         _backup(rc, console)
@@ -172,7 +174,7 @@ def _install_zsh(marker: str, console: Console) -> None:
     # the v2 block.
     has_legacy = any(line.strip() == _ZSH_MARKER_V1 for line in rc_content.splitlines())
     if marker in rc_content and not has_legacy:
-        print_info("already installed", console=console)
+        print_info(_MSG_ALREADY_INSTALLED, console=console)
         return
     if rc.exists():
         _backup(rc, console)
@@ -214,7 +216,7 @@ def _install_pwsh(marker: str, console: Console) -> None:
     rc.parent.mkdir(parents=True, exist_ok=True)
     rc_content = rc.read_text(encoding="utf-8") if rc.exists() else ""
     if marker in rc_content:
-        print_info("already installed", console=console)
+        print_info(_MSG_ALREADY_INSTALLED, console=console)
         return
     if rc.exists():
         _backup(rc, console)

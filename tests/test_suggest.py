@@ -162,7 +162,8 @@ class TestAnalyzeHistory:
         # "cargo download file" → "cdf" (no builtin) — extension works.
         entries = _entries(*["cargo download file"] * 5)
         suggestions = analyze_history(entries, AliasStore(), shell="bash")
-        assert suggestions and suggestions[0].alias == "cdf"
+        assert suggestions
+        assert suggestions[0].alias == "cdf"
 
     def test_time_saved_display(self) -> None:
         entries = _entries(*["git status --short -b"] * 50)

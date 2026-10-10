@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import typer
@@ -25,6 +25,107 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 __all__ = ["stats_command"]
+
+
+def _validate_options(
+    since: str | None,
+    prune: bool,
+    unused: bool,
+    top: int | None,
+    console: Console,
+) -> timedelta | None:
+    """Fail fast on bad options (before any store read); parse ``--since``."""
+    since_delta = None
+    if since is not None:
+        try:
+            since_delta = parse_since(since)
+        except ValueError as exc:
+            print_error(str(exc), console=console)
+            raise typer.Exit(1) from exc
+    if prune and not unused:
+        print_error("--prune requires --unused.", console=console)
+        raise typer.Exit(1)
+    if top is not None and top <= 0:
+        print_error("--top must be a positive number.", console=console)
+        raise typer.Exit(1)
+    return since_delta
+
+
+def _print_empty_store(console: Console) -> None:
+    console.print("[dim]No aliases yet. Run `qwik add <name> <command>` to create one.[/dim]")
+    console.print("[dim]`qwik stats` will light up once you have aliases and runs.[/dim]")
+
+
+def _empty_json_payload() -> dict[str, Any]:
+    return {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "total_aliases": 0,
+        "overlay_aliases": 0,
+        "total_runs": 0,
+        "time_saved_estimate_seconds": 0,
+        "top": [],
+        "unused": [],
+    }
+
+
+def _emit_empty_store(console: Console) -> None:
+    console.print_json(json.dumps(_empty_json_payload()))
+
+
+def _emit_json_stats(
+    data: Any,
+    now: datetime,
+    since: str | None,
+    since_delta: timedelta | None,
+    top: int | None,
+    unused: bool,
+    console: Console,
+) -> None:
+    """Print the ``--json`` usage dashboard for a non-empty store."""
+    top_rows = compute_top(data, top) if top is not None else []
+    unused_rows = compute_unused(data, since=since_delta, now=now) if unused else []
+    all_rows = [
+        AliasUsage(name=n, alias=a, is_overlay=n not in data.aliases)
+        for n, a in data.all_aliases().items()
+    ]
+    payload: dict[str, Any] = {
+        "generated_at": now.isoformat(),
+        "total_aliases": len(all_rows),
+        "overlay_aliases": sum(1 for r in all_rows if r.is_overlay),
+        "total_runs": sum(r.run_count for r in all_rows),
+        "time_saved_estimate_seconds": int(estimate_time_saved(all_rows).total_seconds()),
+        "top": [_usage_to_json(r) for r in top_rows],
+        "unused": [_usage_to_json(r) for r in unused_rows],
+    }
+    if since is not None:
+        payload["since"] = since
+    console.print_json(json.dumps(payload))
+
+
+def _print_unused_view(
+    data: Any,
+    now: datetime,
+    since_delta: timedelta | None,
+    *,
+    prune: bool,
+    yes: bool,
+    console: Console,
+) -> None:
+    """Render the ``--unused`` view, falling back to interactive pruning."""
+    unused_rows = compute_unused(data, since=since_delta, now=now)
+    if not unused_rows:
+        console.print("[qwik.success]✓ No unused aliases matching that window.[/qwik.success]")
+        return
+    if prune:
+        _prune_unused(unused_rows, yes=yes, console=console)
+        return
+    console.print(render_stats(data, top_rows=None, unused_rows=unused_rows, since=since_delta))
+
+
+def _print_top_view(data: Any, top: int, console: Console) -> None:
+    """Render the ``--top N`` view."""
+    top_rows = compute_top(data, top)
+    console.print(render_stats(data, top_rows=top_rows, unused_rows=None))
 
 
 def _usage_to_json(row: AliasUsage) -> dict[str, Any]:
@@ -79,88 +180,34 @@ def stats_command(
 
     # Options are validated before any store read so bad --since values
     # fail fast with a clear error.
-    since_delta = None
-    if since is not None:
-        try:
-            since_delta = parse_since(since)
-        except ValueError as exc:
-            print_error(str(exc), console=console)
-            raise typer.Exit(1) from exc
-
-    if prune and not unused:
-        print_error("--prune requires --unused.", console=console)
-        raise typer.Exit(1)
-
-    if top is not None and top <= 0:
-        print_error("--top must be a positive number.", console=console)
-        raise typer.Exit(1)
+    since_delta = _validate_options(since, prune, unused, top, console)
 
     data = store.load()
 
     if not data.all_aliases():
         if json_output:
-            console.print_json(
-                json.dumps(
-                    {
-                        "generated_at": datetime.now(UTC).isoformat(),
-                        "total_aliases": 0,
-                        "overlay_aliases": 0,
-                        "total_runs": 0,
-                        "time_saved_estimate_seconds": 0,
-                        "top": [],
-                        "unused": [],
-                    }
-                )
-            )
-            return
-        console.print("[dim]No aliases yet. Run `qwik add <name> <command>` to create one.[/dim]")
-        console.print("[dim]`qwik stats` will light up once you have aliases and runs.[/dim]")
+            _emit_empty_store(console)
+        else:
+            _print_empty_store(console)
         return
 
     now = datetime.now(UTC)
 
     if json_output:
-        top_rows = compute_top(data, top) if top is not None else []
-        unused_rows = compute_unused(data, since=since_delta, now=now) if unused else []
-        all_rows = [
-            AliasUsage(name=n, alias=a, is_overlay=n not in data.aliases)
-            for n, a in data.all_aliases().items()
-        ]
-        payload: dict[str, Any] = {
-            "generated_at": now.isoformat(),
-            "total_aliases": len(all_rows),
-            "overlay_aliases": sum(1 for r in all_rows if r.is_overlay),
-            "total_runs": sum(r.run_count for r in all_rows),
-            "time_saved_estimate_seconds": int(estimate_time_saved(all_rows).total_seconds()),
-            "top": [_usage_to_json(r) for r in top_rows],
-            "unused": [_usage_to_json(r) for r in unused_rows],
-        }
-        if since is not None:
-            payload["since"] = since
-        console.print_json(json.dumps(payload))
+        _emit_json_stats(data, now, since, since_delta, top, unused, console)
         return
 
     if unused:
-        unused_rows = compute_unused(data, since=since_delta, now=now)
-        if not unused_rows:
-            console.print("[qwik.success]✓ No unused aliases matching that window.[/qwik.success]")
-            return
-        if prune:
-            _prune_unused(unused_rows, yes=yes, console=console)
-            return
-        console.print(
-            render_stats(data, top_rows=None, unused_rows=unused_rows, since=since_delta, now=now)
-        )
+        _print_unused_view(data, now, since_delta, prune=prune, yes=yes, console=console)
         return
 
     if top is not None:
-        top_rows = compute_top(data, top)
-        console.print(render_stats(data, top_rows=top_rows, unused_rows=None, since=None, now=now))
+        _print_top_view(data, top, console)
         return
 
     # Bare `qwik stats` overview
     overview = compute_overview(data, now=now)
-    console.print(render_stats(data, overview=overview, now=now))
+    console.print(render_stats(data, overview=overview))
 
 
 def _prune_unused(
@@ -191,14 +238,13 @@ def _prune_unused(
     for row in removable:
         console.print(f"  [qwik.highlight]{row.name}[/qwik.highlight] → {row.alias.command!r}")
 
-    if not yes:
-        if not prompt_confirm(
-            f"Remove {len(removable)} alias{'es' if len(removable) != 1 else ''}?",
-            default=False,
-            console=console,
-        ):
-            console.print("[qwik.info]ℹ Prune cancelled.[/qwik.info]")  # noqa: RUF001 — intentional info glyph
-            return
+    if not yes and not prompt_confirm(
+        f"Remove {len(removable)} alias{'es' if len(removable) != 1 else ''}?",
+        default=False,
+        console=console,
+    ):
+        console.print("[qwik.info]ℹ Prune cancelled.[/qwik.info]")  # noqa: RUF001 — intentional info glyph
+        return
 
     from qwik.commands.remove import remove_alias
 

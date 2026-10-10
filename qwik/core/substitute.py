@@ -223,7 +223,7 @@ def find_unrecognized_braces(command: str) -> list[str]:
             ":-" in inner
             or "@" in inner
             or "*" in inner
-            or (inner[:1].isascii() and (inner[:1].isalnum() or inner[:1] == "_"))
+            or (inner[:1].isascii() and (inner[:1].isalnum() or inner.startswith("_")))
         ):
             offenders.append(m.group(0))
     return offenders
@@ -235,6 +235,34 @@ def _raise_invalid_index(idx: int, command: str) -> None:
         f'Invalid placeholder {{{idx}}} in alias: "{command}". '
         f"Positional placeholders must be 1-based ({{1}}, {{2}}, ...)."
     )
+
+
+def _validate_placeholder_index(idx: int, command: str) -> None:
+    """Raise ValueError for a 0/negative positional placeholder index."""
+    if idx < 1:
+        _raise_invalid_index(idx, command)
+
+
+def _validate_positional_arg(idx: int, args: Sequence[str], command: str) -> None:
+    """Raise ValueError when ``{idx}`` is invalid or beyond the supplied args."""
+    _validate_placeholder_index(idx, command)
+    if idx > len(args):
+        raise ValueError(
+            f'Missing argument {idx} for alias: "{command}" (received {len(args)} argument(s))'
+        )
+
+
+def _validate_named_arg(
+    name: str, name_map: dict[str, int], args: Sequence[str], command: str
+) -> None:
+    """Raise ValueError when a named placeholder lacks its positional arg."""
+    idx = name_map[name]
+    if idx > len(args):
+        raise ValueError(
+            f"Missing argument for placeholder {{{name}}} "
+            f'(position {idx}) in alias: "{command}" '
+            f"(received {len(args)} argument(s))"
+        )
 
 
 def validate_placeholders(command: str, args: Sequence[str]) -> None:
@@ -251,29 +279,11 @@ def validate_placeholders(command: str, args: Sequence[str]) -> None:
     name_map = _named_placeholder_index_map(command)
     for match in _PLACEHOLDER_RE.finditer(command):
         if match.group(1) is not None:
-            idx = int(match.group(1))
-            if idx < 1:
-                _raise_invalid_index(idx, command)
-            if idx > len(args):
-                raise ValueError(
-                    f'Missing argument {idx} for alias: "{command}" '
-                    f"(received {len(args)} argument(s))"
-                )
+            _validate_positional_arg(int(match.group(1)), args, command)
         elif match.group(4) is not None:
-            idx = int(match.group(4))
-            if idx < 1:
-                _raise_invalid_index(idx, command)
+            _validate_placeholder_index(int(match.group(4)), command)
         elif match.group(6) is not None:
-            name = match.group(6)
-            idx = name_map[name]
-            if idx > len(args):
-                raise ValueError(
-                    f"Missing argument for placeholder {{{name}}} "
-                    f'(position {idx}) in alias: "{command}" '
-                    f"(received {len(args)} argument(s))"
-                )
-        elif match.group(7) is not None:
-            pass
+            _validate_named_arg(match.group(6), name_map, args, command)
 
 
 def _parse_positional(

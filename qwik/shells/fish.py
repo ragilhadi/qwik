@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 __all__ = ["FishRenderer"]
 
+_RC_NAME = "config.fish"
+
 
 class FishRenderer(ShellRenderer):
     """Emit ``fish`` ``alias`` and function definitions."""
@@ -48,11 +50,11 @@ class FishRenderer(ShellRenderer):
         """Return the fish config path honoring env overrides."""
         env_val = os.environ.get("__fish_config_dir")
         if env_val:
-            return Path(env_val) / "config.fish"
+            return Path(env_val) / _RC_NAME
         xdg = os.environ.get("XDG_CONFIG_HOME")
         if xdg:
-            return Path(xdg) / "fish" / "config.fish"
-        return Path.home() / ".config" / "fish" / "config.fish"
+            return Path(xdg) / "fish" / _RC_NAME
+        return Path.home() / ".config" / "fish" / _RC_NAME
 
     def install_hook_line(self) -> str | None:
         """Return the fish hook line."""

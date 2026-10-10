@@ -629,28 +629,10 @@ def doctor_command(
     results: list[CheckResult] = []
     fix_failed_on_error = False
     for check in checks:
-        result = check.run()
-        was_error = result.status == "error"
-        # --fix repairs every fixable finding. The hook install edits an
-        # rc file and prints its own output, so in --json mode (whose
-        # stdout must stay machine-readable) it is only allowed with
-        # --yes; stateless repairs (stale lock, tmp debris, restore,
-        # git reset) run there regardless. Plain `qwik doctor` keeps its
-        # legacy behavior: interactively offering the backup restore when
-        # the store is unreadable — the exact path every error message
-        # names. `--json` never prompts.
-        hook_fix_in_json = check.id == "shell.hook" and json_output and not assume_yes
-        if fix and result.fixable and not hook_fix_in_json:
-            rerun = _apply_fix(check, result, console, assume_yes)
-            if rerun is not None:
-                result = rerun
-        elif result.fixable and was_error and not fix and not json_output:
-            if check.fix(console=console, assume_yes=False):
-                result = check.run()
-        # A fixable error that persists (declined, failed, or blocked in
-        # JSON mode) means --fix could not fully repair: exit 2. A
-        # non-fixable error keeps the classic exit 1.
-        if fix and was_error and result.status == "error" and result.fixable:
+        result, fix_failed = _run_check(
+            check, fix=fix, json_output=json_output, assume_yes=assume_yes, console=console
+        )
+        if fix_failed:
             fix_failed_on_error = True
         results.append(result)
 
@@ -667,12 +649,42 @@ def doctor_command(
         raise typer.Exit(1)
 
 
-def _apply_fix(
+def _run_check(
     check: Check,
-    result: CheckResult,
-    console: Console,
+    *,
+    fix: bool,
+    json_output: bool,
     assume_yes: bool,
-) -> CheckResult | None:
+    console: Console,
+) -> tuple[CheckResult, bool]:
+    """Run one check, applying requested repairs; return ``<result, fix_failed>``.
+
+    A ``fix_failed`` return is ``True`` only when ``--fix`` was requested
+    and a fixable error persists after the attempt (declined, failed, or
+    blocked in JSON mode).
+    """
+    result = check.run()
+    was_error = result.status == "error"
+    # --fix repairs every fixable finding. The hook install edits an
+    # rc file and prints its own output, so in --json mode (whose
+    # stdout must stay machine-readable) it is only allowed with
+    # --yes; stateless repairs (stale lock, tmp debris, restore,
+    # git reset) run there regardless. Plain `qwik doctor` keeps its
+    # legacy behavior: interactively offering the backup restore when
+    # the store is unreadable — the exact path every error message
+    # names. `--json` never prompts.
+    hook_fix_in_json = check.id == "shell.hook" and json_output and not assume_yes
+    if fix and result.fixable and not hook_fix_in_json:
+        rerun = _apply_fix(check, console, assume_yes)
+        if rerun is not None:
+            result = rerun
+    elif result.fixable and was_error and not fix and not json_output:
+        if check.fix(console=console, assume_yes=False):
+            result = check.run()
+    return result, fix and was_error and result.status == "error" and result.fixable
+
+
+def _apply_fix(check: Check, console: Console, assume_yes: bool) -> CheckResult | None:
     """Run *check*'s fix; return the re-run result, or ``None`` on refusal."""
     fixed = check.fix(console=console, assume_yes=assume_yes)
     if not fixed:
@@ -702,14 +714,19 @@ def _render_report(results: list[CheckResult], console: Console) -> None:
     console.print(f"[bold]Summary:[/bold] {ok}/{total} passed, {warn} warning(s), {err} error(s)")
 
 
+def _overall_status(results: list[CheckResult]) -> str:
+    """Collapse per-check statuses into the single JSON ``status`` field."""
+    if all(r.status == "ok" for r in results):
+        return "ok"
+    if any(r.status == "error" for r in results):
+        return "error"
+    return "warn"
+
+
 def _emit_json(results: list[CheckResult], console: Console) -> None:
     """Print the machine-readable findings; never prompts, always exit 0."""
     payload: dict[str, Any] = {
-        "status": (
-            "ok"
-            if all(r.status == "ok" for r in results)
-            else ("error" if any(r.status == "error" for r in results) else "warn")
-        ),
+        "status": _overall_status(results),
         "checks": [
             {
                 "id": r.id,

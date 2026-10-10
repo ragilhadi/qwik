@@ -20,7 +20,6 @@ runner = CliRunner()
 def clean_store(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
     _reset_config()
-    yield  # type: ignore[misc]
 
 
 def _add(*args: str) -> None:

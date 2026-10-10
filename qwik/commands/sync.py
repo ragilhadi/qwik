@@ -52,6 +52,7 @@ if TYPE_CHECKING:
 __all__ = ["sync_command"]
 
 _DEFAULT_BRANCH = "main"
+_ALIASES_FILENAME = "aliases.toml"
 
 
 def _load_sync_config(repo_dir: Path) -> tuple[str | None, str]:
@@ -82,7 +83,7 @@ def _export_live_store_to_sync(sync_repo: Path, store: Store) -> int:
     """Write the live store as ``<sync_repo>/aliases.toml``; return alias count."""
     data = store.load()
     doc = Store._store_to_document(data)
-    (sync_repo / "aliases.toml").write_text(tomlkit.dumps(doc), encoding="utf-8")
+    (sync_repo / _ALIASES_FILENAME).write_text(tomlkit.dumps(doc), encoding="utf-8")
     return len(data.aliases)
 
 
@@ -90,7 +91,7 @@ def _read_sync_aliases(sync_repo: Path) -> AliasStore:
     """Parse ``<sync_repo>/aliases.toml`` into an :class:`AliasStore`."""
     from qwik.core.migrations import migrate
 
-    raw = (sync_repo / "aliases.toml").read_text(encoding="utf-8")
+    raw = (sync_repo / _ALIASES_FILENAME).read_text(encoding="utf-8")
     data = dict(tomlkit.parse(raw).unwrap())
     data = migrate(data)
     return AliasStore.model_validate(data)
@@ -308,7 +309,7 @@ def _do_status(
     if dirty and short:
         con.print(f"  [qwik.warning]{short}[/qwik.warning]")
 
-    aliases_file = sync_repo / "aliases.toml"
+    aliases_file = sync_repo / _ALIASES_FILENAME
     if aliases_file.exists():
         try:
             incoming = _read_sync_aliases(sync_repo)

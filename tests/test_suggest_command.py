@@ -22,7 +22,6 @@ TS = 1750000000
 def clean_store(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
     _reset_config()
-    yield  # type: ignore[misc]
 
 
 def _bash_history(tmp_path: Path, commands: list[str]) -> Path:

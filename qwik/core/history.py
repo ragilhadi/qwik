@@ -39,6 +39,9 @@ __all__ = [
 
 _HISTORY_ENTRY_POINT_GROUP = "qwik.history_readers"
 
+# XDG default directory name when $XDG_DATA_HOME is unset.
+_LOCAL = ".local"
+
 
 @dataclass(frozen=True)
 class HistoryEntry:
@@ -206,7 +209,7 @@ class FishHistoryReader(HistoryReader):
         xdg = os.environ.get("XDG_DATA_HOME")
         if xdg:
             return (Path(xdg) / "fish" / "fish_history",)
-        return (Path.home() / ".local" / "share" / "fish" / "fish_history",)
+        return (Path.home() / _LOCAL / "share" / "fish" / "fish_history",)
 
     def _parse(self, path: Path) -> list[HistoryEntry]:
         raw = path.read_text(encoding="utf-8", errors="replace")
@@ -254,7 +257,7 @@ class PwshHistoryReader(HistoryReader):
             base = (Path(userprofile) / "AppData" / "Roaming") if userprofile else Path.home()
         else:
             # Non-Windows pwsh (rare) keeps the same relative layout.
-            base = Path.home() / ".local" / "share"
+            base = Path.home() / _LOCAL / "share"
         return (
             base
             / "Microsoft"
@@ -292,7 +295,7 @@ class NuHistoryReader(HistoryReader):
             candidates = [base / "history.sqlite3", base / "history.txt"]
         else:
             xdg = os.environ.get("XDG_DATA_HOME")
-            base = Path(xdg) if xdg else Path.home() / ".local" / "share"
+            base = Path(xdg) if xdg else Path.home() / _LOCAL / "share"
             candidates = [
                 base / "nushell" / "history.sqlite3",
                 Path.home() / ".config" / "nushell" / "history.txt",

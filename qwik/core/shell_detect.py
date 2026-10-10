@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 __all__ = [
     "detect_shell",
@@ -188,8 +189,6 @@ def _shell_name_from_windows_parent_process() -> str | None:
         import ctypes
         from ctypes import wintypes
 
-        TH32CS_SNAPPROCESS = 0x00000002
-
         class PROCESSENTRY32(ctypes.Structure):
             _fields_ = [
                 ("dwSize", wintypes.DWORD),
@@ -212,37 +211,54 @@ def _shell_name_from_windows_parent_process() -> str | None:
         # the AttributeError this raises on non-Windows is still caught
         # below exactly like before.
         kernel32 = getattr(ctypes, "windll").kernel32  # noqa: B009 — see comment above
-        snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-        if snapshot == -1 or snapshot == 0:
-            return None
-        try:
-            pid_to_name: dict[int, str] = {}
-            pid_to_parent: dict[int, int] = {}
-            entry = PROCESSENTRY32()
-            entry.dwSize = ctypes.sizeof(PROCESSENTRY32)
-            if kernel32.Process32First(snapshot, ctypes.byref(entry)):
-                while True:
-                    pid_to_name[entry.th32ProcessID] = entry.szExeFile.decode(
-                        errors="ignore"
-                    ).lower()
-                    pid_to_parent[entry.th32ProcessID] = entry.th32ParentProcessID
-                    if not kernel32.Process32Next(snapshot, ctypes.byref(entry)):
-                        break
-        finally:
-            kernel32.CloseHandle(snapshot)
-
-        pid = os.getppid()
-        seen: set[int] = set()
-        while pid and pid not in seen:
-            seen.add(pid)
-            name = pid_to_name.get(pid)
-            if name:
-                classified = _classify_exe_name(name)
-                if classified is not None:
-                    return classified
-            pid = pid_to_parent.get(pid, 0)
+        pid_to_name, pid_to_parent = _windows_process_tables(kernel32, PROCESSENTRY32)
+        return _classify_from_ancestors(pid_to_name, pid_to_parent, os.getppid())
     except Exception:
         pass
+    return None
+
+
+def _windows_process_tables(kernel32: Any, entry_cls: Any) -> tuple[dict[int, str], dict[int, int]]:
+    """Snapshot all processes; return ``(pid→exe name, pid→parent pid)``.
+
+    Empty maps on a failed snapshot; the snapshot handle is always closed.
+    """
+    import ctypes
+
+    TH32CS_SNAPPROCESS = 0x00000002
+    snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snapshot == -1 or snapshot == 0:
+        return {}, {}
+    pid_to_name: dict[int, str] = {}
+    pid_to_parent: dict[int, int] = {}
+    try:
+        entry = entry_cls()
+        entry.dwSize = ctypes.sizeof(entry_cls)
+        if kernel32.Process32First(snapshot, ctypes.byref(entry)):
+            while True:
+                pid_to_name[entry.th32ProcessID] = entry.szExeFile.decode(errors="ignore").lower()
+                pid_to_parent[entry.th32ProcessID] = entry.th32ParentProcessID
+                if not kernel32.Process32Next(snapshot, ctypes.byref(entry)):
+                    break
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return pid_to_name, pid_to_parent
+
+
+def _classify_from_ancestors(
+    pid_to_name: dict[int, str], pid_to_parent: dict[int, int], start_pid: int
+) -> str | None:
+    """Walk the pid chain from *start_pid*; return the first classified shell."""
+    pid = start_pid
+    seen: set[int] = set()
+    while pid and pid not in seen:
+        seen.add(pid)
+        name = pid_to_name.get(pid)
+        if name:
+            classified = _classify_exe_name(name)
+            if classified is not None:
+                return classified
+        pid = pid_to_parent.get(pid, 0)
     return None
 
 
