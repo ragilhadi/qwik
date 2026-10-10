@@ -82,7 +82,7 @@ def normalize_command(command: str) -> str:
         return ""
     core: list[str] = []
     for word in words:
-        if not core and "=" in word and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", word):
+        if not core and "=" in word and re.match(r"^[A-Za-z_]\w*=", word):
             continue  # leading env assignment
         core.append(word)
     return " ".join(core)
@@ -190,6 +190,66 @@ class _Candidate:
     timestamps: list[object] = field(default_factory=list)
 
 
+def _accumulate(entries: list[HistoryEntry]) -> dict[str, _Candidate]:
+    """Bucket history entries by normalized command, skipping noise.
+
+    Secret-shaped commands are excluded entirely (never suggested, never
+    shown), as are commands that fail the aliasability heuristics.
+    """
+    buckets: dict[str, _Candidate] = {}
+    for entry in entries:
+        if contains_secret(entry.command):
+            continue  # excluded entirely — never suggested, never shown
+        normalized = normalize_command(entry.command)
+        if not normalized or not is_aliasable(normalized):
+            continue
+        bucket = buckets.setdefault(normalized, _Candidate(normalized=normalized))
+        bucket.count += 1
+        if entry.timestamp is not None:
+            bucket.timestamps.append(entry.timestamp)
+    return buckets
+
+
+def _finalize_suggestions(
+    buckets: dict[str, _Candidate],
+    taken: set[str],
+    store: AliasStore,
+    checker: ConflictChecker,
+    *,
+    shell: str | None,
+    min_count: int,
+) -> list[Suggestion]:
+    """Turn frequent buckets into ranked, conflict-checked suggestions."""
+    suggestions: list[Suggestion] = []
+    for bucket in buckets.values():
+        if bucket.count < min_count:
+            continue
+        if normalized_has_alias(bucket.normalized, store):
+            continue
+        base = generate_name(bucket.normalized)
+        if not base:
+            continue
+        name = _extend_on_collision(base, taken, bucket.normalized)
+        # Conflict gate: never propose a builtin, an existing alias, or
+        # (as a hard warning) a PATH binary.
+        result = checker.check(name, shell=shell)
+        if not result.is_safe:
+            continue
+        taken.add(name)
+        saved = max(len(bucket.normalized) - len(name), 0)
+        if saved <= 0:
+            continue
+        suggestions.append(
+            Suggestion(
+                command=bucket.normalized,
+                count=bucket.count,
+                alias=name,
+                saved_chars=saved,
+            )
+        )
+    return suggestions
+
+
 def analyze_history(
     entries: list[HistoryEntry],
     store: AliasStore,
@@ -218,51 +278,10 @@ def analyze_history(
     """
     checker = checker or ConflictChecker(store)
     taken: set[str] = set(store.aliases) | set(store.overlay_aliases)
-    buckets: dict[str, _Candidate] = {}
-    total = 0
-
-    for entry in entries:
-        total += 1
-        if contains_secret(entry.command):
-            continue  # excluded entirely — never suggested, never shown
-        normalized = normalize_command(entry.command)
-        if not normalized or not is_aliasable(normalized):
-            continue
-        bucket = buckets.get(normalized)
-        if bucket is None:
-            bucket = _Candidate(normalized=normalized)
-            buckets[normalized] = bucket
-        bucket.count += 1
-        if entry.timestamp is not None:
-            bucket.timestamps.append(entry.timestamp)
-
-    suggestions: list[Suggestion] = []
-    for bucket in buckets.values():
-        if bucket.count < min_count:
-            continue
-        if normalized_has_alias(bucket.normalized, store):
-            continue
-        base = generate_name(bucket.normalized)
-        if not base:
-            continue
-        name = _extend_on_collision(base, taken, bucket.normalized)
-        # Conflict gate: never propose a builtin, an existing alias, or
-        # (as a hard warning) a PATH binary.
-        result = checker.check(name, shell=shell)
-        if not result.is_safe:
-            continue
-        taken.add(name)
-        saved = max(len(bucket.normalized) - len(name), 0)
-        if saved <= 0:
-            continue
-        suggestions.append(
-            Suggestion(
-                command=bucket.normalized,
-                count=bucket.count,
-                alias=name,
-                saved_chars=saved,
-            )
-        )
+    buckets = _accumulate(entries)
+    suggestions = _finalize_suggestions(
+        buckets, taken, store, checker, shell=shell, min_count=min_count
+    )
 
     suggestions.sort(key=lambda s: (-s.score, s.command))
     return suggestions[:limit]

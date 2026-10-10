@@ -48,6 +48,8 @@ __all__ = ["overlay_command"]
 
 _DEFAULT_BRANCH = "main"
 
+_MSG_NO_OVERLAY = "No overlay configured."
+
 
 def _force_rmtree(path: Path) -> None:
     """Best-effort recursive delete that also clears Windows' read-only bit.
@@ -217,7 +219,7 @@ def _do_remove(config: Config, *, console: Console) -> None:
     config_file = config.overlay_config_file
     overlay_repo = config.overlay_repo_dir
     if not config_file.exists() and not overlay_repo.exists():
-        print_error("No overlay configured.", console=console)
+        print_error(_MSG_NO_OVERLAY, console=console)
         raise typer.Exit(1)
 
     if config_file.exists():
@@ -232,7 +234,7 @@ def _do_update(config: Config, *, yes: bool, console: Console) -> None:
     overlay_repo = config.overlay_repo_dir
 
     if not config_file.exists():
-        print_error("No overlay configured.", console=console)
+        print_error(_MSG_NO_OVERLAY, console=console)
         raise typer.Exit(1)
 
     url, branch, _ = _load_overlay_config(config_file)
@@ -318,7 +320,7 @@ def _do_list(config: Config, *, console: Console) -> None:
     config_file = config.overlay_config_file
 
     if not config_file.exists():
-        print_info("No overlay configured.", console=console)
+        print_info(_MSG_NO_OVERLAY, console=console)
         return
 
     url, branch, auto_update = _load_overlay_config(config_file)

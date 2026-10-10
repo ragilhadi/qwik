@@ -160,6 +160,50 @@ qwik overlay remove
 All of these show a trust-boundary preview before applying incoming
 commands — see [Sharing & Syncing](/guides/sharing/).
 
+## Insights and safety net
+
+### `stats` — Usage dashboard
+
+```bash
+qwik stats                              # totals, most used, busiest group, time saved
+qwik stats --top 5                      # five most-used aliases
+qwik stats --unused                     # aliases never run
+qwik stats --unused --since 7d          # not run in the last 7 days (7h, 2w…)
+qwik stats --unused --prune             # remove unused user aliases after confirmation
+qwik stats --json                       # machine-readable output
+```
+
+Overlay aliases are read-only: `--prune` reports them and skips them.
+
+### `suggest` — Alias suggestions from shell history
+
+```bash
+qwik suggest                            # review candidates interactively
+qwik suggest --dry-run                  # print candidates, create nothing
+qwik suggest --min-count 5 --limit 3    # stricter filters
+qwik suggest --since 30d                # only recent history
+qwik suggest --history-file ~/.bash_history   # parse exactly this file
+qwik suggest --json                     # machine-readable candidates
+```
+
+Frequent commands are ranked by estimated keystrokes saved. Secret-shaped
+commands are never suggested, and every candidate is conflict-checked
+against builtins, existing aliases, and `$PATH` binaries before it is
+offered — see [Conflict Detection](/guides/conflicts/).
+
+### `undo` — Restore the store from a backup
+
+```bash
+qwik undo --list                        # list available backups
+qwik undo                               # diff + confirm, then restore the newest
+qwik undo --diff                        # show what the newest restore would change
+qwik undo --to 20260815-1418            # restore a specific (partial) stamp
+qwik undo --yes                         # skip confirmation
+```
+
+The restore itself writes a backup of the pre-restore store, so a restore
+can be undone — see [Store & Backups](/reference/store/).
+
 ## Setup and health
 
 ### `init` — Shell hook
@@ -180,7 +224,15 @@ qwik completion zsh --install
 
 ```bash
 qwik doctor                            # shell, hook, store, conflicts, sync repo
+qwik doctor --fix                      # apply safe repairs (with confirmations)
+qwik doctor --fix --yes                # skip fix confirmations
+qwik doctor --json                     # machine-readable findings; always exits 0
 ```
+
+`--fix` applies only the safe repairs: restoring the store from a
+backup, removing a stale lock file or crashed temp files, resetting the
+overlay repo, and installing the hook. Anything that could shadow a
+binary or change an alias command is never auto-fixed.
 
 ## Performance notes
 

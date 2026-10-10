@@ -235,8 +235,9 @@ class TestRestoreFromBackup:
         assert result.exit_code == 1
         live = (tmp_path / "aliases.toml").read_text(encoding="utf-8")
         assert live == "not-valid"
+        store = get_store()
         with pytest.raises(RuntimeError):
-            get_store().load()
+            store.load()
 
     def test_doctor_no_backups_exits_with_actionable_error(
         self, tmp_path: Path, monkeypatch

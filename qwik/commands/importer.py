@@ -26,6 +26,50 @@ def _print_capped(con: Console, names: set[str]) -> None:
         con.print(f"  ... and {len(names) - _PREVIEW_CAP} more")
 
 
+def _print_breakdown(
+    conflict_names: set[str],
+    new_names: set[str],
+    removed_names: set[str],
+    mode: Literal["merge", "replace"],
+    con: Console,
+) -> None:
+    """Print the conflict / new / removal breakdown of one import."""
+    if conflict_names:
+        con.print(
+            f"[qwik.warning]Conflicts ({len(conflict_names)}):[/qwik.warning] "
+            f"{', '.join(sorted(conflict_names))}"
+        )
+    if new_names:
+        con.print(
+            f"[qwik.success]New aliases ({len(new_names)}):[/qwik.success] "
+            f"{', '.join(sorted(new_names))}"
+        )
+    if mode == "replace" and removed_names:
+        con.print(f"[qwik.error]Will be REMOVED ({len(removed_names)}):[/qwik.error]")
+        _print_capped(con, removed_names)
+
+
+def _confirm_import(
+    mode: Literal["merge", "replace"],
+    removed_names: set[str],
+    *,
+    yes: bool,
+    con: Console,
+) -> bool:
+    """Prompt for confirmation unless *yes*; return the user's verdict."""
+    if yes:
+        return True
+    if mode == "replace":
+        prompt = (
+            f"Replace store — {len(removed_names)} alias(es) will be deleted. Continue?"
+            if removed_names
+            else "Replace store? Continue?"
+        )
+    else:
+        prompt = "Apply import?"
+    return prompt_confirm(prompt, default=False, console=con)
+
+
 def preview_import(
     incoming: AliasStore,
     data: AliasStore,
@@ -70,32 +114,9 @@ def preview_import(
     conflict_names = incoming_names & existing_names
     removed_names = existing_names - incoming_names if mode == "replace" else set()
 
-    if conflict_names:
-        con.print(
-            f"[qwik.warning]Conflicts ({len(conflict_names)}):[/qwik.warning] "
-            f"{', '.join(sorted(conflict_names))}"
-        )
-    if new_names:
-        con.print(
-            f"[qwik.success]New aliases ({len(new_names)}):[/qwik.success] "
-            f"{', '.join(sorted(new_names))}"
-        )
-    if mode == "replace" and removed_names:
-        con.print(f"[qwik.error]Will be REMOVED ({len(removed_names)}):[/qwik.error]")
-        _print_capped(con, removed_names)
+    _print_breakdown(conflict_names, new_names, removed_names, mode, con)
 
-    if not yes:
-        if mode == "replace":
-            prompt = (
-                f"Replace store — {len(removed_names)} alias(es) will be deleted. Continue?"
-                if removed_names
-                else "Replace store? Continue?"
-            )
-        else:
-            prompt = "Apply import?"
-        if not prompt_confirm(prompt, default=False, console=con):
-            return False
-    return True
+    return _confirm_import(mode, removed_names, yes=yes, con=con)
 
 
 def merge_into(incoming: AliasStore, data: AliasStore) -> tuple[int, int, int]:

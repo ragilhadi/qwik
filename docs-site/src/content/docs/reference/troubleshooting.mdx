@@ -68,8 +68,16 @@ ls ~/.config/qwik/backups/          # or $QWIK_CONFIG_DIR/qwik/backups/
 qwik doctor                         # points at the latest valid backup
 ```
 
-Restore by copying a backup over `aliases.toml` (with qwik closed), or use
-`qwik import <backup>` to merge.
+Restore the easy way — `qwik undo`:
+
+```bash
+qwik undo --list                        # valid backups, newest first
+qwik undo                               # diff + confirm, then restore the newest
+qwik undo --to 20260815-1418            # restore a specific backup
+```
+
+Alternatively copy a backup over `aliases.toml` (with qwik closed), or
+use `qwik import <backup>` to merge.
 
 ## Duplicate names / shadowing confusion
 
