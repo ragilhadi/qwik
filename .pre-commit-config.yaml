@@ -6,7 +6,9 @@ repos:
       - id: no-commit-to-branch
         args: [--branch, master]
       - id: trailing-whitespace
+        exclude: \.ambr$
       - id: end-of-file-fixer
+        exclude: \.ambr$
       - id: check-added-large-files
 
   # Ruff for both linting and formatting
@@ -23,7 +25,21 @@ repos:
     rev: v2.3.1
     hooks:
       - id: mypy
-        args: [--strict]
+        # Strictness is governed by [tool.mypy] in pyproject.toml (strict
+        # = true, with per-module overrides relaxing pytest-style test
+        # files) — passing --strict here as a CLI flag would override
+        # those overrides and fail on every untyped test fixture.
         additional_dependencies:
+          # The mypy hook runs in its own isolated venv; mirror the full
+          # dependency set (runtime + test) so imports resolve instead of
+          # flooding "Cannot find implementation or library stub" errors.
           - pydantic>=2.0.0
           - typer>=0.12.0
+          - rich>=13.0.0
+          - prompt_toolkit>=3.0.0
+          - rapidfuzz>=3.0.0
+          - tomlkit>=0.12.0
+          - platformdirs>=4.0.0
+          - pytest>=8.0.0
+          - syrupy>=4.0.0
+        args: ["--config-file", "pyproject.toml"]
