@@ -58,6 +58,7 @@ export default defineConfig({
             { label: 'Sharing & Syncing', slug: 'guides/sharing' },
             { label: 'Conflict Detection', slug: 'guides/conflicts' },
             { label: 'Shell Completions', slug: 'guides/completions' },
+            { label: 'Insights & Recovery', slug: 'guides/insights-and-recovery' },
           ],
         },
         {

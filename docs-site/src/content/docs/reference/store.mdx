@@ -35,7 +35,8 @@ run_count = 42
 - **Backups:** every destructive operation writes to
   `qwik/backups/aliases-<timestamp>.toml` (last 20 kept); restore with
   [`qwik undo`](/reference/commands/#undo-restore-the-store-from-a-backup)
-- **Atomic writes:** temp file + rename to prevent corruption
+- **Atomic writes:** temp file + rename to prevent corruption; a crashed write
+  leaves `aliases.toml.tmp-*` debris that `qwik doctor --fix` removes
 - **Concurrent access:** a file lock guards the store so two simultaneous
   qwik invocations can't interleave writes
 
@@ -48,7 +49,7 @@ the schema of the file. On load:
   auto-migrates it forward (one migrator per version step) and backs up the
   pre-migration file before writing the new shape.
 - Migration is **forward-only** — downgrade is not supported; restore from
-  a backup (see `qwik doctor`) instead.
+  a backup (see `qwik undo` or `qwik doctor --fix`) instead.
 - If the file's version is **newer** than the version qwik understands,
   qwik refuses to load it and points at `qwik doctor` — typically you need
   to upgrade qwik to a newer release.

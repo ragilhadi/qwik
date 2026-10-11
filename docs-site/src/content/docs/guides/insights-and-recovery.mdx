@@ -1,0 +1,112 @@
+---
+title: Insights & Recovery
+description: Usage stats, history-driven alias suggestions, backup restore with qwik undo, and self-repair with qwik doctor --fix.
+---
+
+Four commands help you keep an alias store healthy over time. Flags are
+listed in the [Commands reference](/reference/commands/); this page
+explains how they fit together.
+
+## Usage stats
+
+```bash
+qwik stats                  # totals, most used, busiest group, time saved
+qwik stats --top 5
+qwik stats --unused --since 30d
+qwik stats --unused --prune # remove unused aliases after confirmation
+```
+
+`--prune` only touches your own aliases; read-only overlay aliases are
+reported and skipped.
+
+## Suggestions from shell history
+
+`qwik suggest` mines your history for frequently repeated commands that
+have no alias, ranks them by estimated keystrokes saved
+(`count × characters saved`), and offers to create them.
+
+```bash
+qwik suggest                    # interactive review
+qwik suggest --dry-run          # print candidates only
+qwik suggest --min-count 5 --since 30d
+qwik suggest --json
+```
+
+Names come from the initials of the command words (`git status` → `gs`),
+extended on collision, and pass the same
+[conflict checks](/guides/conflicts/) as `qwik add`.
+
+### Privacy
+
+- Nothing is transmitted anywhere; qwik only reads your local history file
+  and, on your confirmation, writes your local store.
+- Commands that look like secrets (`--password`/`--token` flags, `AKIA…`
+  keys, `user:pass@host` URLs, bearer headers, GitHub/GitLab/Slack/OpenAI
+  tokens, JWTs, private-key files, secret-named env assignments) are
+  excluded entirely.
+- One-shot commands (long absolute paths, UUIDs, hashes, pipes) are skipped.
+
+### History files read
+
+| Shell | File |
+|---|---|
+| bash | `~/.bash_history` (or `$HISTFILE`) |
+| zsh | `~/.zsh_history` (plain and extended formats) |
+| fish | `~/.local/share/fish/fish_history` |
+| PowerShell | PSReadLine `ConsoleHost_history.txt` |
+| Nushell | `~/.local/share/nushell/history.sqlite3` (read-only) |
+
+Use `--history-file <path>` to parse exactly one file. Plugins can add
+parsers — see [Plugin System](/reference/plugins/#history-readers).
+
+## Undoing mistakes
+
+Every mutating command (add, rm, import, edit, sync pull…) writes a
+timestamped backup first and keeps the last 20. `qwik undo` restores them.
+
+```bash
+qwik undo --list            # available backups
+qwik undo --diff            # what restoring the newest would change
+qwik undo                   # diff + confirm, then restore
+qwik undo --to 20260815     # a specific (partial) stamp
+```
+
+The confirmation always shows a diff:
+
+```text
+Restoring 20260815-141803 would:
+  + add     deploy, k9s
+  - remove  gco
+  ~ change  gs   'git status' → 'git status --short'
+```
+
+Restoring takes its own backup first, so `undo` is itself undoable — run
+it twice to return to where you started. Corrupt backups are skipped in
+`--list` with a note.
+
+## Self-repair with `doctor --fix`
+
+```bash
+qwik doctor               # report only
+qwik doctor --fix         # apply safe repairs, with confirmations
+qwik doctor --fix --yes   # no prompts (dotfile bootstrap friendly)
+qwik doctor --json        # machine-readable, always exits 0
+```
+
+| Finding | Fix |
+|---|---|
+| Store unreadable / future version | Restore newest valid backup |
+| Shell hook missing | Install `qwik init <shell> --install` |
+| Stale lock file | Remove if no live holder |
+| Orphaned `aliases.toml.tmp-*` files | Remove (older than 5 minutes) |
+| Overlay repo in a merge/conflict state | Reset to `origin/<branch>` |
+
+Anything that could shadow a binary or change an alias command is **never**
+fixed automatically — those stay warnings.
+
+**Exit codes:** `0` clean or all fixed, `1` unfixed errors remain, `2` a fix
+attempt failed.
+
+`--json` emits `{"status", "checks": [{"id", "status", "message",
+"fixable", "fix", "detail"}], "summary": {"ok", "warn", "error"}}` with no
+Rich markup.

@@ -29,6 +29,17 @@ to break out of the generated definition).
 Installed plugins appear to users as additional targets for
 `qwik init <shell>`.
 
+## History readers
+
+Teach `qwik suggest` to read another shell's history by registering a
+parser under the `qwik.history_readers` entry-point group (same pattern as
+`qwik.shell_renderers`):
+
+```toml
+[project.entry-points."qwik.history_readers"]
+myshell = "my_package.history:MyShellHistoryReader"
+```
+
 ## CLI commands
 
 Register a Typer-compatible callable under the `qwik.commands` entry-point
