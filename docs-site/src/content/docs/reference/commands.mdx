@@ -232,7 +232,9 @@ qwik doctor --json                     # machine-readable findings; always exits
 `--fix` applies only the safe repairs: restoring the store from a
 backup, removing a stale lock file or crashed temp files, resetting the
 overlay repo, and installing the hook. Anything that could shadow a
-binary or change an alias command is never auto-fixed.
+binary or change an alias command is never auto-fixed. Exit codes: `0` clean
+or all fixed, `1` unfixed errors remain, `2` a fix attempt failed. See
+[Insights & Recovery](/guides/insights-and-recovery/).
 
 ## Performance notes
 
