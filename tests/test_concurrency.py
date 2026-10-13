@@ -41,16 +41,30 @@ def test_concurrent_add_does_not_lose_aliases(tmp_path) -> None:
     assert seed.returncode == 0, seed.stderr
 
     n = 20
+    stderr_files = [tmp_path / f"race{i}.stderr" for i in range(n)]
+    stderr_handles = [stderr_file.open("wb") for stderr_file in stderr_files]
     procs = [
         subprocess.Popen(
             [sys.executable, "-m", "qwik", "add", f"race{i}", "echo", str(i)],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=stderr_handles[i],
             env=env,
         )
         for i in range(n)
     ]
     returncodes = [p.wait() for p in procs]
+    for stderr_handle in stderr_handles:
+        stderr_handle.close()
+    # Surface the failing children's stderr: stderr used to go to DEVNULL,
+    # which made a failure here undiagnosable (the rc list is truncated in
+    # the assertion repr and the traceback was discarded).
+    if not all(rc == 0 for rc in returncodes):
+        details = []
+        for i, rc in enumerate(returncodes):
+            if rc != 0:
+                tail = stderr_files[i].read_text(encoding="utf-8", errors="replace")[-2000:]
+                details.append(f"race{i} exited {rc}:\n{tail}")
+        pytest.fail("\n---\n".join(details))
     assert all(rc == 0 for rc in returncodes), returncodes
 
     import tomlkit

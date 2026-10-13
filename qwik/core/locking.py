@@ -16,7 +16,21 @@ class FileLock:
     Uses ``fcntl.flock`` on POSIX and ``msvcrt.locking`` on Windows.
     """
 
-    def __init__(self, path: Path, *, timeout: float = 5.0) -> None:
+    def __init__(self, path: Path, *, timeout: float = 30.0) -> None:
+        """Hold the file lock for a bounded wait.
+
+        The critical sections guarded here are small (load + in-place
+        mutation + atomic save), so the practical wait is milliseconds —
+        but the default deadline must absorb worst-case real time, not
+        best-case: on a loaded machine a just-written TOML file can be
+        held externally for an antivirus real-time scan (see
+        :func:`qwik.core.store.read_backup_text`), and twenty concurrent
+        commands queue behind each other sequentially. A 5s default
+        failed exactly that way on a loaded Windows runner (every waiter
+        after ~5s of queue time died with a traceback); 30s keeps the
+        same crash semantics with margin to spare. Callers that need a
+        probe (not a wait) pass ``timeout=0`` explicitly.
+        """
         self._path = path
         self._timeout = timeout
         self._fh: IO[bytes] | None = None
