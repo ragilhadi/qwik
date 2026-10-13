@@ -135,7 +135,12 @@ def merge_into(incoming: AliasStore, data: AliasStore) -> tuple[int, int, int]:
     unchanged = 0
     for name, alias in incoming.aliases.items():
         if name in existing_names:
-            if data.aliases[name].command != alias.command:
+            current = data.aliases[name]
+            is_changed = (
+                current.command != alias.command
+                or current.command_variants != alias.command_variants
+            )
+            if is_changed:
                 updated += 1
             else:
                 unchanged += 1

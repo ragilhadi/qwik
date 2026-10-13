@@ -241,6 +241,38 @@ gco
 # → git checkout main      (no error — falls back to 'main')
 ```
 
+## Platform-Conditional Variants
+
+One synced store, many machines. An alias can carry per-platform command
+variants so the same store works on a Linux workstation, a macOS laptop, and
+a Windows desktop:
+
+```toml
+[aliases.open]
+command = "xdg-open {1}"
+command_macos = "open {1}"
+command_windows = "start {1}"
+```
+
+Resolution order (first match wins): `command_<platform>_<shell>` (e.g.
+`command_windows_pwsh`), then `command_<platform>`, then the base
+`command`. `qwik init` and `qwik run` resolve identically, so the hook and
+the subprocess always run the same command for your platform and shell.
+
+```bash
+qwik add open "xdg-open {1}"                # base command
+qwik add open "open {1}"  --platform macos  # adds a variant
+qwik add open "start {1}" --platform windows
+
+qwik show open                  # all variants, active one marked
+qwik list --platform windows    # preview another platform's resolution
+```
+
+Every variant is placeholder-validated at add time, and all variants must
+accept the same arguments as the base — `xdg-open {1}` with `open {1} {2}`
+is rejected. Per-shell variants (`command_windows_pwsh`, …) can be added
+with `qwik edit`.
+
 ## Tips
 
 1. **Use `{1:-default}` for optional args** — provides a fallback and skips

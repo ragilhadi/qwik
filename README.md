@@ -19,6 +19,7 @@ Create, manage, and run shell aliases from a single interface. Works cross-platf
 - [Core Concepts](#core-concepts)
 - [Commands](#commands)
 - [Alias Templates & Arguments](#alias-templates--arguments)
+- [Platform-Conditional Aliases](#platform-conditional-aliases)
 - [Shell Integration](#shell-integration)
 - [Conflict Detection](#conflict-detection)
 - [Storage & Backups](#storage--backups)
@@ -79,6 +80,7 @@ qwik add gs "git status"
 qwik add gs "git status" --tag git --description "Repo status"
 qwik add gs "git status" --group git
 qwik add gs "git status" --force       # overwrite existing
+qwik add open "open {1}" --platform macos   # platform-conditional variant
 qwik add                               # interactive mode
 ```
 
@@ -105,6 +107,8 @@ qwik edit gs
 #   group = ""
 #   description = ""
 #   enabled = true
+#   (platform variants appear as command_<platform> lines when set;
+#    deleting a line removes that variant)
 # Save and quit to apply changes.
 ```
 
@@ -123,6 +127,7 @@ qwik -l                                # shortcut
 qwik list --tag git                    # filter by tag
 qwik list --group git                   # filter by group
 qwik list --search stat                # filter by query
+qwik list --platform windows           # preview another platform's resolution
 ```
 
 Output:
@@ -546,6 +551,62 @@ co                      # → git checkout main (default)
 
 ---
 
+## Platform-Conditional Aliases
+
+One synced store, many machines. An alias can carry per-platform command
+variants, so `qwik sync` travels between a Linux workstation, a macOS
+laptop, and a Windows desktop without diverging:
+
+```toml
+[aliases.open]
+command = "xdg-open {1}"
+command_macos = "open {1}"
+command_windows = "start {1}"
+```
+
+### Resolution order
+
+First match wins, per alias:
+
+1. `command_<platform>_<shell>` — most specific (e.g. `command_windows_pwsh`)
+2. `command_<platform>` — platform fallback (`command_linux`, `command_macos`, `command_windows`)
+3. `command` — the base, always present
+
+`qwik init` (shell hook) and `qwik run` / the picker resolve the same way,
+so both execution paths always pick the identical command for your
+platform and shell.
+
+### CLI
+
+```bash
+qwik add open "xdg-open {1}"                # base command
+qwik add open "open {1}"  --platform macos  # adds a variant
+qwik add open "start {1}" --platform windows
+
+qwik show open            # shows all variants, marks the active one
+qwik list --platform windows   # preview another platform's resolution
+```
+
+Rules:
+
+- On an existing alias, `--platform` upserts **only the variant** — the base
+  and all other fields stay untouched; overwriting an existing variant
+  requires `--force`
+- On a new alias, the command becomes both the base and the variant
+- Every variant is placeholder-validated at add time, and all variants must
+  accept the **same arguments** as the base (e.g. base `xdg-open {1}` and
+  variant `open {1} {2}` is rejected)
+- `qwik edit` shows variants as flat `command_<platform>` keys — delete a
+  line to remove that variant
+- Variants survive `export` / `import` / `sync` round-trips
+
+Per-shell variants (`command_windows_pwsh`, `command_linux_bash`, …) are
+also supported in the store — add them with `qwik edit`. Older qwik
+versions reading a v2 store refuse it cleanly via the store version gate
+(see [Store versioning](#store-versioning)).
+
+---
+
 ## Shell Integration
 
 Make aliases available as **real shell commands**.
@@ -678,6 +739,9 @@ run_count = 42
 ### Store versioning
 
 qwik writes a `version = N` field to the top of `aliases.toml` describing the schema of the file. On load, if the file's version is older than the current schema, qwik auto-migrates it forward (one migrator per version step) and backs up the pre-migration file before writing the new shape. Migration is forward-only — downgrade is not supported; restore from a backup (see `qwik undo` or `qwik doctor --fix`) instead.
+
+- **v1** — the original schema: one `command` per alias.
+- **v2** — adds optional platform-conditional variants: flat `command_<platform>` / `command_<platform>_<shell>` keys next to `command` (see [Platform-Conditional Aliases](#platform-conditional-aliases)). Fresh stores are written as v2; existing stores migrate on the next write. An alias without variants behaves exactly as it did under v1.
 
 If the file's version is newer than the version qwik understands, qwik refuses to load it and points at `qwik doctor` — typically you need to upgrade qwik to a newer release.
 

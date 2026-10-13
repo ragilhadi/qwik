@@ -51,8 +51,9 @@ def diff_stores(a: AliasStore, b: AliasStore) -> StoreDiff:
 
     Returns:
         A :class:`StoreDiff` with sorted added / removed / changed lists.
-        Two aliases with the same name but different commands count as
-        changed; identical commands are not reported.
+        Two aliases with the same name but different commands (including
+        platform-conditional ``command_variants``) count as changed;
+        fully identical aliases are not reported.
     """
     a_names = set(a.aliases)
     b_names = set(b.aliases)
@@ -69,6 +70,7 @@ def diff_stores(a: AliasStore, b: AliasStore) -> StoreDiff:
         DiffEntry(name=n, old_command=a.aliases[n].command, new_command=b.aliases[n].command)
         for n in sorted(a_names & b_names)
         if a.aliases[n].command != b.aliases[n].command
+        or a.aliases[n].command_variants != b.aliases[n].command_variants
     )
     return StoreDiff(added=added, removed=removed, changed=changed)
 

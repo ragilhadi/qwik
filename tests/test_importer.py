@@ -65,7 +65,7 @@ class TestImportSafety:
         import tomlkit
 
         live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
-        assert live["version"] == 1
+        assert live["version"] == 2
         assert "keep1" in live["aliases"].unwrap()  # type: ignore[attr-defined]
 
         result = runner.invoke(app, ["list"])
@@ -103,7 +103,7 @@ class TestImportSafety:
         import tomlkit
 
         live = tomlkit.parse((tmp_path / "aliases.toml").read_text(encoding="utf-8"))
-        assert live["version"] == 1
+        assert live["version"] == 2
         assert "old" in live["aliases"].unwrap()  # type: ignore[attr-defined]
 
     def test_import_malformed_toml_friendly_error(self, tmp_path, monkeypatch):

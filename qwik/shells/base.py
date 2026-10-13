@@ -7,6 +7,8 @@ import importlib.metadata
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, cast
 
+from qwik.core.platform import current_platform
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -97,12 +99,32 @@ class ShellRenderer(ABC):
         """Return the hook line to append to the RC file, or ``None``."""
         return None
 
-    def render_all(self, aliases: dict[str, Alias]) -> str:
+    def render_all(
+        self,
+        aliases: dict[str, Alias],
+        *,
+        platform: str | None = None,
+        shell: str | None = None,
+    ) -> str:
         """Render a complete hook snippet for the given alias map.
 
         Only **enabled** aliases are included.  Output is sorted by name
         for stable generation.
+
+        Platform-conditional aliases resolve *before* rendering: each
+        alias is swapped for a copy whose ``command`` is the variant
+        chosen by :meth:`Alias.resolve_command`, so ``render_alias`` —
+        and therefore every renderer, including third-party plugin
+        renderers — sees the platform-appropriate command without any
+        signature change.
+
+        Args:
+            aliases: The alias map to render.
+            platform: Platform to resolve for; defaults to the current host.
+            shell: Shell to resolve for; defaults to this renderer's shell.
         """
+        resolved_platform = platform or current_platform()
+        resolved_shell = shell or self.shell_name
         lines: list[str] = []
         header = self.render_header()
         if header:
@@ -110,6 +132,9 @@ class ShellRenderer(ABC):
         for name in sorted(aliases):
             alias = aliases[name]
             if alias.enabled:
+                resolved = alias.resolve_command(resolved_platform, resolved_shell)
+                if resolved != alias.command:
+                    alias = alias.model_copy(update={"command": resolved})
                 lines.append(self.render_alias(name, alias))
         footer = self.render_footer()
         if footer:

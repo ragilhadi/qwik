@@ -13,6 +13,7 @@ import sys
 
 import typer
 
+from qwik.core.platform import current_platform
 from qwik.core.shell_detect import detect_shell
 from qwik.core.shell_exec import build_invocation
 from qwik.core.store import get_store
@@ -48,7 +49,11 @@ def run_command(
 
     active_shell = detect_shell()
     try:
-        expanded = expand(alias.command, args or [], shell=active_shell)
+        # Resolve platform-conditional variants exactly like `qwik init`
+        # does when rendering the hook, so both execution paths pick the
+        # same command for the current platform + shell.
+        resolved = alias.resolve_command(current_platform(), active_shell)
+        expanded = expand(resolved, args or [], shell=active_shell)
     except ValueError as exc:
         print_error(str(exc), console=console)
         raise typer.Exit(1) from exc

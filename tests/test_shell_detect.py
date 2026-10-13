@@ -177,4 +177,4 @@ class TestSupportedShellsCoverage:
         from qwik.shells.base import supported_shells
 
         for shell in supported_shells():
-            assert shell in sd._KNOWN_SHELLS
+            assert shell in sd.KNOWN_SHELLS

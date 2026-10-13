@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 __all__ = [
+    "KNOWN_SHELLS",
     "detect_shell",
     "shell_name_from_env",
     "shell_name_from_override",
@@ -25,8 +26,9 @@ __all__ = [
 ]
 
 # Every shell qwik has a renderer for (qwik/shells/*.py), and therefore the
-# only values `QWIK_SHELL` or a detector may legally produce.
-_KNOWN_SHELLS = frozenset({"bash", "zsh", "fish", "pwsh", "cmd", "nu", "xonsh"})
+# only values `QWIK_SHELL` or a detector may legally produce — and the only
+# shell keys allowed in `command_<platform>_<shell>` variant names.
+KNOWN_SHELLS = frozenset({"bash", "zsh", "fish", "pwsh", "cmd", "nu", "xonsh"})
 
 _ENV_OVERRIDE_VAR = "QWIK_SHELL"
 
@@ -42,7 +44,7 @@ def shell_name_from_override() -> str | None:
         A lowercase shell name, or ``None`` if unset or unrecognised.
     """
     value = os.environ.get(_ENV_OVERRIDE_VAR, "").strip().lower()
-    return value if value in _KNOWN_SHELLS else None
+    return value if value in KNOWN_SHELLS else None
 
 
 def shell_name_from_version_env() -> str | None:

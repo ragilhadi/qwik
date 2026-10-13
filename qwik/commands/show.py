@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import typer
 
+from qwik.core.platform import current_platform
+from qwik.core.shell_detect import detect_shell
 from qwik.core.store import get_store
 from qwik.ui.prompts import print_error
 from qwik.ui.tables import render_alias_detail
@@ -25,5 +27,5 @@ def show_command(
         print_error(f'Alias "{name}" does not exist.', console=console)
         raise typer.Exit(1)
 
-    table = render_alias_detail(name, alias)
+    table = render_alias_detail(name, alias, platform=current_platform(), shell=detect_shell())
     console.print(table)

@@ -14,8 +14,9 @@ import typer
 from pydantic import ValidationError
 from tomlkit.exceptions import ParseError as TOMLDecodeError
 
-from qwik.core.models import Alias
+from qwik.core.models import Alias, validate_variant_key
 from qwik.core.store import get_store
+from qwik.core.substitute import placeholders_compatible, validate_placeholders_static
 from qwik.ui.prompts import print_error, print_success
 from qwik.ui.theme import get_console
 
@@ -69,6 +70,15 @@ def edit_alias(name: str) -> None:
     doc = tomlkit.document()
     doc.add(tomlkit.comment(f'Edit the fields below and save/quit to apply changes to "{name}"'))
     doc.add("command", alias.command)
+    if alias.command_variants:
+        doc.add(
+            tomlkit.comment(
+                "Platform variants (delete a line to remove that variant): "
+                "command_<platform> or command_<platform>_<shell>"
+            )
+        )
+    for variant_key in sorted(alias.command_variants):
+        doc.add(variant_key, alias.command_variants[variant_key])
     doc.add("tag", list(alias.tag))
     doc.add("group", alias.group or "")
     doc.add("description", alias.description)
@@ -104,6 +114,58 @@ def edit_alias(name: str) -> None:
             if fresh_alias is None:
                 print_error(f'Alias "{name}" no longer exists.', console=console)
                 raise typer.Exit(1)
+
+            # Platform variants: flat command_* keys in the snippet are the
+            # editable surface.  A key present in the snippet sets the
+            # variant; a variant missing from the snippet is removed, and
+            # a snippet that has no variants drops all of them.  A nested
+            # `command_variants` table is rejected so there is exactly one
+            # way to spell variants here.
+            if "command_variants" in parsed:
+                print_error(
+                    "Edit variants as flat command_<platform> keys, "
+                    "not a nested [command_variants] table.",
+                    console=console,
+                )
+                raise typer.Exit(1)
+            parsed_variants: dict[str, str] = {}
+            for key in sorted(parsed):
+                if key.startswith("command_"):
+                    try:
+                        validate_variant_key(key)
+                    except ValueError as exc:
+                        print_error(str(exc), console=console)
+                        raise typer.Exit(1) from exc
+                    parsed_variants[key] = str(parsed[key]).strip()
+            # Recompute against the freshly loaded alias so a concurrent
+            # change made while the editor was open isn't overwritten by
+            # a stale variant list.
+            if parsed_variants or fresh_alias.command_variants:
+                # Arity is checked against the (possibly edited) base
+                # command from this same snippet.
+                new_base = str(update["command"]) if "command" in update else fresh_alias.command
+                for key, value in parsed_variants.items():
+                    if not str(value).strip():
+                        print_error(
+                            f'"{key}" is empty; delete the line to remove the variant.',
+                            console=console,
+                        )
+                        raise typer.Exit(1)
+                    try:
+                        validate_placeholders_static(value)
+                    except ValueError as exc:
+                        print_error(f"Invalid {key}: {exc}", console=console)
+                        raise typer.Exit(1) from exc
+                    if not placeholders_compatible(new_base, value):
+                        print_error(
+                            f"Placeholder arity mismatch between {key} {value!r} "
+                            f"and base command {new_base!r}: "
+                            "all variants must accept the same arguments.",
+                            console=console,
+                        )
+                        raise typer.Exit(1)
+                update["command_variants"] = parsed_variants
+
             merged = fresh_alias.model_dump()
             merged.update(update)
             try:

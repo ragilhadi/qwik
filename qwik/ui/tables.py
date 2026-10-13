@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from qwik.core.models import Alias
+from qwik.core.platform import variant_key
 from qwik.core.stats import (
     TIME_SAVED_LABEL,
     AliasUsage,
@@ -121,7 +122,10 @@ def _passes_filters(
     if group_filter is not None and alias.group != group_filter:
         return False
     if search_query is not None:
-        haystack = f"{name} {alias.command} {' '.join(alias.tag)}"
+        haystack = (
+            f"{name} {alias.command} {' '.join(alias.tag)} "
+            f"{' '.join(alias.command_variants.values())}"
+        )
         if search_query.lower() not in haystack.lower():
             return False
     return True
@@ -133,6 +137,7 @@ def render_list_table(
     tag_filter: str | None = None,
     group_filter: str | None = None,
     search_query: str | None = None,
+    platform: str | None = None,
     console: Console | None = None,
 ) -> Table:
     """Build a Rich :class:`~rich.table.Table` for ``qwik list``.
@@ -143,6 +148,9 @@ def render_list_table(
         group_filter: If provided, only show aliases in this group.
         search_query: If provided, only show aliases whose name, command,
             or tag contains this substring.
+        platform: If provided, the Command column shows each alias
+            resolved for this platform (via ``Alias.resolve_command``),
+            letting the user preview another machine's view of the store.
         console: Optional Rich console (unused, reserved for future theming).
 
     Returns:
@@ -180,9 +188,10 @@ def render_list_table(
         style = "dim" if not alias.enabled else ""
         is_overlay = name not in store.aliases
         display_name = f"{name} [dim](overlay)[/dim]" if is_overlay else name
+        command = alias.resolve_command(platform, None) if platform else alias.command
         table.add_row(
             display_name,
-            alias.command,
+            command,
             alias.group or "—",
             ", ".join(alias.tag),
             str(alias.run_count),
@@ -193,12 +202,22 @@ def render_list_table(
     return table
 
 
-def render_alias_detail(name: str, alias: Alias) -> Table:
+def render_alias_detail(
+    name: str,
+    alias: Alias,
+    *,
+    platform: str | None = None,
+    shell: str | None = None,
+) -> Table:
     """Build a Rich table showing a single alias in detail.
 
     Args:
         name: Alias identifier.
         alias: The alias definition.
+        platform: Platform used to resolve variants and mark the active
+            one; ``None`` lists variants without a marker.
+        shell: Shell used together with *platform* to prefer the more
+            specific ``command_<platform>_<shell>`` variant.
 
     Returns:
         A two-column detail table.
@@ -207,8 +226,23 @@ def render_alias_detail(name: str, alias: Alias) -> Table:
     table.add_column("Field", style="bold")
     table.add_column("Value")
 
+    # Mirror Alias.resolve_command's precedence to tag the variant this
+    # host would actually run.
+    active_key: str | None = None
+    if platform:
+        shell_key = variant_key(platform, shell)
+        if shell and shell_key in alias.command_variants:
+            active_key = shell_key
+        elif variant_key(platform) in alias.command_variants:
+            active_key = variant_key(platform)
+
     table.add_row("Name", name)
     table.add_row("Command", alias.command)
+    for key, value in alias.command_variants.items():
+        marker = "  ← active" if key == active_key else ""
+        table.add_row("Variant", f"{key} = {value}{marker}")
+    if platform is not None:
+        table.add_row(f"Resolved ({platform})", alias.resolve_command(platform, shell))
     table.add_row("Group", alias.group or "—")
     table.add_row("Tags", ", ".join(alias.tag) or "—")
     table.add_row("Description", alias.description or "—")
