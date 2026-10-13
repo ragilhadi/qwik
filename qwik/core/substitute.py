@@ -10,6 +10,8 @@ __all__ = [
     "expand",
     "find_unrecognized_braces",
     "has_placeholders",
+    "placeholder_arity",
+    "placeholders_compatible",
     "quote_for_shell",
     "validate_placeholders",
     "validate_placeholders_static",
@@ -173,6 +175,63 @@ def validate_placeholders_static(command: str) -> None:
             f"Use {{N}}, {{@}}, {{*}}, {{N:-default}}, {{name}}, or "
             f"{{name:-default}}."
         )
+
+
+def placeholder_arity(command: str) -> int | None:
+    """Return the maximum positional index *command* can consume.
+
+    Used to reject platform-conditional variants whose argument shape
+    disagrees with the base command (``xdg-open {1}`` vs ``open {1} {2}``).
+
+    Args:
+        command: The alias command string to inspect.
+
+    Returns:
+        The 1-based maximum referenced positional index — counting
+        ``{N}``, ``{N:-default}``, and named placeholders (mapped to their
+        positional slots) — or ``0`` when *command* has no placeholders
+        (append mode consumes every argument), or ``None`` when the
+        command contains ``{@}``/``{*}`` and is therefore variadic,
+        which is compatible with any arity.
+    """
+    if _PLACEHOLDER_RE.search(command) is None:
+        return 0
+    arity = 0
+    name_map = _named_placeholder_index_map(command)
+    for match in _PLACEHOLDER_RE.finditer(command):
+        if match.group(2) is not None or match.group(3) is not None:
+            return None
+        if match.group(1) is not None:
+            arity = max(arity, int(match.group(1)))
+        elif match.group(4) is not None:
+            arity = max(arity, int(match.group(4)))
+        elif match.group(6) is not None:
+            arity = max(arity, name_map[match.group(6)])
+        elif match.group(7) is not None:
+            arity = max(arity, name_map[match.group(7)])
+    return arity
+
+
+def placeholders_compatible(base: str, variant: str) -> bool:
+    """Return ``True`` when *variant* can safely replace *base* on a platform.
+
+    Both commands must agree on their placeholder arity
+    (:func:`placeholder_arity`), except that variadic commands (``{@}`` /
+    ``{*}``) are compatible with any shape.
+
+    Args:
+        base: The base alias command.
+        variant: The platform/shell variant command.
+
+    Returns:
+        Boolean indicating whether the two commands consume arguments
+        in a compatible way.
+    """
+    base_arity = placeholder_arity(base)
+    variant_arity = placeholder_arity(variant)
+    if base_arity is None or variant_arity is None:
+        return True
+    return base_arity == variant_arity
 
 
 def find_unrecognized_braces(command: str) -> list[str]:

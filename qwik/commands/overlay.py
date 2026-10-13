@@ -262,6 +262,7 @@ def _do_update(config: Config, *, yes: bool, console: Console) -> None:
         n
         for n in set(incoming.aliases) & set(current.aliases)
         if incoming.aliases[n].command != current.aliases[n].command
+        or incoming.aliases[n].command_variants != current.aliases[n].command_variants
     )
 
     if not added and not removed and not changed:

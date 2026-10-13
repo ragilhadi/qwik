@@ -9,6 +9,7 @@ import typer
 
 from qwik.commands.edit import edit_alias
 from qwik.commands.remove import remove_alias
+from qwik.core.platform import current_platform
 from qwik.core.shell_detect import detect_shell
 from qwik.core.shell_exec import build_invocation
 from qwik.core.store import get_store
@@ -61,7 +62,10 @@ def pick_command() -> None:
 
     active_shell = detect_shell()
     try:
-        expanded = expand(alias.command, [], shell=active_shell)
+        # Same variant resolution as `qwik run` and `qwik init` so every
+        # execution path picks the identical command.
+        resolved = alias.resolve_command(current_platform(), active_shell)
+        expanded = expand(resolved, [], shell=active_shell)
     except ValueError as exc:
         print_error(str(exc), console=console)
         raise typer.Exit(1) from exc

@@ -17,7 +17,7 @@ __all__ = [
     "migrator",
 ]
 
-LATEST_VERSION: int = 1
+LATEST_VERSION: int = 2
 
 _Migration = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -67,4 +67,18 @@ def migrate(data: dict[str, Any]) -> dict[str, Any]:
 def _v0_to_v1(data: dict[str, Any]) -> dict[str, Any]:
     """v0 → v1 identity migration: ensure the ``version`` key is set."""
     data["version"] = 1
+    return data
+
+
+@migrator(1)
+def _v1_to_v2(data: dict[str, Any]) -> dict[str, Any]:
+    """v1 → v2 identity migration: introduce platform-conditional variants.
+
+    v2 adds optional ``command_<platform>[_<shell>]`` keys alongside each
+    ``command``.  The v1 shape is unchanged and variant keys are optional,
+    so no data transformation is needed — the bump only records that this
+    store may carry variants, letting an older qwik refuse the file cleanly
+    via the version gate instead of tripping over unknown keys.
+    """
+    data["version"] = 2
     return data

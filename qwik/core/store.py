@@ -470,6 +470,10 @@ class Store:
             alias = store.aliases[name]
             alias_table = tomlkit.table()
             alias_table.add("command", alias.command)
+            # Platform/shell variants stay as flat keys next to `command`
+            # (rather than a nested table) so hand-editing remains easy.
+            for variant_key in sorted(alias.command_variants):
+                alias_table.add(variant_key, alias.command_variants[variant_key])
             if alias.tag:
                 alias_table.add("tag", alias.tag)
             if alias.group:
