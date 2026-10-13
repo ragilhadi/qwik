@@ -459,7 +459,10 @@ class TestRunResolvesVariant:
     def test_run_uses_platform_variant(self, monkeypatch: pytest.MonkeyPatch) -> None:
         runner.invoke(app, ["add", "open", "echo linuxbase"])
         runner.invoke(app, ["add", "open", "echo macvariant", "--platform", "macos"])
-        monkeypatch.setattr(sys, "platform", "darwin")
+        # Patch the resolution seam, not sys.platform itself: mocking
+        # sys.platform to a POSIX value on Windows makes FileLock branch to
+        # fcntl and crash (No module named 'fcntl') in bump_usage.
+        monkeypatch.setattr("qwik.commands.run.current_platform", lambda: "macos")
         monkeypatch.setenv("QWIK_SHELL", "bash")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
@@ -473,7 +476,7 @@ class TestRunResolvesVariant:
     def test_run_falls_back_to_base(self, monkeypatch: pytest.MonkeyPatch) -> None:
         runner.invoke(app, ["add", "open", "echo linuxbase"])
         runner.invoke(app, ["add", "open", "echo winvariant", "--platform", "windows"])
-        monkeypatch.setattr(sys, "platform", "darwin")
+        monkeypatch.setattr("qwik.commands.run.current_platform", lambda: "macos")
         monkeypatch.setenv("QWIK_SHELL", "bash")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
@@ -488,7 +491,8 @@ class TestPickResolvesVariant:
     def test_pick_uses_platform_variant(self, monkeypatch: pytest.MonkeyPatch) -> None:
         runner.invoke(app, ["add", "open", "echo linuxbase"])
         runner.invoke(app, ["add", "open", "echo macvariant", "--platform", "macos"])
-        monkeypatch.setattr(sys, "platform", "darwin")
+        # Same seam-not-sys.platform rationale as the run tests above.
+        monkeypatch.setattr("qwik.commands.pick.current_platform", lambda: "macos")
         monkeypatch.setenv("QWIK_SHELL", "bash")
         with (
             patch("qwik.commands.pick.run_picker") as mock_picker,
