@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -23,6 +24,14 @@ from tests.test_sync import FakeGit, _make_dirty, _setup_env
 
 runner = CliRunner()
 
+# Alias names used below.  CI runners ship a real `open` binary on every
+# platform (macOS /usr/bin/open, Ubuntu /usr/bin/open, R's open.EXE on
+# Windows), so the conflict gate would prompt "Continue? [y/n]" and abort
+# under CliRunner's empty stdin.  The autouse fixture neutralises only the
+# PATH lookup for these names; `git` must remain findable for the sync test.
+_TEST_ALIAS_NAMES = frozenset({"open", "gs", "gco", "hi"})
+_REAL_WHICH = shutil.which
+
 
 @pytest.fixture(autouse=True)
 def _store_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -30,6 +39,10 @@ def _store_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
     _reset_config()
+    monkeypatch.setattr(
+        "qwik.core.conflicts.shutil.which",
+        lambda name, *a, **kw: None if name in _TEST_ALIAS_NAMES else _REAL_WHICH(name, *a, **kw),
+    )
     yield
     _reset_config()
 
