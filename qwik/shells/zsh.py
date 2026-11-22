@@ -16,6 +16,8 @@ __all__ = ["ZshRenderer"]
 class ZshRenderer(ShellRenderer):
     """Emit ``zsh`` ``alias`` and function definitions."""
 
+    supports_native_templates = True
+
     @property
     def shell_name(self) -> str:
         """Return ``'zsh'``."""
@@ -24,7 +26,11 @@ class ZshRenderer(ShellRenderer):
     def render_alias(self, name: str, alias: Alias) -> str:
         """Return a zsh-compatible alias or function.
 
-        Logic is identical to :class:`~qwik.shells.bash.BashRenderer`.
+        Append-mode logic is identical to
+        :class:`~qwik.shells.bash.BashRenderer`.  Template-mode aliases
+        become a function referencing zsh's own positional parameters
+        where the placeholder grammar translates natively (same mapping as
+        bash), falling back to the ``qwik run`` wrapper otherwise.
 
         Args:
             name: Alias identifier.
@@ -33,9 +39,12 @@ class ZshRenderer(ShellRenderer):
         Returns:
             Zsh source snippet.
         """
-        from qwik.core.substitute import has_placeholders
+        from qwik.core.substitute import has_placeholders, render_native
 
         if has_placeholders(alias.command):
+            native = render_native(alias.command, "zsh")
+            if native is not None:
+                return f"{name}() {{\n    {native}\n}}"
             return f'{name}() {{\n    qwik run "{name}" "$@"\n}}'
         escaped = alias.command.replace("'", "'\"'\"'")
         return f"alias {name}='{escaped}'"

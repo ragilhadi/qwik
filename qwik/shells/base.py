@@ -83,6 +83,31 @@ class ShellRenderer(ABC):
         """
         ...
 
+    #: Native template-mode capability.
+    #:
+    #: Subclasses whose shell can interpolate positional arguments directly
+    #: (bash, zsh, fish, pwsh, xonsh) opt in by overriding this to ``True``
+    #: and calling :meth:`render_template_alias_body` (or the
+    #: :func:`qwik.core.substitute.render_native` engine) from
+    #: ``render_alias``.  The base implementation is ``False``: template-mode
+    #: aliases keep the ``qwik run`` wrapper, which every renderer already
+    #: emits — so third-party plugin renderers don't change behaviour until
+    #: their author chooses to support native templates.
+    supports_native_templates: bool = False
+
+    # Comment emitted in the generated hook whenever a template-mode alias
+    # is rendered through the `qwik run` wrapper by a renderer that does not
+    # support native templates (structural opt-out: cmd, nu, plugins).  Keeps
+    # the emitted hook self-explaining and greppable.
+    _native_skip_comment = (
+        "# {name}: template mode via `qwik run` ({shell} does not render"
+        " argument templates natively)"
+    )
+
+    def render_template_native_comment(self, name: str) -> str:
+        """Return the opt-out comment line for template alias *name*."""
+        return self._native_skip_comment.format(name=name, shell=self.shell_name)
+
     def render_header(self) -> str:
         """Return an optional header emitted before alias definitions."""
         return ""

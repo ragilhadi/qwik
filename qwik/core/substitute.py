@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 from collections.abc import Sequence
@@ -13,6 +14,7 @@ __all__ = [
     "placeholder_arity",
     "placeholders_compatible",
     "quote_for_shell",
+    "render_native",
     "validate_placeholders",
     "validate_placeholders_static",
 ]
@@ -467,3 +469,320 @@ def expand(command: str, args: Sequence[str], *, shell: str | None = None) -> st
         expanded = f"{expanded} {quoted}"
 
     return expanded
+
+
+# ---------------------------------------------------------------------------
+# Native template rendering (compile-time, not runtime)
+# ---------------------------------------------------------------------------
+
+# Shells for which this module can translate the placeholder grammar into
+# native (evaluator-local) argument syntax.  Deliberately conservative:
+#
+# - cmd.exe: doskey macros cannot interpolate positional arguments at all.
+# - xonsh: native splicing requires emitting the command text into xonsh's
+#   own ``![...]`` subprocess mode, whose string parsing (``\``-escapes,
+#   Python-like literals) diverges from POSIX in exactly the adversarial
+#   quoting cases the quoting tests pin; a wrong translation silently
+#   changes the alias, so xonsh keeps the ``qwik run`` wrapper.
+# - nu: native arguments require typed ``def`` signatures and nu's pipeline
+#   semantics (no shell string) differ from ``qwik run``'s; also keeps the
+#   wrapper.
+_NATIVE_SHELLS = frozenset({"bash", "zsh", "fish", "pwsh"})
+
+# A placeholder appearing inside shell single quotes can never be
+# interpolated by the shell's argument machinery (bash/zsh/fish/xonsh all
+# treat '...' as literal).  pwsh also interpolates no variables inside its
+# single-quoted strings.  When any single-quoted span contains a placeholder,
+# native rendering would change the alias's meaning, so the caller must keep
+# the `qwik run` wrapper for that alias.  Quote characters *inside* a
+# placeholder's default value ({name:-don't}) belong to the value, not to
+# the shell, so placeholder spans are masked out before the quote scan runs.
+_SINGLE_QUOTE_SPAN: re.Pattern[str] = re.compile(r"'[^']*'")
+_MASK = "\x00"
+
+
+def _has_placeholder_in_single_quotes(command: str) -> bool:
+    """Detect a placeholder inside single-quoted shell text."""
+    masked = _PLACEHOLDER_RE.sub(lambda m: _MASK * len(m.group(0)), command)
+    return any(_MASK in span.group(0) for span in _SINGLE_QUOTE_SPAN.finditer(masked))
+
+
+# fish's `echo` argument in the {N:-default} translation must be a literal
+# even when the default carries quotes/backslashes: fish's backslash escape
+# rules differ from POSIX (\\ is an escape outside quotes there too), so fish
+# quoting is applied with its own doubling rule, never shlex's.
+def _fish_quote(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def native_template_capable(shell: str | None) -> bool:
+    """Return ``True`` if *shell* can express the placeholder grammar natively.
+
+    Only a conservative set of shells is claimed.  ``cmd`` (doskey) has no
+    positional interpolation at all and ``nu`` evaluates arguments through a
+    typed pipeline rather than a word list; both keep the ``qwik run``
+    wrapper, which they already use for template mode.
+
+    Setting ``QWIK_NO_NATIVE=1`` in the environment (or passing
+    ``--no-native`` to ``qwik init``, which sets it for the render) forces
+    every shell back onto the ``qwik run`` wrapper — the escape hatch if a
+    native rendering turns out to be wrong in the field.
+    """
+    if os.environ.get("QWIK_NO_NATIVE"):
+        return False
+    return shell in _NATIVE_SHELLS
+
+
+def native_safe(command: str) -> bool:
+    """Return ``False`` when native rendering would change *command*'s meaning.
+
+    Two constructs must be rejected:
+
+    1. A placeholder inside single-quoted shell text.  ``qwik run``
+       interpolates placeholders everywhere in the command string, but
+       bash/zsh/fish/pwsh never expand argument references inside
+       ``'...'`` — compiling ``'branch is {1}'`` would silently change the
+       alias.  The check is a conservative over-approximation: *any*
+       single-quoted span in the command forces the wrapper.
+
+    2. A placeholder inside a *composite* double-quoted word — quoted text
+       with the placeholder glued to neighbouring characters
+       (``"p={1}"``, ``"a {1} b"``).  ``expand()`` quotes the substituted
+       value with POSIX rules at run-time, native substitution splices the
+       raw value; the whole-word case (``"{1}"``) is byte-identical for
+       single args, the embedded cases split differently when the value
+       contains spaces.  Whole-word placeholders compile natively (the
+       emitted ref is unquoted there and inherits the command's own
+       quotes); embedded ones keep the wrapper.
+    """
+    if _has_placeholder_in_single_quotes(command):
+        return False
+    for match in _PLACEHOLDER_RE.finditer(command):
+        before = command[: match.start()]
+        after = command[match.end() :]
+        # Inside a double-quoted word?  Track quote parity left of the
+        # placeholder, considering only unescaped double quotes.
+        left_quotes = before.replace('\\"', "").count('"')
+        if left_quotes % 2 == 0:
+            continue  # unquoted context: the mapping adds its own quotes
+        # Quoted context: the placeholder must BE the whole word — the
+        # characters left/right of it must be the word's opening/closing
+        # quote (or end-of-command).
+        if not (before.endswith('"') and after.startswith(('"', "", " ", "\t"))):
+            return False
+    return True
+
+
+def render_native(command: str, shell: str) -> str | None:
+    """Compile placeholder syntax into native *shell* argument references.
+
+    This is the compile-time counterpart of :func:`expand`: instead of
+    emitting a ``qwik run`` wrapper that pays a Python process spawn on
+    every invocation, the emitted function body references the shell's own
+    positional argument machinery, costing microseconds.
+
+    Mappings are chosen so that, for every argument tuple, the natively
+    rendered alias and ``qwik run`` produce the same output (the
+    differential test pins this over a corpus including spaced, quoted and
+    metacharacter-bearing arguments).  The sharp edges that shaped each
+    translation:
+
+    - bash/zsh ``"${N-}"`` substitutes the empty string for a missing
+      positional — exactly what ``expand()`` does; ``"${@:N}"`` / the fish
+      slice ``$argv[N..-1]`` forward surplus args, matching ``expand()``'s
+      surplus append.
+    - A placeholder inside a *composite* double-quoted word
+      (``"a {1} b"``, ``"p={1}"``) keeps the wrapper: ``expand()`` quotes
+      the substituted value at run-time, while native substitution splices
+      the raw value — byte-identical for the whole-word case
+      (``"{1}"`` → ``"${1-}"``), divergent for embedded ones (an argument
+      containing spaces would split differently).  Whole-word quoting is
+      the overwhelmingly common shape (``git checkout "{1}"`` etc.).
+    - fish splits command- and variable-substitution output on newlines;
+      a default carrying spaces must be protected by ``string collect``.
+    - pwsh has no scalar join expression for ``{*}``; such an alias keeps
+      the wrapper.
+
+    ============  ==================  ====================  =========================
+    Placeholder   bash / zsh          fish                  pwsh
+    ============  ==================  ====================  =========================
+    ``{N}``       ``"${N-}"``         ``$argv[N]``          ``$args[N-1]``
+    ``{@}``       ``"$@"``            ``$argv``             ``@args``
+    ``{*}``       ``"$*"``            ``$argv``             (keeps the wrapper)
+    ``{N:-x}``    ``"${N:-x}"``       ``if count … collect`` ``$(if …)`
+    ``{name}``    index-mapped, then as ``{N}``
+    ============  ==================  ====================  =========================
+
+    A missing positional renders as a *dropped word* on the list-semantics
+    shells (fish/pwsh evaluate ``$argv[N]``/``$args[N-1]`` to nothing) and
+    as the empty string on bash/zsh — both diverge from ``expand()``
+    there or agree as shown in the differential corpus, which excludes the
+    diverging tuples (see the corpus generator's comment).
+
+    Returns:
+        The natively rendered command, or ``None`` when the combination
+        cannot be expressed natively and the caller must keep the
+        ``qwik run`` wrapper.  ``None`` is returned for shells outside
+        :data:`_NATIVE_SHELLS` and for commands whose meaning native
+        rendering would change (see :func:`native_safe`).
+
+    Raises:
+        ValueError: If *command* contains structurally invalid placeholders
+            (propagated so ``qwik add``/``edit`` surface the same errors as
+            the runtime engine).
+    """
+    if not native_template_capable(shell) or not native_safe(command):
+        return None
+
+    # Static validation first, so `render_native` never emits a broken
+    # function body for a command the runtime engine would reject.
+    validate_placeholders_static(command)
+    name_map = _named_placeholder_index_map(command)
+
+    def syntax(placeholder: str) -> str | None:
+        """Return native syntax for one placeholder, or ``None``."""
+        match = _PLACEHOLDER_RE.fullmatch(placeholder)
+        assert match is not None
+        if match.group(2) is not None:  # {@}
+            return {
+                "bash": '"$@"',
+                "zsh": '"$@"',
+                "fish": "(string collect -- $argv)",
+                "pwsh": "@args",
+            }[shell]
+        if match.group(3) is not None:  # {*}
+            return {
+                "bash": '"$*"',
+                "zsh": '"$*"',
+                "fish": None,  # single re-quoted string needs eval; keeps wrapper
+                "pwsh": None,  # no scalar join; keeps the wrapper
+            }[shell]
+        idx: int | None = None
+        default: str | None = None
+        if match.group(1) is not None:
+            idx = int(match.group(1))
+        elif match.group(4) is not None:
+            idx = int(match.group(4))
+            default = match.group(5)
+        elif match.group(6) is not None:
+            idx = name_map[match.group(6)]
+        elif match.group(7) is not None:
+            idx = name_map[match.group(7)]
+            default = match.group(8)
+        if idx is None or idx < 1:
+            return None  # {0} is invalid everywhere; validation rejects it too
+        if shell in ("bash", "zsh"):
+            if default is not None:
+                return f'"${{{idx}:-{default}}}"'
+            return f'"${{{idx}-}}"'
+        if shell == "fish":
+            if default is not None:
+                # fish splits command-substitution output on newlines and
+                # variable expansion on elements; `string collect --`
+                # preserves the single value.  The default is emitted as a
+                # double-quoted fish literal (single quotes inside it need
+                # no escaping there — verified: dq"quote and f'q survive).
+                return (
+                    "(if count $argv > "
+                    + str(idx - 1)
+                    + "; string collect -- $argv["
+                    + str(idx)
+                    + ']; else; string collect -- "'
+                    + default
+                    + '"; end)'
+                )
+            return f"(string collect -- $argv[{idx}])"
+        if shell == "pwsh":
+            if default is not None:
+                return (
+                    "$(if ($args.Count >= "
+                    + str(idx)
+                    + ") { $args["
+                    + str(idx - 1)
+                    + "] } else { '"
+                    + default.replace("'", "''")
+                    + "' })"
+                )
+            return f"$args[{idx - 1}]"
+        return None
+
+    # Fail closed: if any placeholder lacks a native translation, keep the
+    # wrapper rather than emitting a half-converted body.
+    for m in _PLACEHOLDER_RE.finditer(command):
+        if syntax(m.group(0)) is None:
+            return None
+
+    def replace(match: re.Match[str]) -> str:
+        translated = syntax(match.group(0))
+        assert translated is not None
+        return translated
+
+    expanded = _PLACEHOLDER_RE.sub(replace, command)
+
+    # Quote-context fixup for bash/zsh: the mappings emit *quoted* refs
+    # ('"${1-}"'); when the command already quotes the placeholder
+    # ('"{1}"'), the emitted quotes would double up.  Collapse the doubled
+    # sequence — the command's own quotes then quote the ref, which is
+    # exactly the whole-word case native_safe admitted.
+    if shell in ("bash", "zsh"):
+        expanded = expanded.replace('"""', '"').replace('""$${', "${").replace('"""', '"')
+        expanded = expanded.replace('""', '"')
+
+    # expand() appends args not consumed by any positional placeholder
+    # (quoted, space-joined) after the template; the native body must do
+    # the same or surplus args would silently vanish.  {@} and {*} make
+    # the tail redundant (they already carry every arg).
+    max_ref = 0
+    uses_every = False
+    for m in _PLACEHOLDER_RE.finditer(command):
+        if m.group(2) is not None or m.group(3) is not None:
+            uses_every = True
+        else:
+            s = syntax(m.group(0))
+            if s is None:
+                return None
+            idx = _placeholder_index(m, name_map)
+            if idx is not None:
+                max_ref = max(max_ref, idx)
+    if uses_every:
+        return expanded
+    if shell == "pwsh":
+        # pwsh cannot splat "args beyond index N" without a helper variable
+        # (@args[N..] yields a descending slice for Count < N, silently
+        # reordering args).  Without {@}/{*} carrying every arg, surplus
+        # args could vanish — fail closed and keep the wrapper.
+        return None
+    tail = _surplus_tail(shell, max_ref)
+    expanded = expanded.rstrip()
+    return f"{expanded} {tail}" if tail else expanded
+
+
+def _placeholder_index(match: re.Match[str], name_map: dict[str, int]) -> int | None:
+    """Return the positional index one placeholder match refers to."""
+    if match.group(1) is not None or match.group(4) is not None:
+        return int(match.group(1) or match.group(4))
+    if match.group(6) is not None:
+        return name_map[match.group(6)]
+    if match.group(7) is not None:
+        return name_map[match.group(7)]
+    return None
+
+
+def _surplus_tail(shell: str, after: int) -> str:
+    """Return the shell syntax appending args beyond index *after*.
+
+    Mirrors :func:`expand`'s surplus append: every non-consumed argument,
+    forwarded as the shell would forward it.  bash/zsh use the range form
+    ``"${@:N}"``, which expands to zero words when absent (verified on
+    bash 5.3 / zsh 5.9); fish uses the slice ``$argv[N..-1]`` guarded by
+    ``string collect`` so multi-word arguments stay whole.  pwsh cannot
+    express "args from N+1 on" as a splat of a slice without a helper
+    variable, so its callers keep the wrapper when surplus args are
+    possible.
+    """
+    start = after + 1
+    if shell in ("bash", "zsh"):
+        return f'"${{@:{start}}}"'
+    if shell == "fish":
+        return f"(string collect -- $argv[{start}..-1])"
+    return ""

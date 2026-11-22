@@ -304,6 +304,16 @@ class TestShellRenderersCoverage:
 
         r = BashRenderer()
         out = r.render_alias("gco", Alias(command="git checkout {1}"))
+        # Native compilation: positional ref, no `qwik run` round-trip.
+        assert 'git checkout "${1-}"' in out
+
+    def test_bash_template_fallback_keeps_wrapper(self) -> None:
+        from qwik.core.models import Alias
+        from qwik.shells.bash import BashRenderer
+
+        r = BashRenderer()
+        out = r.render_alias("gco", Alias(command="echo 'quoted {1}'"))
+        # Composite/single-quote constructs keep the qwik run wrapper.
         assert "qwik run" in out
 
     def test_zsh_append_quotes(self) -> None:
@@ -320,6 +330,16 @@ class TestShellRenderersCoverage:
 
         r = FishRenderer()
         out = r.render_alias("gco", Alias(command="git checkout {1}"))
+        # Native compilation: argv ref via string collect, no round-trip.
+        assert "(string collect -- $argv[1])" in out
+
+    def test_fish_template_fallback_keeps_wrapper(self) -> None:
+        from qwik.core.models import Alias
+        from qwik.shells.fish import FishRenderer
+
+        r = FishRenderer()
+        out = r.render_alias("gco", Alias(command="echo 'quoted {1}'"))
+        # Constructs fish cannot express natively keep the wrapper.
         assert "qwik run" in out
 
     def test_fish_append_quotes(self) -> None:

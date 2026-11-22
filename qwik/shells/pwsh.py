@@ -18,6 +18,8 @@ __all__ = ["PwshRenderer"]
 class PwshRenderer(ShellRenderer):
     """Emit PowerShell function definitions."""
 
+    supports_native_templates = True
+
     @property
     def shell_name(self) -> str:
         """Return ``'pwsh'``."""
@@ -28,11 +30,14 @@ class PwshRenderer(ShellRenderer):
 
         All aliases are rendered as functions because PowerShell does not
         support passing arbitrary arguments to native ``alias``.
-        Template mode uses ``qwik run``; append mode wraps the command as
-        a single-quoted string literal compiled into a script block at
-        call time, so the raw command text is never spliced into the
-        function body as source — a ``}`` (or any other PowerShell
-        syntax) inside it can't close the function early.
+        Template mode references PowerShell's own ``$args``/``@args``
+        machinery where the placeholder grammar translates natively,
+        falling back to ``qwik run`` for constructs it cannot express
+        (e.g. ``{*}``'s space-joined single string).  Append mode wraps
+        the command as a single-quoted string literal compiled into a
+        script block at call time, so the raw command text is never
+        spliced into the function body as source — a ``}`` (or any other
+        PowerShell syntax) inside it can't close the function early.
 
         Args:
             name: Alias identifier.
@@ -41,9 +46,12 @@ class PwshRenderer(ShellRenderer):
         Returns:
             PowerShell source snippet.
         """
-        from qwik.core.substitute import has_placeholders
+        from qwik.core.substitute import has_placeholders, render_native
 
         if has_placeholders(alias.command):
+            native = render_native(alias.command, "pwsh")
+            if native is not None:
+                return f"function {name} {{\n    {native}\n}}"
             return f'function {name} {{\n    qwik run "{name}" @args\n}}'
         escaped = alias.command.replace("'", "''")
         return f"function {name} {{\n    & ([ScriptBlock]::Create('{escaped}')) @args\n}}"

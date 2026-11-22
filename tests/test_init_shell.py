@@ -226,3 +226,35 @@ class TestInitShellRcPath:
         else:
             monkeypatch.setenv("HOME", str(tmp_path))
         assert _rc_path("fish") == tmp_path / ".config" / "fish" / "config.fish"
+
+
+class TestInitShellNoNative:
+    def test_no_native_flag_forces_wrapper(self, tmp_path, monkeypatch) -> None:
+        """--no-native renders template aliases through the qwik run
+        wrapper instead of compiling them to native shell syntax."""
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "gco", "git", "checkout", "{1}"])
+        native = runner.invoke(app, ["init", "bash"])
+        assert native.exit_code == 0
+        assert 'git checkout "${1-}" "${@:2}"' in native.output
+        forced = runner.invoke(app, ["init", "bash", "--no-native"])
+        assert forced.exit_code == 0
+        assert 'qwik run "gco" "$@"' in forced.output
+
+    def test_no_native_only_affects_rendering(self, tmp_path, monkeypatch) -> None:
+        """The flag must not leak into qwik's own runtime behaviour
+        (expand()/run stay engine-driven regardless)."""
+        from qwik.config import _reset_config
+
+        monkeypatch.setenv("QWIK_CONFIG_DIR", str(tmp_path))
+        _reset_config()
+        runner.invoke(app, ["add", "gco", "git", "checkout", "{1}"])
+        runner.invoke(app, ["init", "bash", "--no-native"])
+        # A fresh render without the flag compiles natively again — the env
+        # mutation is restored after the flagged invocation.
+        fresh = runner.invoke(app, ["init", "bash"])
+        assert fresh.exit_code == 0
+        assert "${1-}" in fresh.output

@@ -26,13 +26,13 @@ class XonshRenderer(ShellRenderer):
         """Return a xonsh-compatible alias definition.
 
         Append-mode aliases become ``aliases["name"] = "command"``.
-        Template-mode aliases become a list-form alias,
-        ``aliases["name"] = ["qwik", "run", "name"]`` — xonsh appends
-        any arguments given at the command line to a list alias, so
-        argument substitution is delegated back to the Python engine
-        without needing a Python function (whose body would otherwise
-        need to invoke a subprocess through xonsh's own subprocess
-        syntax, which ``qwik run(...)`` is not).
+        Template-mode aliases stay on the list-form
+        ``aliases["name"] = ["qwik", "run", name]`` wrapper: native
+        splicing would require emitting the raw command text into xonsh's
+        own subprocess syntax, whose parsing diverges from POSIX in the
+        exact quoting cases the test suite pins (see
+        :func:`qwik.core.substitute.render_native`'s exclusion notes), so
+        argument substitution keeps delegating to the Python engine.
 
         Args:
             name: Alias identifier.

@@ -73,19 +73,42 @@ def init_shell_command(
     install: bool = typer.Option(
         False, "--install", "-i", help="Append hook to rc file with backup."
     ),
+    no_native: bool = typer.Option(
+        False,
+        "--no-native",
+        help="Render template aliases via the `qwik run` wrapper instead of"
+        " compiling them to native shell argument syntax.",
+    ),
 ) -> None:
     """Print or install the shell hook snippet."""
     store = get_store()
     data = store.load()
     console = get_console()
 
-    try:
-        renderer = get_renderer(shell)
-    except ValueError as exc:
-        print_error(str(exc), console=console)
-        raise typer.Exit(1) from exc
+    if no_native:
+        # The rendering engine consults this env var, so every renderer —
+        # including third-party plugin renderers that reuse it — falls back
+        # to the wrapper for this process.  Restored afterwards so the flag
+        # only affects this invocation's rendering, not qwik's own runtime.
+        _no_native_backup = os.environ.get("QWIK_NO_NATIVE")
+        os.environ["QWIK_NO_NATIVE"] = "1"
+    else:
+        _no_native_backup = None
 
-    snippet = renderer.render_all(data.all_aliases())
+    try:
+        try:
+            renderer = get_renderer(shell)
+        except ValueError as exc:
+            print_error(str(exc), console=console)
+            raise typer.Exit(1) from exc
+
+        snippet = renderer.render_all(data.all_aliases())
+    finally:
+        if no_native:
+            if _no_native_backup is None:
+                os.environ.pop("QWIK_NO_NATIVE", None)
+            else:
+                os.environ["QWIK_NO_NATIVE"] = _no_native_backup
 
     if not install:
         console.print(snippet)

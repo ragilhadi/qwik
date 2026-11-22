@@ -25,9 +25,13 @@ class TestRenderers:
         assert "alias e=" in out
 
     def test_bash_template_function(self) -> None:
+        """Template aliases compile to native positional syntax: the
+        generated function must reference bash's own parameters, not
+        shell out to `qwik run` (the round-trip native rendering removes).
+        """
         renderer = get_renderer("bash")
         out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
-        assert 'qwik run "gco" "$@"' in out
+        assert 'gco() {\n    git checkout "${1-}" "${@:2}"\n}' == out
 
     def test_bash_append_alias_with_trailing_backslash(self) -> None:
         """Bash single quotes are literal; backslash needs no escaping."""
@@ -86,10 +90,12 @@ class TestRenderers:
         assert out == "alias gco 'git checkout \\'main\\''"
 
     def test_fish_template_alias_still_uses_function(self) -> None:
+        """Template aliases compile to native $argv references
+        (string collect preserves whole arguments)."""
         renderer = get_renderer("fish")
         out = renderer.render_alias("gco", Alias(command="git checkout {1}"))
         assert "function gco" in out
-        assert 'qwik run "gco" $argv' in out
+        assert "(string collect -- $argv[1])" in out
 
     def test_cmd_best_effort(self) -> None:
         renderer = get_renderer("cmd")
