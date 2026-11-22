@@ -589,6 +589,51 @@ def _load_backup_store(path: Path) -> AliasStore | None:
         return None
 
 
+class ProjectTrustCheck(Check):
+    """Report the discovered ``.qwik.toml`` layer and its trust state."""
+
+    id = "project.trust"
+
+    def run(self) -> CheckResult:
+        from qwik.core.project import discover_project
+
+        layer = discover_project()
+        if layer is None:
+            return CheckResult(self.id, "ok", "Project layer: no .qwik.toml.")
+        if layer.parse_error:
+            return CheckResult(
+                self.id,
+                "error",
+                f"Project file {layer.path} does not parse: {layer.parse_error}",
+                fixable=False,
+                detail={"path": str(layer.path)},
+            )
+        if layer.trust == "trusted":
+            aliases = len(layer.file.aliases) if layer.file else 0
+            return CheckResult(
+                self.id,
+                "ok",
+                f"Project layer: {layer.path} trusted ({aliases} alias(es)).",
+                detail={"path": str(layer.path), "trust": "trusted"},
+            )
+        if layer.trust == "stale":
+            return CheckResult(
+                self.id,
+                "warn",
+                f"Project file {layer.path} changed since it was trusted —"
+                " its aliases are inert; run `qwik project trust` to review.",
+                fixable=False,
+                detail={"path": str(layer.path), "trust": "stale"},
+            )
+        return CheckResult(
+            self.id,
+            "warn",
+            f"Project file {layer.path} found but untrusted — inert until `qwik project trust`.",
+            fixable=False,
+            detail={"path": str(layer.path), "trust": "untrusted"},
+        )
+
+
 def _check_list(store: Store) -> list[Check]:
     """Return the standard doctor checks in report order."""
     return [
@@ -601,6 +646,7 @@ def _check_list(store: Store) -> list[Check]:
         SyncRepoCheck(),
         GitAvailableCheck(),
         OverlayRepoCheck(),
+        ProjectTrustCheck(),
     ]
 
 

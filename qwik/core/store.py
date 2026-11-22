@@ -167,6 +167,12 @@ class Store:
     def load(self, include_overlay: bool = True) -> AliasStore:
         """Read the alias database from disk.
 
+        After the user + (optional) overlay layers, the *trusted*
+        ``.qwik.toml`` discovered from the current working directory is
+        injected into ``store.project_aliases`` (in-memory; never
+        persisted).  An untrusted or stale project file contributes
+        nothing.
+
         Args:
             include_overlay: If ``True`` and an overlay config exists, merge
                 overlay aliases into ``store.overlay_aliases`` (read-only).
@@ -202,6 +208,11 @@ class Store:
 
         if include_overlay:
             self._merge_overlay(store)
+        from qwik.core.project import discover_project, load_project_layer
+
+        layer = discover_project()
+        if layer is not None:
+            store.project_aliases = load_project_layer(layer)
         return store
 
     def _merge_overlay(self, store: AliasStore) -> None:
@@ -298,9 +309,9 @@ class Store:
         lock = FileLock(self.lock_path)
         with lock:
             data = self.load(include_overlay=include_overlay)
-            before = data.model_dump(exclude={"overlay_aliases"})
+            before = data.model_dump(exclude={"overlay_aliases", "project_aliases"})
             yield data
-            after = data.model_dump(exclude={"overlay_aliases"})
+            after = data.model_dump(exclude={"overlay_aliases", "project_aliases"})
             if after != before:
                 self.save_with_backup(data)
 

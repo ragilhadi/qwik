@@ -34,6 +34,10 @@ def run_command(
     console = get_console()
 
     alias = data.get(name)
+    if alias is None and name in data.project_aliases:
+        # Project layer is read-only: run directly, never copy into the
+        # user store (that would leak a repo's aliases machine-wide).
+        alias = data.project_aliases[name]
     if alias is None and name in data.overlay_aliases:
         alias = data.overlay_aliases[name]
         with store.mutate() as fresh_data:

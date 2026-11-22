@@ -138,6 +138,20 @@ class ShellRenderer(ABC):
         """Return an optional footer emitted after alias definitions."""
         return ""
 
+    # Directory-change hook lines for project layer refresh.  Renderers
+    # whose shell can re-evaluate on chdir (bash, zsh, fish) override
+    # ``render_footer`` to append these when a project layer exists.
+    _cd_refresh_footer = """\
+# qwik project layer: re-resolve .qwik.toml on directory change
+{refresh_fn} {{
+    eval "$(qwik init {shell} 2>/dev/null)"
+}}
+{hook_line}"""
+
+    def render_cd_refresh_footer(self) -> str:
+        """Return the footer re-rendering the hook on directory change."""
+        return ""
+
     def rc_path(self) -> Path | None:
         """Return the RC file path for this shell, or ``None`` if unsupported."""
         return None
@@ -152,6 +166,7 @@ class ShellRenderer(ABC):
         *,
         platform: str | None = None,
         shell: str | None = None,
+        cd_refresh: bool = False,
     ) -> str:
         """Render a complete hook snippet for the given alias map.
 
@@ -168,6 +183,12 @@ class ShellRenderer(ABC):
         When :attr:`supports_completions` is true, aliases carrying a
         ``complete`` mapping additionally emit their shell-native
         completion definitions after all alias definitions.
+
+        With ``cd_refresh=True``, a renderer whose shell supports
+        directory-change hooks (bash, zsh, fish) appends the footer that
+        re-runs ``qwik init`` whenever the working directory changes —
+        how the project layer (``.qwik.toml``) stays live as the user
+        moves in and out of the project tree.
 
         Args:
             aliases: The alias map to render.
@@ -196,6 +217,10 @@ class ShellRenderer(ABC):
         footer = self.render_footer()
         if footer:
             lines.append(footer)
+        if cd_refresh:
+            refresh = self.render_cd_refresh_footer()
+            if refresh:
+                lines.append(refresh)
         return "\n".join(lines)
 
 

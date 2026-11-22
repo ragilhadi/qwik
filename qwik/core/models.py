@@ -283,12 +283,17 @@ class AliasStore(BaseModel):
             v3 introduces the optional per-alias ``complete`` mapping;
             older qwik versions refuse a v3 file via the migration version
             gate with an actionable upgrade message.
+        project_aliases: In-memory project-scoped layer (from a trusted
+            ``.qwik.toml``), injected by :meth:`Store.load` — **never
+            serialized** to ``aliases.toml``.  Precedence in
+            :meth:`all_aliases`: project → user → overlay.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     aliases: dict[str, Alias] = Field(default_factory=dict)
     overlay_aliases: dict[str, Alias] = Field(default_factory=dict)
+    project_aliases: dict[str, Alias] = Field(default_factory=dict)
     version: int = 3
 
     @model_validator(mode="after")
@@ -298,16 +303,25 @@ class AliasStore(BaseModel):
             validate_alias_name(name)
         for name in self.overlay_aliases:
             validate_alias_name(name)
+        for name in self.project_aliases:
+            validate_alias_name(name)
         return self
 
     def all_aliases(self) -> dict[str, Alias]:
-        """Return merged view: user aliases take precedence over overlay."""
+        """Return merged view: project over user over overlay.
+
+        The project layer comes from a *trusted* ``.qwik.toml`` (injected
+        in-memory by the store; see :mod:`qwik.core.project`), the overlay
+        layer from the configured overlay repo.  Neither is written back
+        to ``aliases.toml``.
+        """
         merged = dict(self.overlay_aliases)
         merged.update(self.aliases)
+        merged.update(self.project_aliases)
         return merged
 
     def get(self, name: str) -> Alias | None:
-        """Look up an alias by name.
+        """Look up an alias by name in the user layer.
 
         Args:
             name: Alias identifier.

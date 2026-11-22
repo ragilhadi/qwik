@@ -56,6 +56,17 @@ class ZshRenderer(ShellRenderer):
 
         return zsh_completion(name, alias)
 
+    def render_cd_refresh_footer(self) -> str:
+        """Re-render the hook on directory change (zsh: chpwd hook)."""
+        return (
+            "# qwik project layer: re-resolve .qwik.toml on directory change\n"
+            "__qwik_project_refresh() {\n"
+            '    eval "$(qwik init zsh 2>/dev/null)"\n'
+            "}\n"
+            "autoload -Uz add-zsh-hook\n"
+            "add-zsh-hook chpwd __qwik_project_refresh"
+        )
+
     def rc_path(self) -> Path | None:
         """Return ``~/.zshrc``."""
         return Path.home() / ".zshrc"

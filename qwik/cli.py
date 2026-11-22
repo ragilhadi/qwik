@@ -20,6 +20,7 @@ from qwik.commands.init_shell import init_shell_command
 from qwik.commands.list import list_command
 from qwik.commands.overlay import overlay_command
 from qwik.commands.pick import pick_command
+from qwik.commands.project import project_command
 from qwik.commands.remove import remove_command
 from qwik.commands.rename import rename_command
 from qwik.commands.run import run_command
@@ -77,6 +78,7 @@ app.command("doctor")(doctor_command)
 app.command("completion")(completion_command)
 app.command("sync")(sync_command)
 app.command("overlay")(overlay_command)
+app.command("project", context_settings={"max_content_width": 120})(project_command)
 app.command("stats")(stats_command)
 app.command("suggest")(suggest_command)
 app.command("undo")(undo_command)
