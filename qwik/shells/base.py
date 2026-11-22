@@ -108,6 +108,28 @@ class ShellRenderer(ABC):
         """Return the opt-out comment line for template alias *name*."""
         return self._native_skip_comment.format(name=name, shell=self.shell_name)
 
+    #: Shell supports programmable argument completion.
+    #:
+    #: Subclasses whose shell can register a completion function
+    #: (bash, zsh, fish, pwsh) opt in by overriding this to ``True`` and
+    #: implementing :meth:`render_completion_alias`.  The default ``False``
+    #: means renderers emit nothing for completions — third-party plugin
+    #: renderers keep their behaviour until the author opts in.
+    supports_completions: bool = False
+
+    def render_completion_alias(self, name: str, alias: Alias) -> str:
+        """Return a completion definition for *name*, or ``""``.
+
+        Args:
+            name: Alias identifier.
+            alias: The alias definition (may carry a ``complete`` mapping).
+
+        Returns:
+            A string containing the shell-native completion definition, or
+            ``""`` when the alias declares no completion.
+        """
+        return ""
+
     def render_header(self) -> str:
         """Return an optional header emitted before alias definitions."""
         return ""
@@ -143,6 +165,10 @@ class ShellRenderer(ABC):
         renderers — sees the platform-appropriate command without any
         signature change.
 
+        When :attr:`supports_completions` is true, aliases carrying a
+        ``complete`` mapping additionally emit their shell-native
+        completion definitions after all alias definitions.
+
         Args:
             aliases: The alias map to render.
             platform: Platform to resolve for; defaults to the current host.
@@ -150,6 +176,7 @@ class ShellRenderer(ABC):
         """
         resolved_platform = platform or current_platform()
         resolved_shell = shell or self.shell_name
+        complete_lines: list[str] = []
         lines: list[str] = []
         header = self.render_header()
         if header:
@@ -161,6 +188,11 @@ class ShellRenderer(ABC):
                 if resolved != alias.command:
                     alias = alias.model_copy(update={"command": resolved})
                 lines.append(self.render_alias(name, alias))
+                if self.supports_completions and alias.complete:
+                    definition = self.render_completion_alias(name, alias)
+                    if definition:
+                        complete_lines.append(definition)
+        lines.extend(complete_lines)
         footer = self.render_footer()
         if footer:
             lines.append(footer)

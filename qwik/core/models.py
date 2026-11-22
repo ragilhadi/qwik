@@ -109,6 +109,14 @@ class Alias(BaseModel):
         description: Human-readable explanation of the alias.
         enabled: Whether the alias is currently active.  Disabled aliases
             are kept in the store but ignored by the shell hook.
+        complete: Optional per-placeholder completion commands mapping a
+            placeholder reference (``"branch"``, ``"1"``) to a shell
+            command whose output supplies that argument's candidates
+            (e.g. ``{"branch": "git branch --format='%(refname:short)'"}``).
+            Emitted into the generated hook as native completion
+            definitions (``complete -F``, ``compdef``, …) by renderers
+            whose shell supports argument completion; shells without
+            support render nothing for it.
         created_at: ISO-8601 UTC timestamp of creation.
         updated_at: ISO-8601 UTC timestamp of last modification.
         last_used: ISO-8601 UTC timestamp of the most recent execution,
@@ -124,6 +132,7 @@ class Alias(BaseModel):
     group: str | None = None
     description: str = ""
     enabled: bool = True
+    complete: dict[str, str] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_used: datetime | None = None
@@ -271,7 +280,8 @@ class AliasStore(BaseModel):
         aliases: Mapping from alias name to :class:`Alias`.
         version: Schema version for forward-compatibility.  v2 introduces
             platform-conditional ``command_<platform>[_<shell>]`` variants;
-            older qwik versions refuse a v2 file via the migration version
+            v3 introduces the optional per-alias ``complete`` mapping;
+            older qwik versions refuse a v3 file via the migration version
             gate with an actionable upgrade message.
     """
 
@@ -279,7 +289,7 @@ class AliasStore(BaseModel):
 
     aliases: dict[str, Alias] = Field(default_factory=dict)
     overlay_aliases: dict[str, Alias] = Field(default_factory=dict)
-    version: int = 2
+    version: int = 3
 
     @model_validator(mode="after")
     def _validate_names(self) -> AliasStore:

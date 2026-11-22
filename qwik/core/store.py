@@ -487,6 +487,11 @@ class Store:
                 alias_table.add("description", alias.description)
             if not alias.enabled:
                 alias_table.add("enabled", alias.enabled)
+            if alias.complete:
+                complete_table = tomlkit.table()
+                for key in sorted(alias.complete):
+                    complete_table.add(key, alias.complete[key])
+                alias_table.add("complete", complete_table)
             alias_table.add("created_at", alias.created_at.isoformat())
             alias_table.add("updated_at", alias.updated_at.isoformat())
             if alias.last_used is not None:

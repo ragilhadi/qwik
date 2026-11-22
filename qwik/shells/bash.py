@@ -17,6 +17,7 @@ class BashRenderer(ShellRenderer):
     """Emit ``bash`` ``alias`` and function definitions."""
 
     supports_native_templates = True
+    supports_completions = True
 
     @property
     def shell_name(self) -> str:
@@ -52,6 +53,12 @@ class BashRenderer(ShellRenderer):
             return f'{name}() {{\n    qwik run "{name}" "$@"\n}}'
         escaped = alias.command.replace("'", "'\"'\"'")
         return f"alias {name}='{escaped}'"
+
+    def render_completion_alias(self, name: str, alias: Alias) -> str:
+        """Return the bash completion definition for *name*, if declared."""
+        from qwik.shells.completions import bash_completion
+
+        return bash_completion(name, alias)
 
     def rc_path(self) -> Path | None:
         """Return ``~/.bashrc``."""

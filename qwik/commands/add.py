@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 import typer
 from rich.console import Console
 
+from qwik.commands.complete_options import build_complete_map
 from qwik.core.conflicts import ConflictChecker, ConflictResult
 from qwik.core.models import Alias, AliasStore, validate_alias_name
 from qwik.core.platform import validate_platform, variant_key
@@ -117,6 +118,27 @@ def add_command(
     description: str | None = typer.Option(
         None, "--description", "-d", help="Optional description."
     ),
+    complete_with: list[str] | None = typer.Option(
+        None,
+        "--complete-with",
+        help=(
+            "Provide completion candidates for a placeholder:"
+            ' KEY="COMMAND" (e.g. --complete-with'
+            " branch=\"git branch --format='%(refname:short)'\").  KEY is a"
+            " positional index (1, 2, …) or a named placeholder"
+            " (branch).  Repeatable."
+        ),
+    ),
+    complete_from: str | None = typer.Option(
+        None,
+        "--complete-from",
+        help=(
+            "Inherit another command's completion for every argument"
+            " (e.g. --complete-from git).  Stored as the reserved"
+            ' completion key "inherit"; rendered as'
+            " completion delegation in shells that support it (bash, zsh)."
+        ),
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite if alias already exists."),
     group: str | None = typer.Option(None, "--group", "-g", help="Primary group for the alias."),
     platform: str | None = typer.Option(
@@ -180,6 +202,8 @@ def add_command(
             group,
             force,
             console,
+            complete_with=complete_with,
+            complete_from=complete_from,
         )
         return
 
@@ -207,6 +231,8 @@ def _add_base_alias(
     group: str | None,
     force: bool,
     console: Console,
+    complete_with: list[str] | None = None,
+    complete_from: str | None = None,
 ) -> None:
     """Create (or ``--force`` overwrite) a plain base alias."""
     result = checker.check(name, shell=active_shell)
@@ -215,11 +241,25 @@ def _add_base_alias(
     if active_shell is not None:
         _warn_shell_compatibility(active_shell, name, full_command, console)
 
+    complete_map = build_complete_map(name, full_command, complete_with, console)
+    if complete_from:
+        # Reserved key: renderers emit completion *delegation* for it
+        # (bash's `complete -F <prog>_complete`-style inheritance).
+        if "inherit" in complete_map:
+            print_error(
+                "--complete-from and a positional/named --complete-with"
+                " conflict; use one or the other.",
+                console=console,
+            )
+            raise SystemExit(1)
+        complete_map["inherit"] = complete_from
+
     alias = Alias(
         command=full_command,
         tag=tag or [],  # type: ignore[arg-type]
         group=group,
         description=description or "",
+        complete=complete_map,
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )
