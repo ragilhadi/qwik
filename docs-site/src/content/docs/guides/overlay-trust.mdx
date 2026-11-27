@@ -1,0 +1,100 @@
+---
+title: Overlay Trust & Signing
+description: Signed manifests, commit pinning, and per-alias provenance for team overlay stores.
+---
+
+The overlay is a **shell-command supply chain**: commands run with your
+user's full privileges, end up in shell startup files, and refresh on
+demand from a repo controlled by someone else. Trust v2 gives it the
+properties one expects from that description — signing, pinning, review,
+and provenance — while keeping signing strictly opt-in.
+
+## For overlay maintainers
+
+Add two files to the overlay repo:
+
+**`qwik-overlay.toml`** — the manifest, next to `aliases.toml`:
+
+```toml
+name = "acme-platform"
+maintainer = "platform@acme.example"
+min_qwik_version = "1.2.1"
+signing_key = "ssh-ed25519 AAAA… platform@acme"
+```
+
+**`aliases.toml.sig`** — an SSH signature over `aliases.toml`:
+
+```bash
+ssh-keygen -Y sign -f ~/.ssh/overlay-key -n qwik-overlay aliases.toml
+```
+
+SSH signing rather than GPG: every developer already has an SSH key, and
+git already supports the same format.
+
+## For overlay users
+
+Pin what you trust:
+
+```bash
+qwik overlay add --url … --key 'ssh-ed25519 AAAA… platform@acme'
+qwik overlay add --url … --pin 3f2a1b9        # pin an exact commit
+qwik overlay verify                            # re-check the signature now
+qwik overlay update                            # verify → diff → confirm
+qwik overlay update --to 9c4e2d1              # move a pinned overlay explicitly
+```
+
+With a key pinned, every `update` verifies `aliases.toml`'s signature at
+the incoming ref **before anything is applied**. A signature that does
+not verify is a hard stop — a tampered `aliases.toml` is never applied
+to your hook, changed commands or not.
+
+## Pinning is a lockfile
+
+```bash
+qwik overlay add --url … --pin 3f2a1b9
+qwik overlay update        # upstream moved: refused, pinned overlay stays
+qwik overlay update --to 9c4e2d1   # explicit move; the pin follows
+```
+
+A pinned overlay never moves on `update` without an explicit `--to` —
+the same guarantee a lockfile gives. `--to` resolves `origin/<branch>`
+first and resets the checkout to that exact commit; afterwards the pin
+records the applied commit.
+
+## The diff you sign off on
+
+Every `update` shows added / removed / changed sets and requires
+confirmation (`--yes` skips). Changed commands show a **before → after**:
+
+```text
+Changed (1): deploy
+    - 'kubectl apply -f k8s/{1}.yaml'
+    + 'helm upgrade {1} ./charts/{1}'
+```
+
+A *modified* command is the highest-risk change and the easiest to miss
+in a name list, so it gets the full picture.
+
+## Degradation ladder
+
+Signing is opt-in; unsigned overlays keep working, marked:
+
+| State | Meaning |
+| --- | --- |
+| `VERIFIED` | manifest + pinned key + signature over `aliases.toml` valid |
+| manifest, no signing key | structured metadata only — `unverified` |
+| no manifest | unknown provenance — `unverified` |
+| signature invalid | hard problem — `overlay update` refuses to apply |
+
+Every surface marks it: `overlay list` prints the ladder, `overlay
+verify` re-checks on demand (exit 1 on invalid), and `qwik doctor`
+reports the repo state. Missing `ssh-keygen` (OpenSSH ≥ 8.2 required;
+older and absent both degrade) means "cannot verify right now", never a
+crash.
+
+## Provenance in the UI
+
+`qwik show <name>` on an overlay alias adds a provenance table: source
+repo and commit, signature status, pinned key fingerprint, maintainer —
+so "where did this command come from, and is it still the thing I
+approved" is one command away.
