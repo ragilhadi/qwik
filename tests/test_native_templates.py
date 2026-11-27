@@ -278,6 +278,13 @@ def _probe_body(native: str, python_bin: str, argecho: str) -> str:
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the differential corpus splices interpreter paths into POSIX"
+    " shell script text (bash needs POSIX paths, pwsh needs Windows"
+    " paths); Windows is covered by the structure pins and the qwik run"
+    " quoting tests instead",
+)
 @pytest.mark.parametrize("shell", _DIFFERENTIAL_SHELLS)
 def test_native_parity_with_expand(shell: str, tmp_path_factory: pytest.TempPathFactory) -> None:
     if not _has(shell):
