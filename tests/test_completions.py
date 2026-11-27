@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 
 import pytest
 from typer.testing import CliRunner
@@ -401,7 +402,9 @@ _COMPLETION_TESTED = [s for s in ("bash", "zsh") if shutil.which(s)]
 
 
 def _invoke_completion(shell: str, script_lines: list[str]) -> tuple[int, str]:
-    binary = shutil.which(shell)
+    from tests._shells import resolve_shell_binary
+
+    binary = resolve_shell_binary(shell)
     assert binary is not None
     script = "\n".join(script_lines) + "\n"
     result = subprocess.run(
@@ -415,6 +418,7 @@ def _invoke_completion(shell: str, script_lines: list[str]) -> tuple[int, str]:
 
 @pytest.mark.integration
 @pytest.mark.skipif(not shutil.which("bash"), reason="bash not installed")
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX shell fixture script")
 def test_bash_completion_offers_branches(tmp_path, monkeypatch) -> None:
     from qwik.config import _reset_config
     from qwik.core.store import get_store
