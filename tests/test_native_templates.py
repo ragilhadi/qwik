@@ -32,6 +32,7 @@ from __future__ import annotations
 import shlex
 import shutil
 import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -168,7 +169,28 @@ _ARGECHO = "import json, sys\nsys.stdout.write(json.dumps(sys.argv[1:]) + chr(10
 
 
 def _python_bin() -> str:
-    return shutil.which("python3") or shutil.which("python") or "python"
+    """An interpreter path safe to splice into POSIX shell script text.
+
+    Windows discovery (``shutil.which``) returns Windows paths
+    (``C:\\…\\python.EXE``); backslashes vanish inside a bash script, so
+    convert through ``cygpath`` (present on Git-Bash runners) and fall
+    back to the bare ``python`` launcher, which Git-Bash resolves itself.
+    """
+    python3 = shutil.which("python3")
+    if python3 is None:
+        python3 = shutil.which("python")
+    if python3 is None:
+        return "python"
+    if sys.platform == "win32":
+        cygpath = shutil.which("cygpath")
+        if cygpath is not None:
+            converted = subprocess.run(
+                [cygpath, python3], capture_output=True, text=True, check=False
+            )
+            if converted.returncode == 0 and converted.stdout.strip():
+                return converted.stdout.strip()
+        return "python"
+    return python3
 
 
 def _has(shell: str) -> bool:
@@ -268,6 +290,11 @@ def test_native_parity_with_expand(shell: str, tmp_path_factory: pytest.TempPath
     for command, args in _corpus(shell):
         probe_command = f"PROBE {command}"
         native_body = render_native(probe_command, shell)
+        if native_body is None:
+            # Engine refused this construct for this shell — the wrapper
+            # path applies (byte-identical to pre-native rendering) and
+            # parity is trivially preserved there.
+            continue
         expected_expand = expand(probe_command, args, shell=shell)
 
         native_argv = _run_native_leg(shell, native_body, args, python_bin, str(argecho))
