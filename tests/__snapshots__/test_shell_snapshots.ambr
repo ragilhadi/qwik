@@ -4,7 +4,7 @@
   alias bsg='echo hello\'
   alias envg='echo $HOME %USERPROFILE%'
   gco() {
-      qwik run "gco" "$@"
+      git checkout "${1-}" "${@:2}"
   }
   alias gs='git status'
   alias lsg='echo '"'"'hello world'"'"''
@@ -25,7 +25,7 @@
   alias bsg 'echo hello\\'
   alias envg 'echo $HOME %USERPROFILE%'
   function gco
-      qwik run "gco" $argv
+      git checkout (string collect -- $argv[1]) (string collect -- $argv[2..-1])
   end
   alias gs 'git status'
   alias lsg 'echo \'hello world\''
@@ -83,7 +83,7 @@
   alias bsg='echo hello\'
   alias envg='echo $HOME %USERPROFILE%'
   gco() {
-      qwik run "gco" "$@"
+      git checkout "${1-}" "${@:2}"
   }
   alias gs='git status'
   alias lsg='echo '"'"'hello world'"'"''

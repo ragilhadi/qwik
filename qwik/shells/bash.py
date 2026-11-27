@@ -16,6 +16,8 @@ __all__ = ["BashRenderer"]
 class BashRenderer(ShellRenderer):
     """Emit ``bash`` ``alias`` and function definitions."""
 
+    supports_native_templates = True
+
     @property
     def shell_name(self) -> str:
         """Return ``'bash'``."""
@@ -25,9 +27,13 @@ class BashRenderer(ShellRenderer):
         """Return a bash-compatible alias or function.
 
         Append-mode aliases become ``alias name='command'``.
-        Template-mode aliases (containing placeholders) become a
-        wrapper function that delegates to ``qwik run`` so that the
-        substitution engine is reused exactly.
+        Template-mode aliases (containing placeholders) become a function
+        that references bash's own positional parameters wherever the
+        placeholder grammar translates to native syntax —
+        ``gco() { git checkout "$1"; }`` — falling back to the ``qwik run``
+        wrapper when the template uses a construct bash cannot express
+        natively (a placeholder inside single quotes, ``{0}``-style invalid
+        references) so the substitution engine is reused exactly.
 
         Args:
             name: Alias identifier.
@@ -36,9 +42,12 @@ class BashRenderer(ShellRenderer):
         Returns:
             Bash source snippet.
         """
-        from qwik.core.substitute import has_placeholders
+        from qwik.core.substitute import has_placeholders, render_native
 
         if has_placeholders(alias.command):
+            native = render_native(alias.command, "bash")
+            if native is not None:
+                return f"{name}() {{\n    {native}\n}}"
             # Function wrapper so complex quoting is handled by qwik itself.
             return f'{name}() {{\n    qwik run "{name}" "$@"\n}}'
         escaped = alias.command.replace("'", "'\"'\"'")

@@ -453,6 +453,13 @@ gs --short              # → git status --short
 
 Use `{…}` markers to substitute arguments into the command.
 
+In the generated shell hook, template aliases are compiled to native shell
+argument references (bash/zsh/fish) so calling them costs microseconds —
+no `qwik run` interpreter spawn. Templates that don't compile safely fall
+back to the `qwik run` wrapper automatically; see
+[Per-shell rendering](#per-shell-rendering). `qwik run` remains the
+runtime engine either way.
+
 | Placeholder | Meaning |
 |---|---|
 | `{1}`, `{2}`, `{3}`… | Nth positional argument (1-based) |
@@ -654,15 +661,26 @@ eval "$(qwik init zsh)"
 
 ### Per-shell rendering
 
-The hook generates native aliases/functions for each shell:
+The hook generates native aliases/functions for each shell. Template-mode
+aliases (containing `{…}` placeholders) are **compiled to native shell
+argument syntax** where the shell can express them — no `qwik run` process
+spawn per invocation:
 
 | Shell | Append mode | Template mode |
 |---|---|---|
-| bash / zsh | `alias gs='git status'` | `gs() { git checkout "$1" ; }` |
-| fish | `alias gs 'git status'` | `function gs ; … ; end` |
+| bash / zsh | `alias gs='git status'` | `gco() { git checkout "${1-}" "${@:2}" ; }` |
+| fish | `alias gs 'git status'` | `function gco ; git checkout (string collect -- $argv[1]) … ; end` |
 | PowerShell | `function gs { & ([ScriptBlock]::Create('git status')) @args }` | `function gs { qwik run "gs" @args }` |
 | nu | `def gs [...args] { qwik run "gs" ...$args }` | `def gs [...args] { qwik run "gs" ...$args }` |
 | cmd | `doskey gs=git status $*` | (best-effort, no template) |
+
+Native compilation applies whenever the whole translation is
+semantics-preserving; templates the shell can't express natively (a
+placeholder inside single quotes, a composite double-quoted word like
+`"p={1}"`, `{*}`'s single-string join on fish/pwsh, surplus args on pwsh)
+keep the `qwik run` wrapper, whose behaviour is unchanged. Pass
+`qwik init <shell> --no-native` (or set `QWIK_NO_NATIVE=1`) to force the
+wrapper everywhere.
 
 PowerShell's append mode wraps the command as a string literal compiled into a script block at call time rather than splicing it into the function body as source, and cmd's `doskey` macros are `$`/metacharacter-escaped — both so a command containing `}`, `&`, `$`, or another shell's syntax can't break out of the generated definition. Nu has no equivalent to a compiled-string script block, so both modes delegate to `qwik run`. Supported characters in a command are documented per shell in [`docs/shell-quoting.md`](docs/shell-quoting.md).
 

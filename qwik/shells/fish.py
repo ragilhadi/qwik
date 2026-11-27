@@ -19,6 +19,8 @@ _RC_NAME = "config.fish"
 class FishRenderer(ShellRenderer):
     """Emit ``fish`` ``alias`` and function definitions."""
 
+    supports_native_templates = True
+
     @property
     def shell_name(self) -> str:
         """Return ``'fish'``."""
@@ -28,9 +30,11 @@ class FishRenderer(ShellRenderer):
         """Return a fish-compatible alias or function.
 
         Append-mode aliases become ``alias name 'command'``.
-        Template-mode aliases become a wrapper function that calls
-        ``qwik run`` so argument substitution is delegated back to the
-        Python engine.
+        Template-mode aliases become a function referencing ``$argv``
+        where the placeholder grammar translates to native fish syntax,
+        falling back to a wrapper that calls ``qwik run`` otherwise, so
+        argument substitution stays with the Python engine for constructs
+        fish cannot express safely.
 
         Args:
             name: Alias identifier.
@@ -39,9 +43,12 @@ class FishRenderer(ShellRenderer):
         Returns:
             Fish source snippet.
         """
-        from qwik.core.substitute import has_placeholders
+        from qwik.core.substitute import has_placeholders, render_native
 
         if has_placeholders(alias.command):
+            native = render_native(alias.command, "fish")
+            if native is not None:
+                return f"function {name}\n    {native}\nend"
             return f'function {name}\n    qwik run "{name}" $argv\nend'
         escaped = alias.command.replace("\\", "\\\\").replace("'", "\\'")
         return f"alias {name} '{escaped}'"

@@ -27,7 +27,7 @@ __all__ = [
     "Store",
     "backup_sort_key",
     "get_store",
-    "read_backup_text",
+    "read_text_retried",
 ]
 
 # Maximum number of backup files to retain.
@@ -67,16 +67,18 @@ def backup_sort_key(path: Path) -> tuple[int, int, int, int]:
     return (int(date), int(clock), int(micros), int(counter))
 
 
-def read_backup_text(path: Path) -> str:
-    """Read *path*, retrying briefly on a transient Windows file lock.
+def read_text_retried(path: Path) -> str:
+    """Read *path* as UTF-8, retrying briefly on a transient Windows lock.
 
-    A backup file is written moments before this reads it back, and on
-    Windows a just-created file can be held open for a short window by
-    antivirus real-time scanning or the search indexer — long enough for
-    a same-process read immediately afterward to see ``PermissionError``
-    (WinError 32) even though nothing in *this* process still has it
-    open. POSIX never raises for this case, so the loop costs nothing
-    there beyond the (never-taken) first attempt.
+    On Windows a file can raise ``PermissionError`` (WinError 32) for a
+    short window while it is still "in use" even though no reader should
+    logically hold it: a concurrent writer's ``os.replace()`` mid-flight,
+    antivirus real-time scanning, or the search indexer holding a
+    recently written (or about-to-be-replaced) file.  Concurrent CLI
+    processes (`qwik add` racing `qwik add`) and same-process
+    read-after-write can both hit it.  POSIX never raises for this case,
+    so the loop costs nothing there beyond the (never-taken) first
+    attempt.
     """
     delay = 0.05
     for attempt in range(5):
@@ -177,7 +179,10 @@ class Store:
             store = AliasStore()
         else:
             try:
-                raw = self._path.read_text(encoding="utf-8")
+                # Retry on a transient Windows file lock: a concurrent
+                # writer's os.replace() or AV scanning can make a read of
+                # an existing file raise PermissionError for a moment.
+                raw = read_text_retried(self._path)
                 doc = tomlkit.parse(raw)
                 data: dict[str, Any] = doc.unwrap()
                 from qwik.core.migrations import migrate
@@ -210,7 +215,7 @@ class Store:
         try:
             from qwik.core.migrations import migrate as do_migrate
 
-            raw = overlay_file.read_text(encoding="utf-8")
+            raw = read_text_retried(overlay_file)
             data: dict[str, Any] = dict(tomlkit.parse(raw).unwrap())
             data = do_migrate(data)
             overlay_store = AliasStore.model_validate(data)
@@ -362,7 +367,7 @@ class Store:
         result: list[tuple[tuple[int, int, int, int], BackupInfo]] = []
         for path in sorted(self._backup_dir.glob("aliases-*.toml")):
             try:
-                raw = read_backup_text(path)
+                raw = read_text_retried(path)
                 doc = tomlkit.parse(raw)
                 store = AliasStore.model_validate(doc.unwrap())
                 size = path.stat().st_size
@@ -422,7 +427,7 @@ class Store:
         # Validate before touching anything: raising here means the live
         # store and its backups are untouched.
         try:
-            doc = tomlkit.parse(read_backup_text(path))
+            doc = tomlkit.parse(read_text_retried(path))
             restored = AliasStore.model_validate(doc.unwrap())
         except Exception as exc:
             raise RuntimeError(f"Could not read backup {path.name}: {exc}") from exc
