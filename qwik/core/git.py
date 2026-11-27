@@ -27,6 +27,7 @@ __all__ = [
     "pull",
     "push",
     "reset_hard",
+    "rev_parse",
     "status_short",
 ]
 
@@ -77,6 +78,15 @@ def is_dirty(path: Path) -> bool:
 def current_branch(path: Path) -> str:
     """Return the current branch name (``git rev-parse --abbrev-ref HEAD``)."""
     return _run_git(["rev-parse", "--abbrev-ref", "HEAD"], path)
+
+
+def rev_parse(path: Path, ref: str) -> str:
+    """Resolve *ref* to a commit hash (``git rev-parse <ref>{commit}``).
+
+    Accepts branch names, tags, ``HEAD``, short or full hashes, and
+    ``origin/<branch>`` remote refs.
+    """
+    return _run_git(["rev-parse", "--verify", ref + "^{commit}"], path)
 
 
 def add_all_and_commit(path: Path, message: str) -> None:

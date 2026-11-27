@@ -252,6 +252,43 @@ removed (they're read-only). A user alias with the same name shadows the
 overlay one. Running an overlay alias copies it to your user store for
 usage tracking.
 
+#### Signed overlays & pinning (trust v2)
+
+The overlay is a supply chain; signing and pinning give it a trust model.
+Maintainers opt in by adding two files to the overlay repo:
+
+- `qwik-overlay.toml` — manifest with `name`, `maintainer`, and a
+  `signing_key` (a public SSH key line)
+- `aliases.toml.sig` — an SSH signature over `aliases.toml`
+  (`ssh-keygen -Y sign -f <key> -n qwik-overlay aliases.toml`)
+
+Users pin what they trust:
+
+```bash
+qwik overlay add --url … --key 'ssh-ed25519 AAAA… maintainer@host'
+qwik overlay add --url … --pin 3f2a1b9            # exact commit
+qwik overlay verify                                # re-check the signature now
+qwik overlay update                                # verify → diff → confirm
+qwik overlay update --to 9c4e2d1                  # explicitly move a pinned overlay
+```
+
+With a key pinned, every `update` verifies `aliases.toml`'s signature at
+the *incoming* ref; a signature that does not verify is a **hard stop** —
+nothing is applied.  A pinned overlay (`--pin`) never moves on `update`
+without an explicit `--to <commit>`, the same guarantee a lockfile gives;
+after `--to` the pin follows the applied commit.  Diff display shows a
+before → after for each *changed* command — the highest-risk change and
+the easiest to miss in a name list.
+
+Unsigned overlays keep working: signing is opt-in.  Every surface marks
+the state — `overlay list` prints the signature ladder (`VERIFIED` /
+manifest-without-key / no-manifest "unverified"), `qwik show <name>` on
+an overlay alias reports the source repo, commit, and verification
+status, and `qwik doctor`'s `overlay` checks cover the repo state.
+Missing `ssh-keygen` (OpenSSH ≥ 8.2) degrades to unverified warnings,
+never a crash.  `qwik show <name>`'s provenance table and
+`qwik overlay verify` are the quick health checks.
+
 ### `doctor` — Health check
 
 ```bash
