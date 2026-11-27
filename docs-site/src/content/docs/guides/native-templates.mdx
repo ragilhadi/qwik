@@ -1,0 +1,58 @@
+---
+title: Native Templates
+description: How template aliases compile to native shell syntax — and when they don't.
+---
+
+Template-mode aliases (containing `{…}` placeholders) historically
+rendered as wrappers that shell out to `qwik run` — a full Python
+interpreter start on *every invocation*. qwik now **compiles** them to
+the shell's own positional argument syntax whenever the translation is
+provably equivalent:
+
+| Shell | Template mode, before | Template mode, now |
+| --- | --- | --- |
+| bash / zsh | `gco() { qwik run "gco" "$@"; }` | `gco() { git checkout "${1-}" "${@:2}"; }` |
+| fish | `function gco; qwik run "gco" $argv; end` | `function gco; git checkout (string collect -- $argv[1]) …; end` |
+
+Microseconds instead of a process spawn for the common path; identical
+results either way.
+
+## Which templates compile
+
+The engine refuses anything where native substitution could change the
+alias's meaning, and keeps the (unchanged) `qwik run` wrapper:
+
+| Construct | Native? | Why |
+| --- | --- | --- |
+| `{1}`, `{@}`, `{N:-default}`, `{name}` in bash/zsh | ✅ | `"${1-}"` matches `expand()` word-for-word, missing args included |
+| `{1}`, `{@}`, `{N:-default}`, `{name}` in fish | ✅ | `string collect` preserves whole arguments; spaced defaults stay one word |
+| `{*}` in bash/zsh | ✅ | `"$*"` is the single-joined string `expand()` produces |
+| `{*}` in fish/pwsh | ❌ | the single-string join needs re-tokenization | 
+| surplus args after `{1}` in pwsh | ❌ | `@args[N..]` reverses for short arg lists |
+| placeholder inside `'single quotes'` | ❌ | shells treat `'…'` literally; `qwik run` interpolates it |
+| composite double-quoted word (`"p={1}"`) | ❌ | `expand()` quotes the value; native splicing splits differently on spaces |
+| cmd (doskey) | ❌ | doskey cannot interpolate positional arguments |
+| nu, xonsh | ❌ | typed/pipeline argument semantics diverge from subprocess semantics |
+
+Anything refused keeps the byte-identical wrapper, so behaviour never
+changes silently — the hook just stays on the old path for that alias.
+
+## Escape hatch
+
+```bash
+qwik init bash --no-native     # wrapper everywhere, this render
+QWIK_NO_NATIVE=1 qwik init bash  # same, via environment
+```
+
+One flag forces every shell back onto the `qwik run` wrapper — the
+safety valve if a native rendering turns out to be wrong in the field.
+
+## Correctness
+
+The mapping is pinned by a **differential test corpus**
+(`tests/test_native_templates.py`): for spaced/quoted/metacharacter
+arguments × every construct, the natively rendered function executed by
+the real shell hands the child program the same `argv` that
+`expand()` + shell execution (exactly what `qwik run` does) hands it.
+Structure tests pin the exact compiled syntax per shell so a mapping
+regression shows up as a readable diff.
