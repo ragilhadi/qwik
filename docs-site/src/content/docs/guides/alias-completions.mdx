@@ -1,0 +1,76 @@
+---
+title: Argument Completion for Aliases
+description: Make gco &lt;Tab&gt; offer branches — per-argument completions for alias wrappers.
+---
+
+A native shell alias inherits the completion of the command it wraps. A
+qwik *function wrapper* doesn't — the shell sees an opaque function and
+falls back to filename completion, which is why `gco <Tab>` offers files
+instead of branches. Installing the hook should not *lose* completion.
+
+Declare how an alias's arguments complete and qwik emits native
+completion definitions into the generated hook:
+
+```bash
+qwik add gco "git checkout {branch}" \
+  --complete-with 'branch=git branch --format="%(refname:short)"'
+# gco <Tab>  →  branch names (bash, zsh, fish, pwsh)
+
+qwik add cp2 "cp {1} {2}" \
+  --complete-with 1="ls -1" \
+  --complete-with 2="find . -maxdepth 1"
+
+qwik add k "kubectl" --complete-from kubectl   # delegate to kubectl's own completion
+```
+
+## Keys
+
+`--complete-with KEY="COMMAND"` maps one argument to a candidate
+command. `KEY` is:
+
+- a **positional index** (`1`, `2`, …) — nth argument of the alias; or
+- a **named placeholder** (`branch`) — resolved through the same
+  first-appearance map the substitution engine uses, so `--complete-with
+  branch=…` and `--complete-with 1=…` target the same slot when `{branch}`
+  is the first placeholder.
+
+Both are stored in the alias entry and survive export/import/sync; edit
+them under `[complete]` in `qwik edit <name>`, and delete the table to
+remove them.
+
+## Emission per shell
+
+| Shell | Emitted definition |
+| --- | --- |
+| bash | `complete -F _qwik_complete_<name>` + `compgen -W "$(candidates)"` |
+| zsh | `compdef _qwik_complete_<name>` + `_describe` |
+| fish | `complete -c <name> -f -n "(count (commandline -opc) == N)"` |
+| PowerShell | `Register-ArgumentCompleter` |
+| cmd / nu / xonsh | nothing — the alias renders unchanged |
+
+The completion **command runs in your shell at `<Tab>` time, never in
+qwik** — qwik only renders the definition. So the candidate command's
+own output becomes the candidate list, and nothing new executes inside
+qwik itself.
+
+## Inheriting (`--complete-from`)
+
+The higher-leverage default for append-mode aliases wrapping a bare
+program: delegate to that program's existing completion system.
+
+```bash
+qwik add k "kubectl" --complete-from kubectl
+# bash: sources the kubectl completion loader and registers its function for `k`
+# zsh:  re-registers _kubectl for `k` when defined
+```
+
+This restores exactly what a raw `alias kubectl` would have inherited,
+with no configuration from the user beyond naming the program. Bash and
+zsh support delegation; other shells simply render nothing for it.
+
+## Where completions appear
+
+The definitions are appended after the alias definitions in `qwik init
+<shell>` output — so sourcing the hook installs both, and
+`qwik completion zsh --install`'s compinit machinery picks the `compdef`
+lines up in the usual zsh way.

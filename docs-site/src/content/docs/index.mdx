@@ -23,7 +23,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 		Type <code>gs</code> as a native shell command after a one-time hook install, or run <code>qwik -r gs</code> anywhere — scripts, CI, restricted shells — with no setup at all.
 	</Card>
 	<Card title="Arguments done right" icon="seti:config">
-		Template aliases with <code>{"{1}"}</code>, <code>{"{name}"}</code>, <code>{"{&#64;}"}</code>, <code>{"{*}"}</code>, and <code>{"{1:-default}"}</code>. Missing required arguments produce clear errors, never silently-empty output.
+		Template aliases with <code>{"{1}"}</code>, <code>{"{name}"}</code>, <code>{"{&#64;}"}</code>, <code>{"{*}"}</code>, and <code>{"{1:-default}"}</code>. Compiled to native shell syntax in the hook — no per-call process spawn — and missing required arguments produce clear errors, never silently-empty output.
 	</Card>
 	<Card title="Cross-platform" icon="window">
 		Rendered natively for bash, zsh, fish, PowerShell, cmd, Nushell, and Xonsh — with shell-aware quoting chosen by the shell that will run the command.
@@ -35,7 +35,10 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 		Tags, groups, fuzzy search, usage stats, a history-driven <code>qwik suggest</code>, and an interactive picker — your alias store stays discoverable as it grows.
 	</Card>
 	<Card title="Shareable" icon="link">
-		Export and import TOML files, sync through a dedicated git repo, or point an overlay at a team alias repository — read-only and shadow-safe.
+		Export and import TOML files, sync through a dedicated git repo, or point an overlay at a team alias repository — read-only, shadow-safe, and (optionally) SSH-signed with commit pinning. Ship a <code>.qwik.toml</code> with your repo for project-scoped commands.
+	</Card>
+	<Card title="Completes like a native command" icon="seti:json">
+		<code>gco &lt;Tab&gt;</code> offers branches, not filenames — declare per-argument candidates with <code>--complete-with</code>, or delegate to the wrapped program's own completion with <code>--complete-from</code>.
 	</Card>
 	<Card title="Fast startup" icon="rocket">
 		Interactive dependencies load lazily and shell renderers are cached, so hook-time invocations like <code>qwik init</code> stay quick.

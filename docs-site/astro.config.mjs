@@ -53,9 +53,13 @@ export default defineConfig({
           label: 'Guides',
           items: [
             { label: 'Alias Templates & Arguments', slug: 'guides/alias-templates' },
+            { label: 'Native Templates', slug: 'guides/native-templates' },
+            { label: 'Argument Completion', slug: 'guides/alias-completions' },
             { label: 'Shell Integration', slug: 'guides/shell-integration' },
+            { label: 'Project Aliases', slug: 'guides/project-aliases' },
             { label: 'Organizing Aliases', slug: 'guides/organizing' },
             { label: 'Sharing & Syncing', slug: 'guides/sharing' },
+            { label: 'Overlay Trust & Signing', slug: 'guides/overlay-trust' },
             { label: 'Conflict Detection', slug: 'guides/conflicts' },
             { label: 'Shell Completions', slug: 'guides/completions' },
             { label: 'Insights & Recovery', slug: 'guides/insights-and-recovery' },
