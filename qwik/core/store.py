@@ -28,6 +28,7 @@ __all__ = [
     "backup_sort_key",
     "get_store",
     "read_text_retried",
+    "replace_retried",
 ]
 
 # Maximum number of backup files to retain.
@@ -84,6 +85,32 @@ def read_text_retried(path: Path) -> str:
     for attempt in range(5):
         try:
             return path.read_text(encoding="utf-8")
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(delay)
+            delay *= 2
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+def replace_retried(temp: Path, target: Path) -> None:
+    """Atomically *replace* *target* with *temp*, retrying on Windows locks.
+
+    ``os.replace`` (rename) is atomic on POSIX and never fails for a
+    busy-but-open target; on Windows raising a destination open for read
+    (a concurrent unlocked ``Store.load()`` in another CLI process, AV
+    scanning, the indexer) fails the rename with ``PermissionError``
+    (WinError 5).  Every writer holds :class:`FileLock`, but readers
+    don't — that is by design, and POSIX tolerates it — so this retry
+    gives Windows the same semantics: wait for the momentary collision
+    to pass, then swap.  A genuinely held-open target (a debugger, a
+    locked-down share) still raises after the retries.
+    """
+    delay = 0.05
+    for attempt in range(5):
+        try:
+            temp.replace(target)
+            return
         except PermissionError:
             if attempt == 4:
                 raise
@@ -253,7 +280,7 @@ class Store:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(tomlkit.dumps(doc))
-            temp.replace(self._path)
+            replace_retried(temp, self._path)
         except BaseException:
             temp.unlink(missing_ok=True)
             raise
@@ -457,7 +484,7 @@ class Store:
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as fh:
                     fh.write(tomlkit.dumps(doc))
-                temp.replace(self._path)
+                replace_retried(temp, self._path)
             except BaseException:
                 temp.unlink(missing_ok=True)
                 raise
