@@ -1,0 +1,76 @@
+---
+title: Project Aliases
+description: Ship a .qwik.toml with your repo — aliases scoped to the project tree, with explicit trust.
+---
+
+A repository can ship its own commands. Drop a `.qwik.toml` in the repo
+root and qwik discovers it from the current directory upward, layering its
+aliases over the user store for shells running inside that tree. A new
+contributor gets the project's commands by cloning — no setup step,
+nothing to install.
+
+## The file
+
+```toml
+# .qwik.toml — committed to the repo
+version = 1
+
+[aliases.dev]
+command = "docker compose -f docker-compose.dev.yml up"
+description = "Start the dev stack"
+
+[aliases.t]
+command = "pytest -q {@}"
+```
+
+Precedence, highest first: **project → user → overlay**. A project alias
+with the same name as one of your own takes precedence inside the tree;
+`qwik list` marks aliases `(project)`, and `qwik show`/`project list` keep
+both layers inspectable.
+
+## Trust is mandatory and explicit
+
+A `.qwik.toml` arrives by `git clone` — from whoever wrote the repo — so
+it is **untrusted code by definition**. A newly-seen file is *inert*:
+
+- nothing from it is loaded, ever, until you run `qwik project trust` in
+  that directory,
+- `qwik list` tells you it exists and how to trust it,
+- `qwik init <shell>` prints a one-line reminder pointing at the file.
+
+```bash
+qwik project init      # scaffold a .qwik.toml in the current directory
+qwik project trust     # review + record trust (confirm prompt)
+qwik project untrust   # remove the trust record
+qwik project status    # discovery + trust state
+qwik project list      # merged view with (project) marks
+```
+
+Trust is recorded per absolute path plus a SHA-256 content hash in your
+config (`trusted.toml`). When the file changes after trusting, it reverts
+to inert — `qwik doctor`'s `project.trust` check reports `stale` — until
+you review and re-trust. Cloning a repository can never define commands
+in your shell by itself.
+
+## Shell refresh on directory change
+
+When a project file is discovered, `qwik init` adds a directory-change
+hook so the layer turns on and off as you move in and out of the tree:
+
+| Shell | Mechanism |
+| --- | --- |
+| bash | `cd` wrapper → `__qwik_project_refresh` |
+| zsh | `add-zsh-hook chpwd` |
+| fish | `--on-variable PWD` handler |
+
+The refresh re-runs `qwik init <shell>`, i.e. one process spawn per `cd` —
+the price of per-directory scoping. Per-alias execution inside the layer
+stays native (see [Alias Templates & Arguments](/guides/alias-templates/));
+only the layer composition pays.
+
+## Read-only layer
+
+Project aliases execute through `qwik run` and the hook like any other,
+but `qwik edit`, `qwik rm`, and `qwik rename` refuse them: the file belongs
+to the repo. Copy what you want to own into your user store by hand —
+or edit the file and let every project member benefit.
