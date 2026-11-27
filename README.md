@@ -471,6 +471,55 @@ runtime engine either way.
 | `{1:-default}` | Nth positional, falling back to `default` if missing |
 | `{name:-default}` | Named slot, falling back to `default` if the arg is missing |
 
+### Project-scoped aliases (`.qwik.toml`)
+
+A repository can ship its own commands.  Drop a `.qwik.toml` in the repo
+root; qwik discovers it from the current directory upward and layers its
+aliases over the user store for shells running inside that tree —
+precedence: **project → user → overlay**.
+
+```toml
+# .qwik.toml — committed to the repo
+version = 1
+
+[aliases.dev]
+command = "docker compose -f docker-compose.dev.yml up"
+description = "Start the dev stack"
+
+[aliases.t]
+command = "pytest -q {@}"
+```
+
+```bash
+qwik project init      # scaffold a .qwik.toml
+qwik project trust     # opt in to this directory's file (interactive)
+qwik project untrust   # remove the trust record
+qwik project status    # discovery + trust state
+qwik project list      # merged view with (project) marks
+```
+
+**Trust is mandatory and explicit.**  A `.qwik.toml` arrives by
+`git clone` — from whoever wrote the repo — so it is untrusted code by
+definition.  A newly-seen file is *inert*: `qwik list` tells you it
+exists and how to trust it, `qwik run`/`pick`/the hook load nothing from
+it.  `qwik project trust` shows the file and records trust per absolute
+path plus a SHA-256 content hash; when the file changes afterwards it
+reverts to inert (doctor reports `stale`) until you re-trust it.  Cloning
+a repository can never define commands in your shell by itself.
+
+The `init` hook emits a directory-change refresh (bash: `cd` wrapper,
+zsh: `chpwd` hook, fish: `--on-variable PWD`) so the project layer turns
+on/off as you move in and out of the tree.  That refresh re-runs
+`qwik init <shell>`, i.e. one process spawn per `cd` — the price of
+per-directory scoping, documented so it's a choice, not a surprise.
+Per-alias execution stays native (microseconds); only the layer
+composition pays.
+
+Project aliases are read-only: `qwik run` executes them and `edit`/
+`remove`/`rename` refuse them — copy the file's contents into your own
+store if you want to own them.  Doctor reports the discovered layer and
+its trust state (`project.trust` check).
+
 ### Argument completion (`--complete-with` / `--complete-from`)
 
 A native shell alias inherits the wrapped command's completion; a function

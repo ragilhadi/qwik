@@ -60,6 +60,15 @@ class FishRenderer(ShellRenderer):
 
         return fish_completion(name, alias)
 
+    def render_cd_refresh_footer(self) -> str:
+        """Re-render the hook on directory change (fish: PWD variable)."""
+        return (
+            "# qwik project layer: re-resolve .qwik.toml on directory change\n"
+            "function __qwik_project_refresh --on-variable PWD\n"
+            "    qwik init fish | source -\n"
+            "end"
+        )
+
     def rc_path(self) -> Path | None:
         """Return the fish config path honoring env overrides."""
         env_val = os.environ.get("__fish_config_dir")

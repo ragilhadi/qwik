@@ -186,8 +186,13 @@ def render_list_table(
         ):
             continue
         style = "dim" if not alias.enabled else ""
-        is_overlay = name not in store.aliases
-        display_name = f"{name} [dim](overlay)[/dim]" if is_overlay else name
+        if name in store.aliases:
+            marker = ""
+        elif name in store.project_aliases:
+            marker = "[dim](project)[/dim]"
+        else:
+            marker = "[dim](overlay)[/dim]"
+        display_name = f"{name} {marker}".rstrip() if marker else name
         command = alias.resolve_command(platform, None) if platform else alias.command
         table.add_row(
             display_name,

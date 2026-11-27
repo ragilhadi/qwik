@@ -102,7 +102,14 @@ def init_shell_command(
             print_error(str(exc), console=console)
             raise typer.Exit(1) from exc
 
-        snippet = renderer.render_all(data.all_aliases())
+        from qwik.core.project import PROJECT_FILE_NAME, discover_project
+
+        project_layer = discover_project()
+        # Trusted, stale, or untrusted: any discovered project file makes
+        # the hook directory-aware so entering/leaving the tree re-renders.
+        # An untrusted file stays inert — only trusted files contribute
+        # aliases; the refresh just keeps the state current.
+        snippet = renderer.render_all(data.all_aliases(), cd_refresh=project_layer is not None)
     finally:
         if no_native:
             if _no_native_backup is None:
@@ -111,6 +118,11 @@ def init_shell_command(
                 os.environ["QWIK_NO_NATIVE"] = _no_native_backup
 
     if not install:
+        if project_layer is not None and project_layer.trust != "trusted":
+            console.print(
+                f"# untrusted {PROJECT_FILE_NAME} at {project_layer.path}"
+                " — inert until `qwik project trust`"
+            )
         console.print(snippet)
         raise typer.Exit(0)
 

@@ -60,6 +60,22 @@ class BashRenderer(ShellRenderer):
 
         return bash_completion(name, alias)
 
+    def render_cd_refresh_footer(self) -> str:
+        """Re-render the hook on directory change (bash: cd wrapper).
+
+        Wrapping ``cd`` re-evaluates the project layer exactly when the
+        project tree is entered/left; ``PROMPT_COMMAND`` would also fire
+        on every prompt with no directory change, paying a spawn for
+        nothing.
+        """
+        return (
+            "# qwik project layer: re-resolve .qwik.toml on directory change\n"
+            "__qwik_project_refresh() {\n"
+            '    eval "$(qwik init bash 2>/dev/null)"\n'
+            "}\n"
+            'cd() { builtin cd "$@" && __qwik_project_refresh; }'
+        )
+
     def rc_path(self) -> Path | None:
         """Return ``~/.bashrc``."""
         return Path.home() / ".bashrc"

@@ -47,6 +47,9 @@ def pick_command() -> None:
 
     name = result.name
     alias = data.get(name)
+    if alias is None and name in data.project_aliases:
+        # Read-only project layer, like overlay: run without copying.
+        alias = data.project_aliases[name]
     if alias is None and name in data.overlay_aliases:
         alias = data.overlay_aliases[name]
         with store.mutate() as fresh_data:
