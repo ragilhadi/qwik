@@ -24,7 +24,7 @@ class FileLock:
         but the default deadline must absorb worst-case real time, not
         best-case: on a loaded machine a just-written TOML file can be
         held externally for an antivirus real-time scan (see
-        :func:`qwik.core.store.read_backup_text`), and twenty concurrent
+        :func:`qwik.core.store.read_text_retried`), and twenty concurrent
         commands queue behind each other sequentially. A 5s default
         failed exactly that way on a loaded Windows runner (every waiter
         after ~5s of queue time died with a traceback); 30s keeps the

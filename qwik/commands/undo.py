@@ -18,7 +18,7 @@ import typer
 
 from qwik.core.diff import diff_stores
 from qwik.core.models import AliasStore
-from qwik.core.store import get_store, read_backup_text
+from qwik.core.store import get_store, read_text_retried
 from qwik.ui.prompts import print_error, print_info, print_success, prompt_confirm
 from qwik.ui.tables import render_backup_table
 from qwik.ui.theme import get_console
@@ -37,7 +37,7 @@ __all__ = ["undo_command"]
 def _parse_backup(backup_path: Path) -> AliasStore | None:
     """Load *backup_path* as an :class:`AliasStore`, or ``None`` if corrupt."""
     try:
-        doc = tomlkit.parse(read_backup_text(backup_path))
+        doc = tomlkit.parse(read_text_retried(backup_path))
         return AliasStore.model_validate(doc.unwrap())
     except Exception:
         return None

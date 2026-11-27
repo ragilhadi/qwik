@@ -38,7 +38,7 @@ from qwik.core.shell_detect import (
 from qwik.core.store import (
     backup_sort_key,
     get_store,
-    read_backup_text,
+    read_text_retried,
 )
 from qwik.shells.base import supported_shells
 from qwik.ui.prompts import (
@@ -67,7 +67,6 @@ _detect_shell = detect_shell
 _shell_name_from_env = shell_name_from_env
 _shell_name_from_proc = shell_name_from_proc
 _backup_sort_key = backup_sort_key
-_read_backup_text = read_backup_text
 
 Status = Literal["ok", "warn", "error"]
 
@@ -105,7 +104,7 @@ def latest_valid_backup(backup_dir: Path) -> Path | None:
     candidates = sorted(backup_dir.glob("aliases-*.toml"), key=backup_sort_key, reverse=True)
     for path in candidates:
         try:
-            AliasStore.model_validate(_parse_toml_dict(read_backup_text(path)))
+            AliasStore.model_validate(_parse_toml_dict(read_text_retried(path)))
         except Exception:
             continue
         return path
@@ -585,7 +584,7 @@ def _merge_state_present(repo: Path) -> bool:
 def _load_backup_store(path: Path) -> AliasStore | None:
     """Parse a backup file into an :class:`AliasStore`, ``None`` if corrupt."""
     try:
-        return AliasStore.model_validate(_parse_toml_dict(read_backup_text(path)))
+        return AliasStore.model_validate(_parse_toml_dict(read_text_retried(path)))
     except Exception:
         return None
 
