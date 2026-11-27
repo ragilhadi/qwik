@@ -242,10 +242,14 @@ def test_init_notes_untrusted_file(project_dir: Path) -> None:
 
 def test_init_bash_cd_wrapper_runs_real_bash(project_dir: Path) -> None:
     """The emitted cd wrapper actually re-evaluates in a real bash."""
-    import shutil
     import subprocess
+    import sys
 
-    if shutil.which("bash") is None:
+    if sys.platform == "win32":
+        pytest.skip("POSIX shell fixture script")
+    from tests._shells import resolve_shell_binary
+
+    if resolve_shell_binary("bash") is None:
         pytest.skip("bash not installed")
     (project_dir / PROJECT_FILE_NAME).write_text(_TRUST_FILE, encoding="utf-8")
     # Trust via the TrustStore directly (the CLI prompt is interactive).
@@ -262,8 +266,12 @@ def test_init_bash_cd_wrapper_runs_real_bash(project_dir: Path) -> None:
     hook = runner.invoke(app, ["init", "bash"]).output
     # The refresh re-eval happens inside the shell; assert the wrapper at
     # least fires without error (stderr empty) on a real cd.
+    from tests._shells import resolve_shell_binary
+
+    binary = resolve_shell_binary("bash")
+    assert binary is not None
     result = subprocess.run(
-        ["bash", "-c", "shopt -s expand_aliases\n" + hook + "\ncd /tmp\n"],
+        [binary, "-c", "shopt -s expand_aliases\n" + hook + "\ncd /tmp\n"],
         capture_output=True,
         text=True,
         check=False,
