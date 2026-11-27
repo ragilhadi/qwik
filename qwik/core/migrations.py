@@ -17,7 +17,7 @@ __all__ = [
     "migrator",
 ]
 
-LATEST_VERSION: int = 2
+LATEST_VERSION: int = 3
 
 _Migration = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -81,4 +81,19 @@ def _v1_to_v2(data: dict[str, Any]) -> dict[str, Any]:
     via the version gate instead of tripping over unknown keys.
     """
     data["version"] = 2
+    return data
+
+
+@migrator(2)
+def _v2_to_v3(data: dict[str, Any]) -> dict[str, Any]:
+    """v2 → v3 identity migration: introduce per-alias completion commands.
+
+    v3 adds the optional ``complete`` table to each alias (mapping
+    placeholder references to completion commands).  The v2 shape is
+    otherwise unchanged and the field is optional, so no data
+    transformation is needed — the bump only records that this store may
+    carry completion definitions, letting an older qwik refuse the file
+    cleanly via the version gate instead of tripping over unknown keys.
+    """
+    data["version"] = 3
     return data

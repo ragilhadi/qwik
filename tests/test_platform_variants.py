@@ -251,13 +251,13 @@ class TestV2Migration:
         )
         store = self._store(tmp_path)
         loaded = store.load()
-        assert loaded.version == 2
+        assert loaded.version == 3
         alias = loaded.get("open")
         assert alias is not None
         assert alias.command == "xdg-open {1}"
         assert alias.command_variants == {"command_macos": "open {1}"}
         on_disk = store.path.read_text(encoding="utf-8")
-        assert "version = 2" in on_disk
+        assert "version = 3" in on_disk
         assert len(list(store._backup_dir.glob("aliases-*.toml"))) == 1
 
     def test_v1_store_without_variants_migrates_cleanly(self, tmp_path: Path) -> None:
@@ -272,7 +272,7 @@ class TestV2Migration:
         )
         store = self._store(tmp_path)
         loaded = store.load()
-        assert loaded.version == 2
+        assert loaded.version == 3
         assert loaded.get("gs") is not None
         assert loaded.get("gs").command_variants == {}
 
@@ -616,7 +616,7 @@ class TestVariantRoundTrips:
         runner.invoke(app, ["add", "open", "open {1}", "--platform", "macos"])
         on_disk = _loaded().path.read_text(encoding="utf-8")
         assert 'command_macos = "open {1}"' in on_disk
-        assert "version = 2" in on_disk
+        assert "version = 3" in on_disk
 
     def test_toml_export_import_round_trip(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

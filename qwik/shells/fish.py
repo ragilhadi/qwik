@@ -20,6 +20,7 @@ class FishRenderer(ShellRenderer):
     """Emit ``fish`` ``alias`` and function definitions."""
 
     supports_native_templates = True
+    supports_completions = True
 
     @property
     def shell_name(self) -> str:
@@ -52,6 +53,12 @@ class FishRenderer(ShellRenderer):
             return f'function {name}\n    qwik run "{name}" $argv\nend'
         escaped = alias.command.replace("\\", "\\\\").replace("'", "\\'")
         return f"alias {name} '{escaped}'"
+
+    def render_completion_alias(self, name: str, alias: Alias) -> str:
+        """Return the fish completion definition for *name*, if declared."""
+        from qwik.shells.completions import fish_completion
+
+        return fish_completion(name, alias)
 
     def rc_path(self) -> Path | None:
         """Return the fish config path honoring env overrides."""

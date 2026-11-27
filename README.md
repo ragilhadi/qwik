@@ -81,6 +81,8 @@ qwik add gs "git status" --tag git --description "Repo status"
 qwik add gs "git status" --group git
 qwik add gs "git status" --force       # overwrite existing
 qwik add open "open {1}" --platform macos   # platform-conditional variant
+qwik add gco "git checkout {branch}" --complete-with 'branch=git branch --format="%(refname:short)"'
+qwik add k "kubectl" --complete-from kubectl  # inherit kubectl's completion
 qwik add                               # interactive mode
 ```
 
@@ -468,6 +470,35 @@ runtime engine either way.
 | `{*}` | All arguments as a single quoted string |
 | `{1:-default}` | Nth positional, falling back to `default` if missing |
 | `{name:-default}` | Named slot, falling back to `default` if the arg is missing |
+
+### Argument completion (`--complete-with` / `--complete-from`)
+
+A native shell alias inherits the wrapped command's completion; a function
+wrapper doesn't — that's why `gco <Tab>` offers filenames instead of
+branches. qwik lets an alias declare per-argument completion, emitted into
+the hook as native completion definitions:
+
+```bash
+qwik add gco "git checkout {branch}" \
+  --complete-with 'branch=git branch --format="%(refname:short)"'
+# gco <Tab>  →  main, feat/x, …   (bash/zsh/fish/pwsh)
+
+qwik add k "kubectl" --complete-from kubectl
+# k <Tab> delegates to kubectl's own completion (bash/zsh)
+```
+
+- `--complete-with KEY="COMMAND"` maps an argument to a command whose
+  output supplies the candidates; `KEY` is a positional index (`1`,
+  `2`, …) or a named placeholder (`branch`). Repeatable.
+- `--complete-from PROGRAM` delegates every argument to that program's
+  installed completion (restoring what a raw `alias` would inherit).
+- Emitting is per shell: bash (`complete -F` + `compgen`), zsh
+  (`compdef` + `_describe`), fish (`complete -c`), PowerShell
+  (`Register-ArgumentCompleter`); `cmd`/`nu`/`xonsh` render nothing for
+  completions.
+- The completion *command runs in your shell at `<Tab>` time — never
+  qwik. Stored in the alias entry (`[aliases.<name>.complete]`), so it
+  survives export/import/sync; edit it with `qwik edit <name>`.
 
 ---
 

@@ -22,7 +22,6 @@ these hooks are used in practice.
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -71,19 +70,9 @@ HOOK_TESTED_SHELLS = ["bash", "zsh", "fish", "pwsh", "nu", "xonsh"]
 # purely to print "install a WSL distribution" and exit, regardless of
 # what's actually installed, and that GitHub's windows-latest runner
 # image puts ahead of Git's bin directory on PATH.
-_WINDOWS_GIT_BASH_CANDIDATES = (
-    r"C:\Program Files\Git\bin\bash.exe",
-    r"C:\Program Files\Git\usr\bin\bash.exe",
-)
-
-
-def _resolve_shell_binary(name: str) -> str | None:
-    """Resolve *name* to the binary to invoke, working around PATH quirks."""
-    if name == "bash" and sys.platform == "win32":
-        for candidate in _WINDOWS_GIT_BASH_CANDIDATES:
-            if Path(candidate).exists():
-                return candidate
-    return shutil.which(name)
+# Windows PATH quirk workaround lives in tests/_shells.py so the
+# completion/project integration modules resolve the same correct bash.
+from tests._shells import resolve_shell_binary as _resolve_shell_binary  # noqa: E402
 
 
 def _shell_available(name: str) -> bool:

@@ -17,6 +17,7 @@ class ZshRenderer(ShellRenderer):
     """Emit ``zsh`` ``alias`` and function definitions."""
 
     supports_native_templates = True
+    supports_completions = True
 
     @property
     def shell_name(self) -> str:
@@ -48,6 +49,12 @@ class ZshRenderer(ShellRenderer):
             return f'{name}() {{\n    qwik run "{name}" "$@"\n}}'
         escaped = alias.command.replace("'", "'\"'\"'")
         return f"alias {name}='{escaped}'"
+
+    def render_completion_alias(self, name: str, alias: Alias) -> str:
+        """Return the zsh completion definition for *name*, if declared."""
+        from qwik.shells.completions import zsh_completion
+
+        return zsh_completion(name, alias)
 
     def rc_path(self) -> Path | None:
         """Return ``~/.zshrc``."""

@@ -19,6 +19,7 @@ class PwshRenderer(ShellRenderer):
     """Emit PowerShell function definitions."""
 
     supports_native_templates = True
+    supports_completions = True
 
     @property
     def shell_name(self) -> str:
@@ -55,6 +56,12 @@ class PwshRenderer(ShellRenderer):
             return f'function {name} {{\n    qwik run "{name}" @args\n}}'
         escaped = alias.command.replace("'", "''")
         return f"function {name} {{\n    & ([ScriptBlock]::Create('{escaped}')) @args\n}}"
+
+    def render_completion_alias(self, name: str, alias: Alias) -> str:
+        """Return the pwsh completion definition for *name*, if declared."""
+        from qwik.shells.completions import pwsh_completion
+
+        return pwsh_completion(name, alias)
 
     def rc_path(self) -> Path | None:
         """Return the PowerShell profile path, Windows-aware."""

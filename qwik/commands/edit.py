@@ -83,6 +83,19 @@ def edit_alias(name: str) -> None:
     doc.add("group", alias.group or "")
     doc.add("description", alias.description)
     doc.add("enabled", alias.enabled)
+    if alias.complete:
+        doc.add(
+            tomlkit.comment(
+                'Completions ([complete.KEY] = "COMMAND" mapping placeholder'
+                " references to candidate commands; delete the table to remove"
+                " them)"
+            )
+        )
+    if alias.complete:
+        complete_table = tomlkit.table()
+        for comp_key in sorted(alias.complete):
+            complete_table.add(comp_key, alias.complete[comp_key])
+        doc.add("complete", complete_table)
     snippet = tomlkit.dumps(doc)
 
     with tempfile.NamedTemporaryFile(
@@ -167,6 +180,32 @@ def edit_alias(name: str) -> None:
                 update["command_variants"] = parsed_variants
 
             merged = fresh_alias.model_dump()
+            # Completion table: present in the snippet → replace the whole
+            # mapping (each value must be a non-empty string); absent →
+            # drop all completions (the only way to remove them).
+            if "complete" in parsed:
+                parsed_complete = parsed["complete"]
+                if not isinstance(parsed_complete, dict):
+                    print_error(
+                        "Edit completions as a [complete] table with"
+                        ' KEY = "COMMAND" rows, not a bare string.',
+                        console=console,
+                    )
+                    raise typer.Exit(1)
+                new_complete: dict[str, str] = {}
+                for comp_key, comp_raw in sorted(parsed_complete.items()):
+                    comp_value = str(comp_raw).strip()
+                    if not comp_value:
+                        print_error(
+                            f"[complete.{comp_key}] is empty; delete the row"
+                            " to remove that completion.",
+                            console=console,
+                        )
+                        raise typer.Exit(1)
+                    new_complete[str(comp_key)] = comp_value
+                update["complete"] = new_complete
+            elif fresh_alias.complete:
+                update["complete"] = {}
             merged.update(update)
             try:
                 fresh_data.aliases[name] = Alias.model_validate(merged)
